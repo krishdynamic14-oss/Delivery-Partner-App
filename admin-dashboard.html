@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Dashboard</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<!-- Floating stock alert -->
+<div class="float-alert" onclick="location.href='stock.html'">
+  <span class="material-symbols-rounded">warning</span> 8 items low
+</div>
+
+<!-- Profile Drawer Overlay -->
+<div class="sheet-overlay" id="drawer-ov" onclick="closeProfile()"></div>
+
+<!-- Profile Drawer -->
+<div class="profile-drawer" id="profile-drawer">
+  <div class="drawer-header">
+    <div class="drawer-avatar" id="drawer-initials">A</div>
+    <div class="drawer-name" id="drawer-name">Admin User</div>
+    <div class="drawer-role" id="drawer-role">Admin · Dynamic Bazar</div>
+    <div class="drawer-badge"><div class="sync-dot"></div> Online</div>
+  </div>
+  <div class="drawer-menu">
+    <div class="drawer-item" onclick="location.href='admin-dashboard.html';closeProfile()">
+      <span class="material-symbols-rounded">dashboard</span>
+      <div><div class="drawer-item-label">Dashboard</div></div>
+    </div>
+    <div class="drawer-item" onclick="location.href='postman-profile.html';closeProfile()">
+      <span class="material-symbols-rounded">person</span>
+      <div><div class="drawer-item-label">My Profile</div><div class="drawer-item-sub">Stats & earnings</div></div>
+    </div>
+    <div class="drawer-item" onclick="location.href='live-map.html';closeProfile()">
+      <span class="material-symbols-rounded">map</span>
+      <div><div class="drawer-item-label">Live Map</div><div class="drawer-item-sub">84 postmen active</div></div>
+    </div>
+    <div class="drawer-item" onclick="location.href='settlement.html';closeProfile()">
+      <span class="material-symbols-rounded">account_balance_wallet</span>
+      <div><div class="drawer-item-label">Cash Settlement</div><div class="drawer-item-sub">EOD handover</div></div>
+    </div>
+    <div class="drawer-item" onclick="location.href='event-logs.html';closeProfile()">
+      <span class="material-symbols-rounded">history</span>
+      <div><div class="drawer-item-label">Event Logs</div></div>
+    </div>
+    <div class="drawer-item" onclick="showToast('Settings coming soon','info')">
+      <span class="material-symbols-rounded">settings</span>
+      <div><div class="drawer-item-label">Settings</div></div>
+    </div>
+  </div>
+  <div class="drawer-logout" onclick="logout()">
+    <span class="material-symbols-rounded">logout</span> Sign Out
+  </div>
+</div>
+
+<div class="screen">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="avatar" onclick="openProfile()">A</div>
+      <div>
+        <div class="header-title">Mahotsav HQ</div>
+        <div class="header-sub">Admin Panel</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="sync-pill"><div class="sync-dot"></div>Live</div>
+      <button class="icon-btn" onclick="location.href='live-map.html'"><span class="material-symbols-rounded">map</span></button>
+      <button class="icon-btn" onclick="openProfile()"><span class="material-symbols-rounded">menu</span></button>
+    </div>
+  </header>
+
+  <div class="scroll-area" style="padding:16px 16px 80px;">
+    <div style="margin-bottom:20px;">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:21px;font-weight:800;margin-bottom:3px;">Good Morning 👋</div>
+      <div style="font-size:12px;color:var(--muted);">Diwali Season · Oct 24, 2023</div>
+    </div>
+
+    <div class="hero-card" style="margin-bottom:10px;">
+      <div class="card-label">Total COD Collected</div>
+      <div class="card-value">₹4,82,590</div>
+      <div class="card-trend"><span class="material-symbols-rounded">trending_up</span>+12.4% vs yesterday</div>
+    </div>
+
+    <div class="stat-grid" style="margin-bottom:10px;">
+      <div class="stat-card" onclick="location.href='orders.html'" style="cursor:pointer;">
+        <div class="stat-icon" style="background:rgba(78,156,255,0.14);color:var(--blue);"><span class="material-symbols-rounded" style="font-size:16px;">package_2</span></div>
+        <div class="card-label">Today's Orders</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:var(--blue);">1,284</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">75% target hit</div>
+      </div>
+      <div class="stat-card" onclick="location.href='live-map.html'" style="cursor:pointer;">
+        <div class="stat-icon" style="background:rgba(0,200,150,0.14);color:var(--green);"><span class="material-symbols-rounded" style="font-size:16px;">directions_bike</span></div>
+        <div class="card-label">Active Partners</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:var(--green);">84/86</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">2 currently offline</div>
+      </div>
+      <div class="stat-card" onclick="location.href='postman-profile.html'" style="cursor:pointer;">
+        <div class="stat-icon" style="background:rgba(255,179,71,0.14);color:var(--amber);"><span class="material-symbols-rounded" style="font-size:16px;">speed</span></div>
+        <div class="card-label">Performance</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:var(--amber);">9.4/10</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">Excellent</div>
+      </div>
+      <div class="stat-card" onclick="location.href='orders.html'" style="cursor:pointer;">
+        <div class="stat-icon" style="background:rgba(255,75,110,0.14);color:var(--red);"><span class="material-symbols-rounded" style="font-size:16px;">assignment_return</span></div>
+        <div class="card-label">RTO Pending</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:var(--red);">42</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">↓8 from yesterday</div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <a href="assign-orders.html" style="text-decoration:none;">
+        <div class="card" style="display:flex;align-items:center;gap:10px;padding:14px;">
+          <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--orange),#ff9500);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:17px;color:#fff;">assignment_ind</span>
+          </div>
+          <div><div style="font-size:12px;font-weight:700;">Assign Orders</div><div style="font-size:10px;color:var(--muted);">128 pending</div></div>
+        </div>
+      </a>
+      <a href="live-map.html" style="text-decoration:none;">
+        <div class="card" style="display:flex;align-items:center;gap:10px;padding:14px;">
+          <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--blue),#1a6fd8);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:17px;color:#fff;">location_on</span>
+          </div>
+          <div><div style="font-size:12px;font-weight:700;">Live Map</div><div style="font-size:10px;color:var(--muted);">84 active</div></div>
+        </div>
+      </a>
+      <a href="settlement.html" style="text-decoration:none;">
+        <div class="card" style="display:flex;align-items:center;gap:10px;padding:14px;">
+          <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--green),#009070);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:17px;color:#fff;">account_balance_wallet</span>
+          </div>
+          <div><div style="font-size:12px;font-weight:700;">Settlement</div><div style="font-size:10px;color:var(--muted);">EOD handover</div></div>
+        </div>
+      </a>
+      <a href="earnings.html" style="text-decoration:none;">
+        <div class="card" style="display:flex;align-items:center;gap:10px;padding:14px;">
+          <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:17px;color:#fff;">payments</span>
+          </div>
+          <div><div style="font-size:12px;font-weight:700;">Earnings</div><div style="font-size:10px;color:var(--muted);">₹12.4L total</div></div>
+        </div>
+      </a>
+    </div>
+
+    <div class="section-title">Live Activity</div>
+
+    <div class="activity-item" style="cursor:pointer;" onclick="showToast('Order #FEST-98241 · Delivered · ₹4,850 collected','success')">
+      <div class="act-icon act-delivered"><span class="material-symbols-rounded">check_circle</span></div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;">#FEST-98241</div>
+        <div style="font-size:11px;color:var(--muted);">Ahmedabad · Viramgam · Raj Kumar</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--amber);">₹4,850</div>
+        <span class="badge badge-delivered">Delivered</span>
+      </div>
+    </div>
+
+    <!-- WhatsApp quick send demo -->
+    <div class="activity-item" style="cursor:pointer;">
+      <div class="act-icon act-pending"><span class="material-symbols-rounded">local_shipping</span></div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;">#FEST-98235</div>
+        <div style="font-size:11px;color:var(--muted);">Surat · Udhna</div>
+        <div style="margin-top:5px;">
+          <span class="wa-btn" onclick="showToast('WhatsApp tracking sent to customer ✓','success')">
+            <span class="material-symbols-rounded" style="font-size:13px;">send</span> Send Tracking
+          </span>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--amber);">₹12,200</div>
+        <span class="badge badge-pending">Out for Delivery</span>
+      </div>
+    </div>
+
+    <div class="activity-item">
+      <div class="act-icon act-rto"><span class="material-symbols-rounded">assignment_return</span></div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;">#FEST-98218</div>
+        <div style="font-size:11px;color:var(--muted);">Vadodara · Manjalpur</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--amber);">₹2,150</div>
+        <span class="badge badge-rto">RTO</span>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item nav-active" onclick="location.href='admin-dashboard.html'">
+      <span class="material-symbols-rounded">dashboard</span><span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item" onclick="location.href='orders.html'">
+      <span class="material-symbols-rounded">inventory_2</span><span class="nav-label">Orders</span>
+    </div>
+    <div class="nav-item" onclick="location.href='earnings.html'">
+      <span class="material-symbols-rounded">payments</span><span class="nav-label">Earnings</span>
+    </div>
+    <div class="nav-item" onclick="location.href='stock.html'">
+      <span class="material-symbols-rounded">warehouse</span><span class="nav-label">Stock</span>
+    </div>
+  </nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Delivery</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.priority-tag { display:inline-flex;align-items:center;gap:4px;background:rgba(255,75,110,0.14);border:1px solid rgba(255,75,110,0.3);padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;color:var(--red);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em; }
+.cod-box { display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,rgba(255,107,0,0.14),rgba(255,179,71,0.09));border:1px solid rgba(255,107,0,0.22);border-radius:16px;padding:16px 18px; }
+.call-pill { display:inline-flex;align-items:center;gap:4px;margin-top:7px;background:rgba(0,200,150,0.1);border:1px solid rgba(0,200,150,0.22);border-radius:99px;padding:5px 12px;font-size:11px;color:var(--green);font-weight:600;cursor:pointer; }
+</style>
+</head>
+<body>
+
+<!-- Profile Drawer Overlay -->
+<div class="sheet-overlay" id="drawer-ov" onclick="closeProfile()"></div>
+<div class="profile-drawer" id="profile-drawer">
+  <div class="drawer-header">
+    <div class="drawer-avatar" id="drawer-initials">R</div>
+    <div class="drawer-name" id="drawer-name">Raj Kumar</div>
+    <div class="drawer-role" id="drawer-role">Postman · Dynamic Bazar</div>
+    <div class="drawer-badge"><div class="sync-dot"></div> Online</div>
+  </div>
+  <div class="drawer-menu">
+    <div class="drawer-item" onclick="location.href='delivery-flow.html';closeProfile()"><span class="material-symbols-rounded">local_shipping</span><div><div class="drawer-item-label">My Delivery</div></div></div>
+    <div class="drawer-item" onclick="location.href='postman-profile.html';closeProfile()"><span class="material-symbols-rounded">person</span><div><div class="drawer-item-label">My Profile</div><div class="drawer-item-sub">Stats & rank</div></div></div>
+    <div class="drawer-item" onclick="location.href='settlement.html';closeProfile()"><span class="material-symbols-rounded">account_balance_wallet</span><div><div class="drawer-item-label">Cash Handover</div><div class="drawer-item-sub">Submit today's COD</div></div></div>
+    <div class="drawer-item" onclick="location.href='earnings.html';closeProfile()"><span class="material-symbols-rounded">payments</span><div><div class="drawer-item-label">My Earnings</div></div></div>
+  </div>
+  <div class="drawer-logout" onclick="logout()"><span class="material-symbols-rounded">logout</span> Sign Out</div>
+</div>
+
+<div class="screen">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="avatar" onclick="openProfile()">R</div>
+      <div><div class="header-title">Raj Kumar</div><div class="header-sub">Postman · Online</div></div>
+    </div>
+    <div class="header-actions">
+      <div class="sync-pill"><div class="sync-dot"></div>GPS</div>
+      <button class="icon-btn" onclick="openProfile()"><span class="material-symbols-rounded">menu</span></button>
+    </div>
+  </header>
+
+  <!-- Step Tracker -->
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);">
+    <div class="step-tracker">
+      <div class="step step-done">
+        <div class="step-circle"><span class="material-symbols-rounded" style="font-size:13px;">check</span></div>
+        <div class="step-label">Navigate</div>
+      </div>
+      <div style="flex:1;height:2px;background:var(--green);margin-top:13px;"></div>
+      <div class="step step-done">
+        <div class="step-circle"><span class="material-symbols-rounded" style="font-size:13px;">check</span></div>
+        <div class="step-label">Reached</div>
+      </div>
+      <div style="flex:1;height:2px;background:var(--green);margin-top:13px;"></div>
+      <div class="step step-active" id="step-verify">
+        <div class="step-circle">3</div>
+        <div class="step-label">Verify</div>
+      </div>
+      <div style="flex:1;height:2px;background:var(--border);margin-top:13px;"></div>
+      <div class="step step-todo">
+        <div class="step-circle">4</div>
+        <div class="step-label">Collect</div>
+      </div>
+      <div style="flex:1;height:2px;background:var(--border);margin-top:13px;"></div>
+      <div class="step step-todo">
+        <div class="step-circle">5</div>
+        <div class="step-label">Confirm</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div style="padding:14px 16px 14px;background:linear-gradient(180deg,rgba(255,107,0,0.08) 0%,transparent 100%);border-bottom:1px solid var(--border);">
+    <div class="priority-tag"><span class="material-symbols-rounded" style="font-size:11px;">priority_high</span>Priority Order</div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;margin-bottom:3px;">#DB-8821</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Royal Festive Assortment · Power Bank 10000mAh</div>
+    <div class="cod-box">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em;">Collect COD</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:800;color:var(--amber);">₹4,250</div>
+      </div>
+      <button onclick="showToast('COD collection recorded ✓','success')" style="background:linear-gradient(135deg,var(--orange),#ff9500);border:none;border-radius:12px;padding:10px 16px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;box-shadow:0 4px 14px rgba(255,107,0,0.38);">
+        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:middle;">currency_rupee</span> Collect
+      </button>
+    </div>
+  </div>
+
+  <div class="scroll-area" style="padding:14px 16px 80px;">
+
+    <div class="info-card">
+      <span class="material-symbols-rounded info-icon">location_on</span>
+      <div>
+        <div class="info-label">Delivery Address</div>
+        <div class="info-value">42, Shivam Society, Opp. Big Bazaar,<br>Maninagar, Ahmedabad – 380008</div>
+        <div style="margin-top:8px;display:flex;gap:6px;">
+          <button onclick="showToast('Opening in maps…','info')" style="background:rgba(78,156,255,0.1);border:1px solid rgba(78,156,255,0.22);border-radius:99px;padding:5px 12px;color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:13px;">navigation</span> Navigate
+          </button>
+          <button onclick="showToast('Sharing location with admin ✓','success')" style="background:rgba(0,200,150,0.08);border:1px solid rgba(0,200,150,0.18);border-radius:99px;padding:5px 12px;color:var(--green);font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:13px;">share_location</span> Share
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <span class="material-symbols-rounded info-icon">person</span>
+      <div style="flex:1;">
+        <div class="info-label">Customer</div>
+        <div class="info-value">Sunita Patel · XXXXXX4521</div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <div class="call-pill" onclick="showToast('Calling XXXXXX4521…','info')">
+            <span class="material-symbols-rounded">call</span> Call
+          </div>
+          <span class="wa-btn" onclick="showToast('Tracking sent via WhatsApp ✓','success')">
+            <span class="material-symbols-rounded" style="font-size:13px;">send</span> WA
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:4px;">Call Status</div>
+    <div class="pill-row" style="margin-bottom:10px;" id="call-status-row">
+      <div class="pill pill-active" onclick="selectStatus(this,'reached')">Reached</div>
+      <div class="pill" onclick="selectStatus(this,'ring')">Ring</div>
+      <div class="pill" onclick="selectStatus(this,'nr')">No Response</div>
+      <div class="pill" onclick="selectStatus(this,'so')">Switch Off</div>
+    </div>
+
+    <!-- Smart hint — shown when NR selected -->
+    <div class="smart-hint" id="smart-hint" style="display:none;">
+      <span class="material-symbols-rounded">tips_and_updates</span>
+      <div class="smart-hint-text">
+        <strong style="color:var(--blue);">Smart Hint:</strong> Sunita Patel is usually reachable between <strong>5–7 PM</strong> based on 3 past deliveries. Try calling this evening.
+      </div>
+    </div>
+
+    <div class="section-title">Delivery Proof</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;" id="proof-grid">
+      <div id="proof-1" style="aspect-ratio:1;border-radius:14px;border:1.5px dashed var(--border);background:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;" onclick="captureProof('proof-1','Open Box')">
+        <span class="material-symbols-rounded" style="color:var(--muted);font-size:26px;">photo_camera</span>
+        <span style="font-size:10px;color:var(--muted);">Open Box</span>
+      </div>
+      <div id="proof-2" style="aspect-ratio:1;border-radius:14px;border:1.5px dashed var(--border);background:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;" onclick="captureProof('proof-2','Signature')">
+        <span class="material-symbols-rounded" style="color:var(--muted);font-size:26px;">photo_camera</span>
+        <span style="font-size:10px;color:var(--muted);">Signature</span>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="location.href='otp-confirm.html'" style="font-size:14px;">
+      <span class="material-symbols-rounded" style="font-size:18px;">check_circle</span>
+      Mark Delivered (OTP)
+    </button>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item nav-active"><span class="material-symbols-rounded">local_shipping</span><span class="nav-label">Delivery</span></div>
+    <div class="nav-item" onclick="location.href='orders.html'"><span class="material-symbols-rounded">inventory_2</span><span class="nav-label">My Orders</span></div>
+    <div class="nav-item" onclick="location.href='earnings.html'"><span class="material-symbols-rounded">payments</span><span class="nav-label">Earnings</span></div>
+    <div class="nav-item" onclick="location.href='postman-profile.html'"><span class="material-symbols-rounded">person</span><span class="nav-label">Profile</span></div>
+  </nav>
+</div>
+
+<script src="app.js"></script>
+<script>
+function selectStatus(el, status) {
+  document.querySelectorAll('#call-status-row .pill').forEach(p => p.className = 'pill');
+  el.className = 'pill pill-active';
+  const hint = document.getElementById('smart-hint');
+  hint.style.display = (status === 'nr' || status === 'so') ? 'flex' : 'none';
+  if (status === 'reached') showToast('Call status: Reached ✓', 'success');
+}
+function captureProof(id, label) {
+  const el = document.getElementById(id);
+  el.style.background = 'rgba(0,200,150,0.1)';
+  el.style.borderColor = 'rgba(0,200,150,0.4)';
+  el.innerHTML = `<span class="material-symbols-rounded" style="color:var(--green);font-size:26px;">check_circle</span><span style="font-size:10px;color:var(--green);">${label} ✓</span>`;
+  showToast(label + ' photo captured ✓', 'success');
+}
+</script>
+</body>
+</html>

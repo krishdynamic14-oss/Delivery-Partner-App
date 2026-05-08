@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · OTP Confirm</title>
+<link rel="stylesheet" href="app.css">
+<style>
+body { background:linear-gradient(160deg,#0d0800 0%,#080808 50%,#080d08 100%); }
+.otp-screen { max-width:430px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+.otp-success-screen { display:none; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:40px 24px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="otp-screen" id="otp-main">
+  <header class="app-header" style="padding-top:52px;">
+    <button class="icon-btn" onclick="history.back()" style="margin-right:8px;"><span class="material-symbols-rounded">arrow_back</span></button>
+    <div style="flex:1;">
+      <div class="header-title">OTP Verification</div>
+      <div class="header-sub">Delivery confirmation</div>
+    </div>
+    <div class="sync-pill"><div class="sync-dot"></div>Live</div>
+  </header>
+
+  <!-- Order summary -->
+  <div style="padding:16px 20px;background:linear-gradient(180deg,rgba(255,107,0,0.08) 0%,transparent 100%);border-bottom:1px solid var(--border);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;">#DB-8821</div>
+      <span class="badge badge-priority">Priority</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Sunita Patel · 42 Shivam Society, Maninagar</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,107,0,0.1);border:1px solid rgba(255,107,0,0.2);border-radius:12px;padding:12px 16px;">
+      <div><div style="font-size:10px;color:var(--muted);">COD to collect</div><div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:var(--amber);">₹4,250</div></div>
+      <div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Product</div><div style="font-size:12px;font-weight:600;">Power Bank XL</div></div>
+    </div>
+  </div>
+
+  <div style="flex:1;padding:24px 20px;">
+    <div style="text-align:center;margin-bottom:8px;">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;margin-bottom:6px;">Enter Customer OTP</div>
+      <div style="font-size:13px;color:var(--muted);">Customer received OTP on XXXXXX4521</div>
+    </div>
+
+    <!-- OTP digits display -->
+    <div class="otp-row" id="otp-display">
+      <div class="otp-digit" id="d0">_</div>
+      <div class="otp-digit" id="d1">_</div>
+      <div class="otp-digit" id="d2">_</div>
+      <div class="otp-digit" id="d3">_</div>
+      <div class="otp-digit" id="d4">_</div>
+      <div class="otp-digit" id="d5">_</div>
+    </div>
+
+    <div style="text-align:center;margin-bottom:20px;font-size:12px;color:var(--muted);">Demo OTP: <strong style="color:var(--orange);">482619</strong></div>
+
+    <!-- Keypad -->
+    <div class="keypad">
+      <div class="key" onclick="pressKey('1')">1</div>
+      <div class="key" onclick="pressKey('2')">2</div>
+      <div class="key" onclick="pressKey('3')">3</div>
+      <div class="key" onclick="pressKey('4')">4</div>
+      <div class="key" onclick="pressKey('5')">5</div>
+      <div class="key" onclick="pressKey('6')">6</div>
+      <div class="key" onclick="pressKey('7')">7</div>
+      <div class="key" onclick="pressKey('8')">8</div>
+      <div class="key" onclick="pressKey('9')">9</div>
+      <div class="key key-empty"></div>
+      <div class="key" onclick="pressKey('0')">0</div>
+      <div class="key key-del" onclick="pressDelete()"><span class="material-symbols-rounded" style="font-size:22px;">backspace</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Success screen -->
+<div class="otp-success-screen" id="success-screen">
+  <div class="success-check"><span class="material-symbols-rounded">check</span></div>
+  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:800;margin-bottom:8px;">Delivered!</div>
+  <div style="font-size:14px;color:var(--muted);margin-bottom:4px;">#DB-8821 confirmed delivered</div>
+  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:32px;font-weight:800;color:var(--green);margin:16px 0;">₹4,250 ✓</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:32px;">COD collected successfully</div>
+  <button class="btn-primary" style="max-width:280px;" onclick="location.href='delivery-flow.html'">
+    <span class="material-symbols-rounded" style="font-size:18px;">local_shipping</span> Next Delivery
+  </button>
+  <div style="height:14px;"></div>
+  <button class="btn-outline" style="max-width:280px;justify-content:center;" onclick="location.href='settlement.html'">
+    <span class="material-symbols-rounded" style="font-size:16px;">account_balance_wallet</span> Submit to Admin
+  </button>
+</div>
+
+<script src="app.js"></script>
+<script>
+const CORRECT_OTP = '482619';
+let entered = '';
+
+function pressKey(k) {
+  if (entered.length >= 6) return;
+  entered += k;
+  updateDisplay();
+  if (entered.length === 6) setTimeout(verifyOTP, 300);
+}
+function pressDelete() {
+  entered = entered.slice(0, -1);
+  updateDisplay();
+}
+function updateDisplay() {
+  for (let i = 0; i < 6; i++) {
+    const d = document.getElementById('d' + i);
+    if (i < entered.length) {
+      d.textContent = entered[i];
+      d.classList.add('filled');
+      d.classList.toggle('active', i === entered.length - 1);
+    } else {
+      d.textContent = '_';
+      d.classList.remove('filled', 'active');
+    }
+  }
+}
+function verifyOTP() {
+  if (entered === CORRECT_OTP) {
+    document.getElementById('otp-main').style.display = 'none';
+    const s = document.getElementById('success-screen');
+    s.style.display = 'flex';
+  } else {
+    entered = '';
+    updateDisplay();
+    showToast('Incorrect OTP. Try again.', 'error');
+    document.querySelectorAll('.otp-digit').forEach(d => { d.style.borderColor = 'var(--red)'; setTimeout(() => d.style.borderColor = '', 600); });
+  }
+}
+</script>
+</body>
+</html>

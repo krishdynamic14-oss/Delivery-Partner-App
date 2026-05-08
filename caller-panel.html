@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Caller Panel</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.caller-screen { background:linear-gradient(180deg,rgba(255,107,0,0.07) 0%,var(--bg) 35%); }
+.live-badge { display:flex;align-items:center;gap:6px;background:rgba(255,75,110,0.1);border:1px solid rgba(255,75,110,0.28);border-radius:99px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--red); }
+.live-dot { width:7px;height:7px;border-radius:50%;background:var(--red);animation:livepulse 1s infinite; }
+@keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+.caller-av-wrap { position:relative;display:inline-block; }
+.caller-av { width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#2a1060,#1a0830);border:3px solid rgba(255,107,0,0.38);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:800;color:var(--amber); }
+.ring1 { position:absolute;inset:-10px;border-radius:50%;border:2px solid rgba(255,107,0,0.2);animation:ringout 2s linear infinite; }
+.ring2 { position:absolute;inset:-20px;border-radius:50%;border:1px solid rgba(255,107,0,0.1);animation:ringout 2s linear infinite .5s; }
+@keyframes ringout { 0%{transform:scale(1);opacity:1} 100%{transform:scale(1.08);opacity:0} }
+.ctrl-btn { width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;transition:transform .15s; }
+.ctrl-btn:active { transform:scale(0.92); }
+.ctrl-mute { background:rgba(255,255,255,0.07);color:var(--text); }
+.ctrl-vol { background:rgba(255,255,255,0.07);color:var(--text); }
+.ctrl-end { background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(255,75,110,0.42); }
+.hist-item { display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border); }
+.hist-item:last-child { border-bottom:none; }
+</style>
+</head>
+<body>
+
+<!-- Profile Drawer -->
+<div class="sheet-overlay" id="drawer-ov" onclick="closeProfile()"></div>
+<div class="profile-drawer" id="profile-drawer">
+  <div class="drawer-header">
+    <div class="drawer-avatar" id="drawer-initials">C</div>
+    <div class="drawer-name" id="drawer-name">Caller Priya</div>
+    <div class="drawer-role" id="drawer-role">Caller · Dynamic Bazar</div>
+    <div class="drawer-badge"><div class="sync-dot"></div> Online</div>
+  </div>
+  <div class="drawer-menu">
+    <div class="drawer-item" onclick="location.href='caller-panel.html';closeProfile()"><span class="material-symbols-rounded">call</span><div><div class="drawer-item-label">Active Calls</div></div></div>
+    <div class="drawer-item" onclick="location.href='orders.html';closeProfile()"><span class="material-symbols-rounded">inventory_2</span><div><div class="drawer-item-label">Orders</div></div></div>
+    <div class="drawer-item" onclick="location.href='event-logs.html';closeProfile()"><span class="material-symbols-rounded">history</span><div><div class="drawer-item-label">Call Logs</div></div></div>
+  </div>
+  <div class="drawer-logout" onclick="logout()"><span class="material-symbols-rounded">logout</span> Sign Out</div>
+</div>
+
+<div class="screen caller-screen">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="avatar" onclick="openProfile()">C</div>
+      <div><div class="header-title">Caller Panel</div><div class="header-sub">Inbound Support</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      <button class="icon-btn" onclick="openProfile()"><span class="material-symbols-rounded">menu</span></button>
+    </div>
+  </header>
+
+  <!-- Call UI -->
+  <div style="display:flex;flex-direction:column;align-items:center;padding:20px 24px 14px;">
+    <div class="caller-av-wrap" style="margin-bottom:12px;">
+      <div class="ring1"></div><div class="ring2"></div>
+      <div class="caller-av">PM</div>
+    </div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:2px;">Priya Mehta</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">XXXXXX8824 · Ahmedabad</div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;font-weight:300;color:var(--green);letter-spacing:.08em;margin-bottom:14px;" id="timer">00:00</div>
+    <div style="display:flex;gap:14px;">
+      <button class="ctrl-btn ctrl-mute" id="mute-btn" onclick="toggleMute()"><span class="material-symbols-rounded" id="mute-icon">mic</span></button>
+      <button class="ctrl-btn ctrl-end" onclick="endCall()"><span class="material-symbols-rounded">call_end</span></button>
+      <button class="ctrl-btn ctrl-vol"><span class="material-symbols-rounded">volume_up</span></button>
+    </div>
+  </div>
+
+  <div class="scroll-area" style="padding:0 16px 80px;">
+
+    <!-- Order info -->
+    <div class="card" style="margin-bottom:10px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Order · #FD-8892</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Royal Festive Assortment — Diwali Pack</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;color:var(--amber);">₹4,850</div>
+        <span class="wa-btn" onclick="showToast('Tracking sent via WhatsApp ✓','success')"><span class="material-symbols-rounded" style="font-size:13px;">send</span> Send Tracking</span>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);">
+        <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-right:4px;">location_on</span>
+        42, Shivam Society, Maninagar, Ahmedabad
+      </div>
+    </div>
+
+    <!-- Customer History -->
+    <div class="card" style="margin-bottom:10px;">
+      <div class="section-title" style="margin-bottom:10px;">Customer History</div>
+      <div class="hist-item">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;">#FD-7821 · Delivered</div><div style="font-size:10px;color:var(--muted);">Oct 14 · ₹3,200 collected</div></div>
+      </div>
+      <div class="hist-item">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;"></div>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;">#FD-7102 · Rescheduled</div><div style="font-size:10px;color:var(--muted);">Oct 2 · Customer asked for evening</div></div>
+      </div>
+      <div class="hist-item">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;">#FD-6540 · Delivered</div><div style="font-size:10px;color:var(--muted);">Sep 22 · ₹5,600 collected</div></div>
+      </div>
+      <!-- Smart hint from history -->
+      <div class="smart-hint" style="margin-top:10px;margin-bottom:0;">
+        <span class="material-symbols-rounded">tips_and_updates</span>
+        <div class="smart-hint-text"><strong style="color:var(--blue);">Smart Hint:</strong> Priya Mehta prefers <strong>evening deliveries (5–7 PM)</strong> based on 2 past reschedules.</div>
+      </div>
+    </div>
+
+    <!-- Schedule -->
+    <div class="card" style="margin-bottom:10px;">
+      <div class="info-label" style="margin-bottom:8px;">Reschedule Delivery</div>
+      <div style="display:flex;gap:8px;">
+        <input type="date" value="2023-10-25" style="flex:1;background:var(--dim);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;">
+        <select style="flex:1;background:var(--dim);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;appearance:none;">
+          <option>Morning (9–12)</option>
+          <option selected>Evening (5–7 PM)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Remarks -->
+    <div class="section-title">Call Remarks</div>
+    <div class="pill-row" style="margin-bottom:12px;">
+      <div class="pill pill-active" onclick="setRemark(this)">Reached</div>
+      <div class="pill" onclick="setRemark(this)">Ring</div>
+      <div class="pill" onclick="setRemark(this)">No Response</div>
+    </div>
+
+    <button class="btn-green" onclick="showToast('Call status confirmed ✓','success')">
+      <span class="material-symbols-rounded" style="font-size:17px;">check</span> Confirm Status
+    </button>
+    <div style="height:10px;"></div>
+    <button class="btn-outline" style="width:100%;justify-content:center;" onclick="showToast('Note added ✓','success')">
+      <span class="material-symbols-rounded" style="font-size:16px;">note_add</span> Add Note
+    </button>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='admin-dashboard.html'"><span class="material-symbols-rounded">dashboard</span><span class="nav-label">Home</span></div>
+    <div class="nav-item nav-active"><span class="material-symbols-rounded">call</span><span class="nav-label">Calls</span></div>
+    <div class="nav-item" onclick="location.href='orders.html'"><span class="material-symbols-rounded">inventory_2</span><span class="nav-label">Orders</span></div>
+    <div class="nav-item" onclick="location.href='event-logs.html'"><span class="material-symbols-rounded">history</span><span class="nav-label">Logs</span></div>
+  </nav>
+</div>
+
+<script src="app.js"></script>
+<script>
+let s = 0, muted = false;
+const t = document.getElementById('timer');
+setInterval(() => { s++; t.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }, 1000);
+
+function toggleMute() {
+  muted = !muted;
+  document.getElementById('mute-icon').textContent = muted ? 'mic_off' : 'mic';
+  document.getElementById('mute-btn').style.background = muted ? 'rgba(255,107,0,0.2)' : 'rgba(255,255,255,0.07)';
+  showToast(muted ? 'Microphone muted' : 'Microphone on', 'info');
+}
+function endCall() {
+  if (confirm('End this call?')) { showToast('Call ended · Duration ' + t.textContent, 'info'); }
+}
+function setRemark(el) {
+  document.querySelectorAll('.pill').forEach(p => p.className = 'pill');
+  el.className = 'pill pill-active';
+}
+</script>
+</body>
+</html>

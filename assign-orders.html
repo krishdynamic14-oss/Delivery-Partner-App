@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Assign Orders</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.map-area {
+  background:linear-gradient(135deg,#0d1a0d 0%,#0a140a 40%,#0d1a10 100%);
+  border-bottom:1px solid var(--border); padding:16px; position:relative; min-height:220px;
+  overflow:hidden;
+}
+.map-grid {
+  position:absolute; inset:0; opacity:.12;
+  background-image:linear-gradient(var(--green) 1px,transparent 1px),linear-gradient(90deg,var(--green) 1px,transparent 1px);
+  background-size:28px 28px;
+}
+.map-marker {
+  position:absolute; display:flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border-radius:50%; cursor:pointer; z-index:2;
+  transform:translate(-50%,-50%); transition:transform .2s;
+}
+.map-marker:hover { transform:translate(-50%,-50%) scale(1.2); }
+.marker-orange { background:radial-gradient(circle,var(--orange),rgba(255,107,0,0.5)); box-shadow:0 0 12px rgba(255,107,0,0.5); }
+.marker-blue { background:radial-gradient(circle,var(--blue),rgba(78,156,255,0.5)); box-shadow:0 0 12px rgba(78,156,255,0.4); }
+.marker-amber { background:radial-gradient(circle,var(--amber),rgba(255,179,71,0.5)); box-shadow:0 0 12px rgba(255,179,71,0.4); }
+.map-label { position:absolute; background:rgba(8,8,15,0.88); border:1px solid var(--border); border-radius:8px; padding:4px 8px; font-size:10px; font-weight:600; z-index:3; white-space:nowrap; }
+.order-assign-card { border-radius:16px;border:1px solid var(--border);background:var(--surface2);padding:14px;margin-bottom:9px; }
+.postman-select {
+  width:100%; background:var(--dim);border:1px solid var(--border);border-radius:10px;
+  padding:9px 12px; color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;
+  -webkit-appearance:none; margin-top:8px;
+}
+</style>
+</head>
+<body>
+<div class="screen">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="avatar">A</div>
+      <div>
+        <div class="header-title">Assign Orders</div>
+        <div class="header-sub">128 unassigned · Oct 24</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button style="background:linear-gradient(135deg,var(--orange),#ff9500);border:none;border-radius:10px;padding:7px 12px;color:#fff;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <span class="material-symbols-rounded" style="font-size:14px;">auto_fix_high</span> Auto-Assign
+      </button>
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <div style="padding:10px 16px;display:flex;gap:8px;border-bottom:1px solid var(--border);">
+    <select style="flex:1;background:var(--dim);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;-webkit-appearance:none;">
+      <option>All Regions</option>
+      <option>Ahmedabad</option>
+      <option>Surat</option>
+      <option>Rajkot</option>
+    </select>
+    <div style="display:flex;align-items:center;gap:6px;background:var(--dim);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer;">
+      <span class="material-symbols-rounded" style="font-size:15px;">alt_route</span> Optimize Routes
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-area">
+    <div class="map-grid"></div>
+    <!-- Map markers -->
+    <div class="map-marker marker-orange" style="top:40%;left:30%;" title="Viramgam">
+      <span class="material-symbols-rounded" style="font-size:14px;color:#fff;">location_on</span>
+    </div>
+    <div class="map-marker marker-blue" style="top:55%;left:55%;" title="Narol">
+      <span class="material-symbols-rounded" style="font-size:14px;color:#fff;">location_on</span>
+    </div>
+    <div class="map-marker marker-amber" style="top:28%;left:65%;" title="Maninagar">
+      <span class="material-symbols-rounded" style="font-size:14px;color:#fff;">location_on</span>
+    </div>
+    <div class="map-marker marker-orange" style="top:65%;left:20%;" title="Bopal">
+      <span class="material-symbols-rounded" style="font-size:14px;color:#fff;">location_on</span>
+    </div>
+    <div class="map-marker marker-blue" style="top:35%;left:80%;" title="Gota">
+      <span class="material-symbols-rounded" style="font-size:14px;color:#fff;">location_on</span>
+    </div>
+    <!-- Labels -->
+    <div class="map-label" style="top:20%;left:8%;">Old Ahmedabad · 242</div>
+    <div class="map-label" style="top:72%;left:50%;">New Areas · 86</div>
+    <!-- Legend -->
+    <div style="position:absolute;bottom:10px;right:10px;background:rgba(8,8,15,0.88);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:10px;z-index:4;">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;color:var(--orange);">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--orange);"></div>Urgent (34)
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;color:var(--blue);">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--blue);"></div>Standard (94)
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-area" style="padding:12px 16px 80px;">
+    <div class="section-title">Unassigned Orders</div>
+
+    <div class="order-assign-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;">#ORD-88291</div>
+          <div style="font-size:11px;color:var(--muted);">42, Shivam Society, Maninagar</div>
+        </div>
+        <span class="badge badge-rto" style="white-space:nowrap;">URGENT</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Power Bank 10000mAh XL · <strong style="color:var(--amber);">₹4,850</strong></div>
+      <select class="postman-select">
+        <option value="">— Select Postman —</option>
+        <option>Raj Kumar (3 orders)</option>
+        <option>Amit Verma (5 orders)</option>
+        <option>Suresh Patel (2 orders)</option>
+      </select>
+      <div style="display:flex;gap:7px;margin-top:10px;">
+        <button style="flex:1;background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.22);border-radius:9px;padding:8px;color:var(--amber);font-size:11px;font-weight:600;cursor:pointer;">Suggest</button>
+        <button style="flex:2;background:linear-gradient(135deg,var(--orange),#ff9500);border:none;border-radius:9px;padding:8px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Confirm Assignment</button>
+      </div>
+    </div>
+
+    <div class="order-assign-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;">#ORD-88295</div>
+          <div style="font-size:11px;color:var(--muted);">18, Gokul Nagar, Narol</div>
+        </div>
+        <span class="badge badge-pending" style="white-space:nowrap;">STANDARD</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Wireless Headphones BT-5 · <strong style="color:var(--amber);">₹3,200</strong></div>
+      <select class="postman-select">
+        <option value="">— Select Postman —</option>
+        <option>Raj Kumar (3 orders)</option>
+        <option>Amit Verma (5 orders)</option>
+        <option>Suresh Patel (2 orders)</option>
+      </select>
+      <div style="display:flex;gap:7px;margin-top:10px;">
+        <button style="flex:1;background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.22);border-radius:9px;padding:8px;color:var(--amber);font-size:11px;font-weight:600;cursor:pointer;">Suggest</button>
+        <button style="flex:2;background:linear-gradient(135deg,var(--orange),#ff9500);border:none;border-radius:9px;padding:8px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Confirm Assignment</button>
+      </div>
+    </div>
+
+    <div class="order-assign-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;">#ORD-88302</div>
+          <div style="font-size:11px;color:var(--muted);">7, Radhe Complex, Bopal</div>
+        </div>
+        <span class="badge badge-rto" style="white-space:nowrap;">URGENT</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">CCTV Camera 2MP · <strong style="color:var(--amber);">₹2,800</strong></div>
+      <select class="postman-select">
+        <option value="">— Select Postman —</option>
+        <option>Raj Kumar (3 orders)</option>
+        <option>Amit Verma (5 orders)</option>
+        <option>Suresh Patel (2 orders)</option>
+      </select>
+      <div style="display:flex;gap:7px;margin-top:10px;">
+        <button style="flex:1;background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.22);border-radius:9px;padding:8px;color:var(--amber);font-size:11px;font-weight:600;cursor:pointer;">Suggest</button>
+        <button style="flex:2;background:linear-gradient(135deg,var(--orange),#ff9500);border:none;border-radius:9px;padding:8px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Confirm Assignment</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='admin-dashboard.html'">
+      <span class="material-symbols-rounded">dashboard</span><span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item nav-active">
+      <span class="material-symbols-rounded">map</span><span class="nav-label">Assign</span>
+    </div>
+    <div class="nav-item" onclick="location.href='orders.html'">
+      <span class="material-symbols-rounded">inventory_2</span><span class="nav-label">Orders</span>
+    </div>
+    <div class="nav-item" onclick="location.href='event-logs.html'">
+      <span class="material-symbols-rounded">history</span><span class="nav-label">Logs</span>
+    </div>
+  </nav>
+</div>
+</body>
+</html>

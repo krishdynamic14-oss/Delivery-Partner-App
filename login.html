@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Login</title>
+<link rel="stylesheet" href="app.css">
+<style>
+body { background:linear-gradient(160deg,#1a0a00 0%,#0d0509 40%,#0a0d1a 100%); }
+.login-screen { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 28px 48px; position:relative; overflow:hidden; max-width:430px; margin:0 auto; }
+.glow-a { position:absolute; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle,rgba(255,107,0,0.2) 0%,transparent 70%); top:-100px; left:-80px; pointer-events:none; }
+.glow-b { position:absolute; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 70%); bottom:80px; right:-50px; pointer-events:none; }
+.login-logo { width:76px; height:76px; border-radius:24px; background:linear-gradient(135deg,var(--orange),var(--amber)); display:flex; align-items:center; justify-content:center; font-size:34px; margin-bottom:20px; z-index:1; position:relative; box-shadow:0 10px 36px rgba(255,107,0,0.42); }
+.login-heading { font-family:'Plus Jakarta Sans',sans-serif; font-size:30px; font-weight:800; text-align:center; margin-bottom:5px; z-index:1; position:relative; }
+.login-tagline { color:var(--muted); font-size:13px; text-align:center; margin-bottom:32px; z-index:1; position:relative; }
+.role-selector { display:flex; gap:8px; width:100%; margin-bottom:28px; z-index:1; position:relative; }
+.role-btn { flex:1; padding:11px 6px; border-radius:13px; text-align:center; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:var(--dim); color:var(--muted); transition:all .2s; letter-spacing:.03em; text-transform:uppercase; }
+.role-btn.active { background:rgba(255,107,0,0.16); border-color:rgba(255,107,0,0.5); color:var(--amber); box-shadow:0 0 18px rgba(255,107,0,0.18); }
+.form-group { width:100%; margin-bottom:12px; z-index:1; position:relative; }
+.input-field { width:100%; background:rgba(255,255,255,0.05); border:1.5px solid var(--border); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:10px; transition:border-color .2s; }
+.input-field:focus-within { border-color:rgba(255,107,0,0.5); background:rgba(255,255,255,0.07); }
+.input-field .material-symbols-rounded { font-size:20px; color:var(--muted); flex-shrink:0; }
+.input-field input { background:none; border:none; outline:none; color:var(--text); font-family:'Inter',sans-serif; font-size:14px; flex:1; }
+.input-field input::placeholder { color:var(--muted); }
+.row-between { display:flex; align-items:center; justify-content:space-between; margin:4px 0 18px; z-index:1; position:relative; width:100%; }
+.remember { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); cursor:pointer; }
+.remember input[type=checkbox] { accent-color:var(--orange); width:14px; height:14px; }
+.forgot { font-size:12px; color:var(--amber); text-decoration:none; }
+.version { font-size:11px; color:var(--muted); margin-top:28px; z-index:1; position:relative; letter-spacing:.04em; }
+.footer-links { display:flex; gap:20px; margin-top:12px; z-index:1; position:relative; }
+.footer-links a { color:var(--muted); font-size:11px; text-decoration:none; }
+.footer-links a:hover { color:var(--amber); }
+.biometric-btn { display:flex; align-items:center; justify-content:center; gap:6px; color:var(--muted); font-size:12px; margin-top:14px; cursor:pointer; z-index:1; position:relative; }
+.biometric-btn .material-symbols-rounded { font-size:20px; }
+.biometric-btn:hover { color:var(--amber); }
+</style>
+</head>
+<body>
+<div class="login-screen">
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+  <div class="login-logo">🛍️</div>
+  <div class="login-heading">Dynamic Bazar</div>
+  <div class="login-tagline">Festive Delivery Management · v2.5.0</div>
+  <div class="role-selector">
+    <div class="role-btn" onclick="setRole(this,'Admin','A')">Admin</div>
+    <div class="role-btn active" onclick="setRole(this,'Postman','R')">Postman</div>
+    <div class="role-btn" onclick="setRole(this,'Caller','C')">Caller</div>
+  </div>
+  <div class="form-group">
+    <div class="input-field">
+      <span class="material-symbols-rounded">person</span>
+      <input type="text" placeholder="Username" id="username" autocomplete="username">
+    </div>
+  </div>
+  <div class="form-group">
+    <div class="input-field">
+      <span class="material-symbols-rounded">lock</span>
+      <input type="password" placeholder="Password" id="pw-input" autocomplete="current-password">
+      <span class="material-symbols-rounded" style="cursor:pointer;font-size:18px;color:var(--muted);" onclick="togglePw(this)">visibility</span>
+    </div>
+  </div>
+  <div class="row-between">
+    <label class="remember"><input type="checkbox" checked> Remember me</label>
+    <a href="#" class="forgot">Forgot password?</a>
+  </div>
+  <button class="btn-primary" onclick="login()" id="login-btn">
+    Sign In <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+  </button>
+  <div class="biometric-btn" onclick="showToast('Biometric login coming soon','info')">
+    <span class="material-symbols-rounded">fingerprint</span> Use biometrics
+  </div>
+  <div class="version">Version 2.5.0-Festive</div>
+  <div class="footer-links"><a href="#">Support</a><a href="#">हिंदी</a><a href="#">ગુજરાતી</a></div>
+</div>
+<script src="app.js"></script>
+<script>
+let role = 'Postman', initials = 'R', names = { Admin: 'Admin User', Postman: 'Raj Kumar', Caller: 'Caller Priya' };
+function setRole(el, r, i) {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active'); role = r; initials = i;
+}
+function togglePw(el) {
+  const i = document.getElementById('pw-input');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  el.textContent = i.type === 'password' ? 'visibility' : 'visibility_off';
+}
+function login() {
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  setUser({ name: names[role], role, initials });
+  const routes = { Admin: 'admin-dashboard.html', Postman: 'delivery-flow.html', Caller: 'caller-panel.html' };
+  setTimeout(() => location.href = routes[role], 600);
+}
+function showToast(m,t){const old=document.getElementById('db-toast');if(old)old.remove();const el=document.createElement('div');el.id='db-toast';el.className=`toast toast-${t}`;el.innerHTML=`<span>${m}</span>`;document.body.appendChild(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('toast-show')));setTimeout(()=>{el.classList.remove('toast-show');setTimeout(()=>el.remove(),350)},3000);}
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Live Map</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.map-canvas { position:relative; flex:1; background:linear-gradient(160deg,#0a0a18 0%,#0d0d1a 100%); overflow:hidden; min-height:420px; }
+.map-grid { position:absolute; inset:0; background-image:linear-gradient(rgba(78,156,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(78,156,255,0.04) 1px,transparent 1px); background-size:40px 40px; }
+.map-road-h { position:absolute; height:2px; background:rgba(255,255,255,0.06); border-radius:1px; }
+.map-road-v { position:absolute; width:2px; background:rgba(255,255,255,0.06); border-radius:1px; }
+.map-zone { position:absolute; border-radius:20px; border:1px dashed rgba(78,156,255,0.2); background:rgba(78,156,255,0.04); display:flex; align-items:flex-start; justify-content:flex-end; padding:8px; font-size:9px; color:rgba(78,156,255,0.5); font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+.pm-dot { position:absolute; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition:transform .15s; z-index:10; }
+.pm-dot:hover { transform:scale(1.15); z-index:20; }
+.pm-dot-circle { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Plus Jakarta Sans',sans-serif; font-size:10px; font-weight:800; color:#fff; box-shadow:0 4px 14px rgba(0,0,0,0.5); border:2px solid rgba(255,255,255,0.25); }
+.pm-dot-label { background:rgba(10,10,24,0.88); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:2px 6px; font-size:9px; font-weight:600; white-space:nowrap; }
+.pm-ping { position:absolute; inset:-6px; border-radius:50%; animation:pm-ring 2s ease-out infinite; }
+@keyframes pm-ring { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(1.8);opacity:0} }
+.order-cluster { position:absolute; background:rgba(255,179,71,0.15); border:1px solid rgba(255,179,71,0.35); border-radius:99px; padding:3px 8px; font-size:10px; font-weight:700; color:var(--amber); white-space:nowrap; z-index:5; }
+.pm-tooltip { position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; min-width:160px; z-index:30; display:none; box-shadow:0 8px 28px rgba(0,0,0,0.6); }
+.pm-dot:hover .pm-tooltip { display:block; }
+.map-stats-row { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); overflow-x:auto; }
+.map-stats-row::-webkit-scrollbar { display:none; }
+.map-stat-chip { flex-shrink:0; background:var(--dim); border:1px solid var(--border); border-radius:12px; padding:8px 14px; display:flex; align-items:center; gap:7px; }
+.map-filter-bar { display:flex; gap:6px; padding:10px 16px; border-bottom:1px solid var(--border); overflow-x:auto; }
+.map-filter-bar::-webkit-scrollbar { display:none; }
+.map-filter { flex-shrink:0; background:var(--dim); border:1px solid var(--border); border-radius:99px; padding:5px 14px; font-size:11px; font-weight:600; color:var(--muted); cursor:pointer; transition:all .2s; }
+.map-filter.active { background:rgba(255,107,0,0.12); border-color:rgba(255,107,0,0.35); color:var(--orange); }
+.postman-list-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; }
+.postman-list-item:hover { background:var(--dim); }
+.pm-av-sm { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-family:'Plus Jakarta Sans',sans-serif; font-size:11px; font-weight:800; color:#fff; flex-shrink:0; }
+.status-indicator { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<!-- Profile Drawer -->
+<div class="sheet-overlay" id="drawer-ov" onclick="closeProfile()"></div>
+<div class="profile-drawer" id="profile-drawer">
+  <div class="drawer-header">
+    <div class="drawer-avatar" id="drawer-initials">A</div>
+    <div class="drawer-name" id="drawer-name">Admin User</div>
+    <div class="drawer-role" id="drawer-role">Admin · Dynamic Bazar</div>
+    <div class="drawer-badge"><div class="sync-dot"></div> Online</div>
+  </div>
+  <div class="drawer-menu">
+    <div class="drawer-item" onclick="location.href='admin-dashboard.html';closeProfile()"><span class="material-symbols-rounded">dashboard</span><div><div class="drawer-item-label">Dashboard</div></div></div>
+    <div class="drawer-item" onclick="location.href='orders.html';closeProfile()"><span class="material-symbols-rounded">inventory_2</span><div><div class="drawer-item-label">Orders</div></div></div>
+    <div class="drawer-item" onclick="location.href='earnings.html';closeProfile()"><span class="material-symbols-rounded">payments</span><div><div class="drawer-item-label">Earnings</div></div></div>
+  </div>
+  <div class="drawer-logout" onclick="logout()"><span class="material-symbols-rounded">logout</span> Sign Out</div>
+</div>
+
+<div class="screen">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="avatar" onclick="openProfile()">A</div>
+      <div><div class="header-title">Live Map</div><div class="header-sub">142 postmen · Ahmedabad</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="sync-pill"><div class="sync-dot"></div>Live</div>
+      <button class="icon-btn" onclick="openProfile()"><span class="material-symbols-rounded">menu</span></button>
+    </div>
+  </header>
+
+  <!-- Filter bar -->
+  <div class="map-filter-bar">
+    <div class="map-filter active" onclick="setFilter(this,'all')">All (142)</div>
+    <div class="map-filter" onclick="setFilter(this,'active')">Active (118)</div>
+    <div class="map-filter" onclick="setFilter(this,'idle')">Idle (16)</div>
+    <div class="map-filter" onclick="setFilter(this,'delayed')">Delayed (8)</div>
+    <div class="map-filter" onclick="setFilter(this,'zone-a')">Zone A</div>
+    <div class="map-filter" onclick="setFilter(this,'zone-b')">Zone B</div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-canvas" id="map-canvas">
+    <div class="map-grid"></div>
+
+    <!-- Roads -->
+    <div class="map-road-h" style="top:38%;left:0;right:0;"></div>
+    <div class="map-road-h" style="top:62%;left:0;right:0;"></div>
+    <div class="map-road-v" style="left:30%;top:0;bottom:0;"></div>
+    <div class="map-road-v" style="left:65%;top:0;bottom:0;"></div>
+
+    <!-- Zones -->
+    <div class="map-zone" style="left:5%;top:8%;width:38%;height:34%;">Zone A</div>
+    <div class="map-zone" style="left:50%;top:8%;width:44%;height:34%;">Zone B</div>
+    <div class="map-zone" style="left:5%;top:50%;width:38%;height:38%;">Zone C</div>
+    <div class="map-zone" style="left:50%;top:50%;width:44%;height:38%;">Zone D</div>
+
+    <!-- Order clusters -->
+    <div class="order-cluster" style="top:18%;left:12%;">8 orders</div>
+    <div class="order-cluster" style="top:14%;left:55%;">12 orders</div>
+    <div class="order-cluster" style="top:56%;left:20%;">5 orders</div>
+    <div class="order-cluster" style="top:60%;left:62%;">9 orders</div>
+
+    <!-- Postmen dots - they move via JS animation -->
+    <div class="pm-dot" id="pm1" style="left:18%;top:22%;" onclick="focusPostman('RK','Raj Kumar','#1 · 18 delivered','₹14,580','Active')">
+      <div style="position:relative;">
+        <div class="pm-ping" style="background:rgba(0,200,150,0.3);"></div>
+        <div class="pm-dot-circle" style="background:linear-gradient(135deg,var(--orange),var(--amber));">RK</div>
+      </div>
+      <div class="pm-dot-label" style="color:var(--green);">Raj · 18 done</div>
+      <div class="pm-tooltip">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px;">Raj Kumar</div>
+        <div style="font-size:10px;color:var(--muted);">18 delivered · 2 pending</div>
+        <div style="font-size:11px;color:var(--amber);font-weight:700;margin-top:4px;">₹14,580 COD</div>
+        <div style="font-size:9px;color:var(--green);margin-top:3px;">● Active — 3 min ago</div>
+      </div>
+    </div>
+
+    <div class="pm-dot" id="pm2" style="left:60%;top:16%;" onclick="focusPostman('AV','Amit Verma','#2 · 14 delivered','₹12,200','Active')">
+      <div style="position:relative;">
+        <div class="pm-ping" style="background:rgba(78,156,255,0.3);animation-delay:.4s;"></div>
+        <div class="pm-dot-circle" style="background:linear-gradient(135deg,var(--blue),#1a6fd8);">AV</div>
+      </div>
+      <div class="pm-dot-label" style="color:var(--blue);">Amit · 14 done</div>
+    </div>
+
+    <div class="pm-dot" id="pm3" style="left:22%;top:58%;" onclick="focusPostman('SP','Suresh Patel','#3 · 11 delivered','₹10,950','Active')">
+      <div style="position:relative;">
+        <div class="pm-ping" style="background:rgba(0,200,150,0.25);animation-delay:.8s;"></div>
+        <div class="pm-dot-circle" style="background:linear-gradient(135deg,var(--green),#009070);">SP</div>
+      </div>
+      <div class="pm-dot-label" style="color:var(--green);">Suresh · 11 done</div>
+    </div>
+
+    <div class="pm-dot" id="pm4" style="left:70%;top:64%;" onclick="focusPostman('DK','Dev Kumar','Delayed · 7 delivered','₹6,400','Delayed')">
+      <div style="position:relative;">
+        <div class="pm-ping" style="background:rgba(255,75,110,0.35);animation-delay:.2s;"></div>
+        <div class="pm-dot-circle" style="background:linear-gradient(135deg,var(--red),#c42248);">DK</div>
+      </div>
+      <div class="pm-dot-label" style="color:var(--red);">Dev · Delayed</div>
+    </div>
+
+    <div class="pm-dot" id="pm5" style="left:45%;top:42%;" onclick="focusPostman('MN','Mahesh Nair','Idle · 9 delivered','₹8,100','Idle')">
+      <div style="position:relative;">
+        <div class="pm-dot-circle" style="background:linear-gradient(135deg,#444,#333);opacity:.7;">MN</div>
+      </div>
+      <div class="pm-dot-label" style="color:var(--muted);">Mahesh · Idle</div>
+    </div>
+
+    <!-- Zoom controls -->
+    <div style="position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:15;">
+      <button onclick="showToast('Zoom in','info')" style="width:36px;height:36px;border-radius:10px;background:rgba(20,20,30,0.9);border:1px solid var(--border);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+      <button onclick="showToast('Zoom out','info')" style="width:36px;height:36px;border-radius:10px;background:rgba(20,20,30,0.9);border:1px solid var(--border);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+    </div>
+
+    <!-- Live counter -->
+    <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(10,10,24,0.88);border:1px solid rgba(255,107,0,0.3);border-radius:99px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--orange);display:flex;align-items:center;gap:6px;z-index:15;">
+      <div class="sync-dot" style="background:var(--orange);box-shadow:0 0 7px var(--orange);"></div>
+      <span id="live-count">142 active postmen</span>
+    </div>
+  </div>
+
+  <!-- Map stat chips -->
+  <div class="map-stats-row">
+    <div class="map-stat-chip">
+      <div class="status-indicator" style="background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+      <div><div style="font-size:11px;font-weight:700;color:var(--green);">118</div><div style="font-size:9px;color:var(--muted);">Active</div></div>
+    </div>
+    <div class="map-stat-chip">
+      <div class="status-indicator" style="background:var(--muted);"></div>
+      <div><div style="font-size:11px;font-weight:700;">16</div><div style="font-size:9px;color:var(--muted);">Idle</div></div>
+    </div>
+    <div class="map-stat-chip">
+      <div class="status-indicator" style="background:var(--red);box-shadow:0 0 6px var(--red);"></div>
+      <div><div style="font-size:11px;font-weight:700;color:var(--red);">8</div><div style="font-size:9px;color:var(--muted);">Delayed</div></div>
+    </div>
+    <div class="map-stat-chip">
+      <span class="material-symbols-rounded" style="font-size:14px;color:var(--amber);">inventory_2</span>
+      <div><div style="font-size:11px;font-weight:700;color:var(--amber);">1,284</div><div style="font-size:9px;color:var(--muted);">Orders out</div></div>
+    </div>
+    <div class="map-stat-chip">
+      <span class="material-symbols-rounded" style="font-size:14px;color:var(--green);">check_circle</span>
+      <div><div style="font-size:11px;font-weight:700;color:var(--green);">847</div><div style="font-size:9px;color:var(--muted);">Delivered</div></div>
+    </div>
+  </div>
+
+  <!-- Postmen list -->
+  <div style="flex:1;overflow-y:auto;" id="postmen-list">
+    <div style="padding:10px 16px 6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Field Team</div>
+
+    <div class="postman-list-item" onclick="location.href='postman-profile.html'">
+      <div class="pm-av-sm" style="background:linear-gradient(135deg,var(--orange),var(--amber));">RK</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">Raj Kumar</div>
+        <div style="font-size:10px;color:var(--muted);">Zone A · #DB-8821 in progress</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);">₹14,580</div>
+        <div style="font-size:9px;color:var(--green);">18 delivered</div>
+      </div>
+      <div class="status-indicator" style="background:var(--green);margin-left:8px;"></div>
+    </div>
+
+    <div class="postman-list-item">
+      <div class="pm-av-sm" style="background:linear-gradient(135deg,var(--blue),#1a6fd8);">AV</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">Amit Verma</div>
+        <div style="font-size:10px;color:var(--muted);">Zone B · 2 orders remaining</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);">₹12,200</div>
+        <div style="font-size:9px;color:var(--green);">14 delivered</div>
+      </div>
+      <div class="status-indicator" style="background:var(--green);margin-left:8px;"></div>
+    </div>
+
+    <div class="postman-list-item">
+      <div class="pm-av-sm" style="background:linear-gradient(135deg,var(--green),#009070);">SP</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">Suresh Patel</div>
+        <div style="font-size:10px;color:var(--muted);">Zone A · En route to next</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);">₹10,950</div>
+        <div style="font-size:9px;color:var(--green);">11 delivered</div>
+      </div>
+      <div class="status-indicator" style="background:var(--green);margin-left:8px;"></div>
+    </div>
+
+    <div class="postman-list-item">
+      <div class="pm-av-sm" style="background:linear-gradient(135deg,var(--red),#c42248);">DK</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">Dev Kumar</div>
+        <div style="font-size:10px;color:var(--red);">Delayed · 45 min behind schedule</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);">₹6,400</div>
+        <div style="font-size:9px;color:var(--muted);">7 delivered</div>
+      </div>
+      <div class="status-indicator" style="background:var(--red);margin-left:8px;box-shadow:0 0 5px var(--red);"></div>
+    </div>
+
+    <div class="postman-list-item" style="opacity:.6;">
+      <div class="pm-av-sm" style="background:linear-gradient(135deg,#444,#333);">MN</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">Mahesh Nair</div>
+        <div style="font-size:10px;color:var(--muted);">Zone C · Idle — lunch break</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);">₹8,100</div>
+        <div style="font-size:9px;color:var(--muted);">9 delivered</div>
+      </div>
+      <div class="status-indicator" style="background:var(--muted);margin-left:8px;"></div>
+    </div>
+
+    <div style="padding:10px 16px;font-size:10px;color:var(--muted);text-align:center;">+ 137 more postmen in field</div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='admin-dashboard.html'"><span class="material-symbols-rounded">dashboard</span><span class="nav-label">Home</span></div>
+    <div class="nav-item" onclick="location.href='orders.html'"><span class="material-symbols-rounded">inventory_2</span><span class="nav-label">Orders</span></div>
+    <div class="nav-item nav-active"><span class="material-symbols-rounded">map</span><span class="nav-label">Live Map</span></div>
+    <div class="nav-item" onclick="location.href='earnings.html'"><span class="material-symbols-rounded">payments</span><span class="nav-label">Earnings</span></div>
+  </nav>
+</div>
+
+<script src="app.js"></script>
+<script>
+function setFilter(el, f) {
+  document.querySelectorAll('.map-filter').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  showToast('Filtering: ' + el.textContent, 'info', 1800);
+}
+
+function focusPostman(initials, name, status, cod, state) {
+  const color = state === 'Active' ? 'var(--green)' : state === 'Delayed' ? 'var(--red)' : 'var(--muted)';
+  showToast(name + ' · ' + status + ' · ' + cod, state === 'Delayed' ? 'error' : 'success', 3000);
+}
+
+// Animate postmen positions gently
+const positions = {
+  pm1: { x: 18, y: 22, dx: 0.015, dy: 0.008 },
+  pm2: { x: 60, y: 16, dx: -0.012, dy: 0.01 },
+  pm3: { x: 22, y: 58, dx: 0.018, dy: -0.006 },
+  pm4: { x: 70, y: 64, dx: -0.008, dy: -0.012 },
+  pm5: { x: 45, y: 42, dx: 0.005, dy: 0.005 }
+};
+
+function animateDots() {
+  Object.entries(positions).forEach(([id, p]) => {
+    p.x += p.dx;
+    p.y += p.dy;
+    if (p.x > 85 || p.x < 5) p.dx *= -1;
+    if (p.y > 82 || p.y < 10) p.dy *= -1;
+    const el = document.getElementById(id);
+    if (el) { el.style.left = p.x + '%'; el.style.top = p.y + '%'; }
+  });
+}
+setInterval(animateDots, 80);
+
+// Update live count occasionally
+let liveCount = 142;
+setInterval(() => {
+  liveCount += (Math.random() > 0.5 ? 1 : -1);
+  liveCount = Math.max(138, Math.min(148, liveCount));
+  const el = document.getElementById('live-count');
+  if (el) el.textContent = liveCount + ' active postmen';
+}, 4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Settlement</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.method-card { border-radius:14px;border:2px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s;margin-bottom:8px; }
+.method-card.selected { border-color:var(--orange);background:rgba(255,107,0,0.08); }
+.method-icon { width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0; }
+.receipt-line { display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px; }
+.receipt-line:last-child { border-bottom:none; }
+.receipt-line.total { font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;padding:12px 0; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <header class="app-header" style="padding-top:52px;">
+    <button class="icon-btn" onclick="history.back()" style="margin-right:8px;"><span class="material-symbols-rounded">arrow_back</span></button>
+    <div style="flex:1;"><div class="header-title">Cash Settlement</div><div class="header-sub">End-of-Day Handover</div></div>
+    <div class="sync-pill"><div class="sync-dot"></div>Oct 24</div>
+  </header>
+
+  <div class="scroll-area" style="padding:16px 16px 80px;">
+
+    <!-- Summary hero -->
+    <div class="hero-card" style="margin-bottom:14px;">
+      <div class="card-label">Total COD to Submit</div>
+      <div class="card-value">₹84,250</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;">
+        <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:8px;text-align:center;">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:var(--green);">62</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;">Delivered</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:8px;text-align:center;">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:var(--amber);">8</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;">Pending</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:8px;text-align:center;">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:var(--red);">2</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;">RTO</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receipt -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+        <span class="material-symbols-rounded" style="font-size:16px;color:var(--orange);">receipt_long</span> Today's Breakdown
+      </div>
+      <div class="receipt-line"><span style="color:var(--muted);">Orders Delivered</span><span style="font-weight:600;">62 orders</span></div>
+      <div class="receipt-line"><span style="color:var(--muted);">COD Collected</span><span style="font-weight:600;color:var(--amber);">₹84,250</span></div>
+      <div class="receipt-line"><span style="color:var(--muted);">Advance Paid</span><span style="font-weight:600;color:var(--green);">₹0</span></div>
+      <div class="receipt-line"><span style="color:var(--muted);">Expenses</span><span style="font-weight:600;color:var(--red);">− ₹350</span></div>
+      <div class="receipt-line total"><span>Net to Submit</span><span style="color:var(--green);">₹83,900</span></div>
+    </div>
+
+    <!-- Deposit Method -->
+    <div class="section-title">Deposit Method</div>
+
+    <div class="method-card selected" id="method-cash" onclick="selectMethod('cash')">
+      <div class="method-icon" style="background:rgba(255,179,71,0.15);">💵</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;">Cash to Admin</div><div style="font-size:11px;color:var(--muted);">Hand over directly at office</div></div>
+      <div id="check-cash" style="width:18px;height:18px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:12px;color:#fff;">check</span></div>
+    </div>
+
+    <div class="method-card" id="method-upi" onclick="selectMethod('upi')">
+      <div class="method-icon" style="background:rgba(78,156,255,0.15);">📱</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;">UPI Transfer</div><div style="font-size:11px;color:var(--muted);">Immediate transfer · UPI ID on file</div></div>
+      <div id="check-upi" style="width:18px;height:18px;border-radius:50%;background:var(--border);"></div>
+    </div>
+
+    <div class="method-card" id="method-bank" onclick="selectMethod('bank')">
+      <div class="method-icon" style="background:rgba(0,200,150,0.15);">🏦</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;">Bank Deposit</div><div style="font-size:11px;color:var(--muted);">Submit slip to admin within 2 hrs</div></div>
+      <div id="check-bank" style="width:18px;height:18px;border-radius:50%;background:var(--border);"></div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <!-- Notes -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="info-label" style="margin-bottom:8px;">Remarks (optional)</div>
+      <textarea placeholder="Any notes for admin…" style="width:100%;background:none;border:none;outline:none;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;resize:none;height:60px;line-height:1.5;" rows="3"></textarea>
+    </div>
+
+    <button class="btn-green" id="submit-btn" onclick="submitSettlement()">
+      <span class="material-symbols-rounded" style="font-size:18px;">account_balance_wallet</span>
+      Submit ₹83,900 to Admin
+    </button>
+    <div style="height:8px;"></div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);">A receipt will be generated and sent to admin</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let method = 'cash';
+function selectMethod(m) {
+  method = m;
+  ['cash','upi','bank'].forEach(id => {
+    document.getElementById('method-'+id).classList.toggle('selected', id === m);
+    const c = document.getElementById('check-'+id);
+    if (id === m) { c.style.background = 'var(--orange)'; c.innerHTML = '<span class="material-symbols-rounded" style="font-size:12px;color:#fff;">check</span>'; }
+    else { c.style.background = 'var(--border)'; c.innerHTML = ''; }
+  });
+}
+function submitSettlement() {
+  const btn = document.getElementById('submit-btn');
+  btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">hourglass_top</span> Submitting…';
+  btn.disabled = true;
+  setTimeout(() => {
+    showToast('Settlement submitted ✓ Ref: SET-4422', 'success', 4000);
+    btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">check_circle</span> Submitted!';
+    btn.style.background = 'linear-gradient(135deg,var(--green),#009070)';
+    setTimeout(() => location.href = 'admin-dashboard.html', 2500);
+  }, 1800);
+}
+</script>
+</body>
+</html>

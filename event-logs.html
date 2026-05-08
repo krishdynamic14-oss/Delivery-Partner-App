@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dynamic Bazar · Event Log</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.log-item { display:flex;align-items:flex-start;gap:11px;padding:13px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);margin-bottom:8px; }
+.log-icon { width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.log-icon .material-symbols-rounded { font-size:18px; }
+.li-alert { background:rgba(255,75,110,0.12);color:var(--red); }
+.li-success { background:rgba(0,200,150,0.12);color:var(--green); }
+.li-dispatch { background:rgba(255,107,0,0.12);color:var(--orange); }
+.li-system { background:rgba(255,255,255,0.06);color:var(--muted); }
+.log-type { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:2px 8px;border-radius:99px;display:inline-block;margin-bottom:4px; }
+.lt-alert { background:rgba(255,75,110,0.1);color:var(--red); }
+.lt-success { background:rgba(0,200,150,0.1);color:var(--green); }
+.lt-dispatch { background:rgba(255,107,0,0.1);color:var(--orange); }
+.lt-system { background:rgba(255,255,255,0.05);color:var(--muted); }
+.log-date { font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:12px 0 8px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <header class="app-header">
+    <div>
+      <div class="header-title">Event Log</div>
+      <div class="header-sub">System Activity · Real-time</div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn"><span class="material-symbols-rounded">filter_list</span></button>
+      <button class="icon-btn"><span class="material-symbols-rounded">search</span></button>
+    </div>
+  </header>
+
+  <div class="scroll-area" style="padding:0 16px 80px;">
+    <div class="log-date">Today · Oct 24</div>
+
+    <div class="log-item">
+      <div class="log-icon li-alert"><span class="material-symbols-rounded">inventory_2</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-alert">Inventory Alert</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">Power Bank 10000mAh XL dropped below 15 units threshold (12 remaining)</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">10:45 AM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">Restock Now →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-icon li-success"><span class="material-symbols-rounded">check_circle</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-success">Delivered</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">#FEST-98220 delivered · ₹6,400 COD collected by Raj Kumar</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">09:12 AM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">View Proof →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-icon li-dispatch"><span class="material-symbols-rounded">local_shipping</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-dispatch">Dispatched</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">84 orders assigned to postmen · Route optimisation applied</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">07:30 AM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">View Map →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-date">Yesterday · Oct 23</div>
+
+    <div class="log-item">
+      <div class="log-icon li-system"><span class="material-symbols-rounded">cloud_sync</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-system">System</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">Google Sheets sync completed · 312 records updated in 1.2s</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">06:00 AM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">Details →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-icon li-success"><span class="material-symbols-rounded">check_circle</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-success">Delivered</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">#FEST-98105 · ₹4,850 collected · Performance index +2.1% this week</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">05:45 PM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">View Proof →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-icon li-alert"><span class="material-symbols-rounded">assignment_return</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-alert">RTO Initiated</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">#FEST-98218 · Customer unavailable after 3 attempts · ₹2,150</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">02:20 PM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">Review →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-item">
+      <div class="log-icon li-system"><span class="material-symbols-rounded">settings</span></div>
+      <div style="flex:1;">
+        <span class="log-type lt-system">System</span>
+        <div style="font-size:12px;color:rgba(240,240,248,0.8);line-height:1.4;margin-bottom:5px;">App updated to v2.4.0-Festive · Delivery confirmation flow improved</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--muted);">12:00 PM</span>
+          <span style="font-size:11px;font-weight:600;color:var(--orange);cursor:pointer;">Changelog →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='admin-dashboard.html'">
+      <span class="material-symbols-rounded">dashboard</span><span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item" onclick="location.href='orders.html'">
+      <span class="material-symbols-rounded">inventory_2</span><span class="nav-label">Orders</span>
+    </div>
+    <div class="nav-item" onclick="location.href='earnings.html'">
+      <span class="material-symbols-rounded">payments</span><span class="nav-label">Earnings</span>
+    </div>
+    <div class="nav-item nav-active">
+      <span class="material-symbols-rounded">history</span><span class="nav-label">Logs</span>
+    </div>
+  </nav>
+</div>
+</body>
+</html>
