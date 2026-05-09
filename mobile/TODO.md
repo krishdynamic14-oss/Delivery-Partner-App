@@ -25,7 +25,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Failed delivery UI | [x] | [ ] | Reason/notes submit and failed state |
 | COD tracker UI | [x] | [ ] | Summary and order-wise amounts match orders |
 | Offline queue foundation | [x] | [ ] | Disable network, submit action, reconnect sync |
-| GAS API starter | [~] | [ ] | Deploy Web App and call each action |
+| GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [ ] | [ ] | Fetch/update real Sheet1 data |
 | Photo upload to Drive | [ ] | [ ] | Capture, upload, store URL |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
@@ -73,8 +73,9 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [~] GAS API starter action router
 - [x] Confirm exact Google Sheet column names from real Sheet1
 - [x] Update `DeliveryAppAPI.gs` mapping to real Sheet1 columns
-- [ ] Deploy GAS Web App
+- [x] Deploy GAS Web App
 - [x] Document script property `DB_SHEET_ID`
+- [x] Verify `meta.columns` resolves Sheet1 headers
 - [~] Add script-property based column alias mapping (`DB_COLUMN_ALIASES_JSON`)
 - [~] Add script-property based sheet names (`DB_ORDERS_SHEET`, `DB_PAYMENT_LOG_SHEET`)
 - [ ] Configure `EXPO_PUBLIC_GAS_API_URL` in `mobile/.env`
