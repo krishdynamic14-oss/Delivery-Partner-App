@@ -129,12 +129,12 @@ function submitCodSettlement_(body, token) {
   sheet.appendRow([
     new Date(),
     settlementId,
-    body.partnerName || '',
-    body.partnerPhone || '',
-    body.district || '',
+    String(body.partnerName || '').trim(),
+    onlyDigits_(body.partnerPhone),
+    String(body.district || '').trim(),
     Number(body.amount || 0),
-    body.method || '',
-    body.reference || '',
+    String(body.method || '').trim(),
+    String(body.reference || '').trim(),
     Number(body.assignedCod || 0),
     Number(body.collectedCod || 0),
     Number(body.remainingCod || 0),
@@ -367,8 +367,8 @@ function findPartnerByPhone_(phone) {
     const row = values[i];
     const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER'));
     if (partnerPhone && partnerPhone.slice(-10) === normalizedPhone.slice(-10)) {
-      const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner');
-      const district = String(accessor.read(row, 'DISTRICT') || '');
+      const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim();
+      const district = String(accessor.read(row, 'DISTRICT') || '').trim();
       return {
         id: 'partner_' + normalizedPhone.slice(-10),
         name: name,

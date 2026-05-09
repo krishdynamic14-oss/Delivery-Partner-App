@@ -23,10 +23,10 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Order detail screen | [x] | [ ] | Open every order status without crash |
 | Delivery confirmation UI | [x] | [ ] | OTP validation, photo proof, delivered state |
 | Failed delivery UI | [x] | [ ] | Reason/notes submit and failed state |
-| COD tracker UI | [x] | [ ] | Summary and order-wise amounts match orders |
+| COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
 | Offline queue foundation | [x] | [ ] | Disable network, submit action, reconnect sync |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
-| Real Google Sheets sync | [~] | [ ] | Read-only login and partner order fetch verified for MEHSANA partner |
+| Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
 | Photo upload to Drive | [ ] | [ ] | Capture, upload, store URL |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
@@ -87,7 +87,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [ ] Fetch single order detail from GAS
 - [ ] Mark delivered in Sheet1
 - [ ] Mark failed/RTO in Sheet1
-- [ ] Write COD settlement to `PAYMENT LOG`
+- [x] Write COD settlement to `PAYMENT LOG`
 - [ ] Upload delivery photo and store photo URL
 - [ ] Return consistent API error codes/messages
 
@@ -112,7 +112,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] COD summary from local orders
 - [x] COD order-wise breakdown
 - [x] Settlement submission stub
-- [~] Real settlement entry in Google Sheet
+- [x] Real settlement entry in Google Sheet
 - [ ] Settlement method selector: Cash / UPI / Bank
 - [ ] UPI/bank reference validation
 - [ ] Settlement history
@@ -172,7 +172,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Search and tabs return expected orders
 - [ ] Delivered action updates UI, local cache, and Sheet1
 - [ ] Failed action updates UI, local cache, and Sheet1
-- [ ] COD totals match Sheet data
+- [x] COD totals match Sheet data
 - [ ] Offline delivery queues and syncs after reconnect
 - [ ] Photo capture works on real Android device
 - [ ] Photo URL is stored against correct order
