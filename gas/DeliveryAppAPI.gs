@@ -49,6 +49,7 @@ function doPost(e) {
       'orders.fail': () => markOrderFailed_(body, token),
       'cod.settle': () => submitCodSettlement_(body, token),
       'meta.columns': () => inspectColumns_(),
+      'meta.partners': () => inspectPartners_(),
     };
 
     if (!routes[action]) return json_({ ok: false, error: 'Unknown action: ' + action });
@@ -293,6 +294,34 @@ function inspectColumns_() {
     resolved: accessor.resolved,
     aliases: accessor.aliases,
   };
+}
+
+function inspectPartners_() {
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return [];
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  const byPartner = {};
+
+  values.forEach((row) => {
+    const name = String(accessor.read(row, 'POSTMAN') || '').trim();
+    const numberMasked = maskPhone_(onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')));
+    const district = String(accessor.read(row, 'DISTRICT') || '').trim();
+    if (!name && !numberMasked) return;
+
+    const key = [name, numberMasked, district].join('|');
+    if (!byPartner[key]) {
+      byPartner[key] = {
+        name: name,
+        numberMasked: numberMasked,
+        district: district,
+        orderCount: 0,
+      };
+    }
+    byPartner[key].orderCount += 1;
+  });
+
+  return Object.keys(byPartner).map((key) => byPartner[key]);
 }
 
 function ensurePaymentLogHeader_(sheet) {

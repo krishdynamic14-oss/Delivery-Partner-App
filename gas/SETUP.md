@@ -42,6 +42,10 @@ Expected result:
 - `resolved.POSTMAN` is `DELIVERY PARTNER NAME`
 - `resolved.MOBILE` is `MOBILE NUMBER`
 
+Diagnostics action:
+
+- `meta.partners` returns delivery partner name, masked number, district, and assigned order count.
+
 ## Payment Log Columns
 
 `cod.settle` now creates a header row automatically in `PAYMENT LOG`:
