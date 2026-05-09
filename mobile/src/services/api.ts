@@ -10,7 +10,7 @@ async function request<T>(action: string, body?: unknown, token?: string): Promi
   const res = await fetch(GAS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ action, body }),
+    body: JSON.stringify({ action, body, ...(token ? { __token: token } : {}) }),
   });
   const json = (await res.json()) as ApiResponse<T>;
   if (!json.ok) throw new Error(json.error);

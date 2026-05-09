@@ -72,9 +72,11 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 
 - [~] GAS API starter action router
 - [ ] Confirm exact Google Sheet column names from real Sheet1
-- [ ] Update `DeliveryAppAPI.gs` mapping to real Sheet1 columns
+- [~] Update `DeliveryAppAPI.gs` mapping to real Sheet1 columns
 - [ ] Deploy GAS Web App
 - [ ] Set script property `DB_SHEET_ID`
+- [~] Add script-property based column alias mapping (`DB_COLUMN_ALIASES_JSON`)
+- [~] Add script-property based sheet names (`DB_ORDERS_SHEET`, `DB_PAYMENT_LOG_SHEET`)
 - [ ] Configure `EXPO_PUBLIC_GAS_API_URL` in `mobile/.env`
 - [ ] Replace demo login with real partner lookup
 - [ ] Add token/session validation in GAS

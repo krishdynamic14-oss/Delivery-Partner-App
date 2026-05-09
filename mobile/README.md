@@ -60,6 +60,33 @@ Deploy it as a Web App and set `DB_SHEET_ID` in Script Properties. The mobile cl
 - `orders.fail`
 - `cod.settle`
 
+Recommended GAS Script Properties:
+
+- `DB_SHEET_ID`: Google Sheet ID
+- `DB_ORDERS_SHEET`: orders sheet name (default `Sheet1`)
+- `DB_PAYMENT_LOG_SHEET`: settlement sheet name (default `PAYMENT LOG`)
+- `DB_COLUMN_ALIASES_JSON`: optional JSON override for logical column aliases
+
+Example `DB_COLUMN_ALIASES_JSON`:
+
+```json
+{
+  "ORDER_NO": ["ORDER NO"],
+  "CUSTOMER_NAME": ["CUSTOMER NAME"],
+  "MOBILE": ["MOBILE"],
+  "DISTRICT": ["DISTRICT"],
+  "POSTMAN": ["POSTMAN"],
+  "DELIVERY_COUNTED": ["DELIVERY_COUNTED"],
+  "DELIVERY_DATE": ["DELIVERY DATE"],
+  "PROCESSED": ["PROCESSED"],
+  "REMARKS": ["REMARKS"]
+}
+```
+
+Column mapping inspection action:
+
+- `meta.columns` returns current sheet headers and resolved logical mapping.
+
 ## Build
 
 Preview APK:
