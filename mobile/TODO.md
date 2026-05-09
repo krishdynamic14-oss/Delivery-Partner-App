@@ -8,6 +8,31 @@ This file is the working source of truth for the React Native Android MVP. Updat
 - `[~]` Started but not production-ready
 - `[ ]` Not started
 
+## Build And Test Tracker
+
+Use this table before marking anything fully complete. `Build` means the feature exists in code. `Test` means it has been verified in Expo web, Expo Go, emulator, or a real Android device as appropriate.
+
+| Area | Build | Test | Verification Needed |
+| --- | --- | --- | --- |
+| Expo app scaffold | [x] | [x] | `npm run typecheck`, Expo config validation |
+| GitHub feature branch | [x] | [x] | Branch pushed to origin |
+| Expo web preview | [x] | [x] | `http://localhost:8083` returns app UI |
+| Secure partner session | [x] | [ ] | Login, restart app, confirm session persists |
+| Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
+| Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
+| Order detail screen | [x] | [ ] | Open every order status without crash |
+| Delivery confirmation UI | [x] | [ ] | OTP validation, photo proof, delivered state |
+| Failed delivery UI | [x] | [ ] | Reason/notes submit and failed state |
+| COD tracker UI | [x] | [ ] | Summary and order-wise amounts match orders |
+| Offline queue foundation | [x] | [ ] | Disable network, submit action, reconnect sync |
+| GAS API starter | [~] | [ ] | Deploy Web App and call each action |
+| Real Google Sheets sync | [ ] | [ ] | Fetch/update real Sheet1 data |
+| Photo upload to Drive | [ ] | [ ] | Capture, upload, store URL |
+| Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
+| Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
+| Android preview APK | [ ] | [ ] | Build APK and install on phone |
+| Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
+
 ## Product Goal
 
 Build a production-ready Android delivery partner app for Dynamic Bazar that lets partners log in, view assigned district orders, confirm deliveries with OTP/photo/COD, record failed deliveries, track COD, work offline, and sync with Google Sheets through Google Apps Script.
