@@ -2,7 +2,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { DeliveryOrder, FailPayload, DeliverPayload } from '../types';
 import { fetchOrders, getCodSummary, markDelivered, markFailed } from '../services/api';
-import { loadOrders, saveOrders } from '../services/storage';
+import { loadOrders, loadQueue, saveOrders } from '../services/storage';
 import { enqueueAction, syncQueue } from '../services/offlineQueue';
 import { useAuth } from './AuthContext';
 
@@ -42,6 +42,10 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    loadQueue().then((queue) => setPendingSync(queue.length));
+  }, []);
+
   const syncOfflineQueue = useCallback(async () => {
     const result = await syncQueue(user?.token);
     setPendingSync(result.remaining);
@@ -57,7 +61,9 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
 
   async function deliverOrder(orderId: string, payload: DeliverPayload) {
     const state = await NetInfo.fetch();
-    setOrders((current) => current.map((order) => order.id === orderId ? { ...order, status: 'delivered', photoUrl: payload.photoUri, updatedAt: new Date().toISOString() } : order));
+    const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'delivered' as const, photoUrl: payload.photoUri, updatedAt: new Date().toISOString() } : order);
+    setOrders(updatedOrders);
+    await saveOrders(updatedOrders);
     if (state.isConnected) {
       await markDelivered(orderId, payload, user?.token);
     } else {
@@ -68,7 +74,9 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
 
   async function failOrder(orderId: string, payload: FailPayload) {
     const state = await NetInfo.fetch();
-    setOrders((current) => current.map((order) => order.id === orderId ? { ...order, status: 'failed', remarks: `FAILED: ${payload.reason}`, attempts: order.attempts + 1, updatedAt: new Date().toISOString() } : order));
+    const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'failed' as const, remarks: `FAILED: ${payload.reason}`, attempts: order.attempts + 1, updatedAt: new Date().toISOString() } : order);
+    setOrders(updatedOrders);
+    await saveOrders(updatedOrders);
     if (state.isConnected) {
       await markFailed(orderId, payload, user?.token);
     } else {

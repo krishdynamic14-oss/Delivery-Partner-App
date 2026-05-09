@@ -31,11 +31,13 @@ If the URL is not set, the app runs in demo mode with mock orders.
 - Partner login placeholder with secure local session storage.
 - Native dashboard with COD and order KPIs.
 - Orders list with pending, delivered, failed, and all tabs.
+- Order search by order number, customer, area, product, or masked phone.
 - Order detail screen.
+- Masked-call placeholder action for Bonvoice integration.
 - Delivery confirmation with customer OTP field and camera proof capture.
 - Failed delivery/RTO reason submission.
 - COD tracker and settlement submission.
-- Offline queue for delivery, failed, and settlement actions.
+- Persisted local status changes plus offline queue for delivery, failed, and settlement actions.
 - GAS-ready API client using a single Web App endpoint.
 
 ## Backend

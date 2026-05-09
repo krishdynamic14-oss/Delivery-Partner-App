@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Button, Card, Header, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
@@ -40,6 +40,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
         <View style={{ gap: 10 }}>
+          <Button label="Call Customer (Masked)" tone="secondary" onPress={() => Alert.alert('Masked call', `Bonvoice call request will be sent for ${order.phoneMasked}.`)} />
           <Button label="Start Delivery Confirmation" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} />
           <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} />
           <Button label="Back to Orders" tone="secondary" onPress={() => navigation.goBack()} />

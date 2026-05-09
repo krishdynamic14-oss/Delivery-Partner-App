@@ -1,10 +1,14 @@
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Card, Header, Money, Screen } from '../components/ui';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { Button, Card, Header, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useAuth } from '../state/AuthContext';
 import { useOrders } from '../state/OrdersContext';
+import type { TabParamList } from '../types';
 
 export function DashboardScreen() {
+  const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { user } = useAuth();
   const { orders, loading, refresh, codSummary, pendingSync } = useOrders();
   const delivered = orders.filter((order) => order.status === 'delivered').length;
@@ -32,6 +36,10 @@ export function DashboardScreen() {
           <Text style={styles.order}>{orders.find((order) => order.status === 'pending')?.orderNo || 'No pending orders'}</Text>
           <Text style={styles.meta}>Pull down to refresh from Google Sheets when GAS is connected.</Text>
         </Card>
+        <View style={styles.actions}>
+          <Button label="Start Orders" onPress={() => navigation.navigate('Orders')} />
+          <Button label="COD Tracker" tone="secondary" onPress={() => navigation.navigate('COD')} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -54,4 +62,5 @@ const styles = StyleSheet.create({
   metric: { fontSize: 28, fontWeight: '900' },
   section: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 10 },
   order: { color: colors.text, fontSize: 24, fontWeight: '900' },
+  actions: { gap: 10, marginBottom: 22 },
 });

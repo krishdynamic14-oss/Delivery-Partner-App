@@ -25,11 +25,15 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Camera permission needed', 'Allow camera access to capture delivery proof.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.6 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.6 }));
     if (!result.canceled) setPhotoUri(result.assets[0].uri);
   }
 
   async function submit() {
+    if (otp.length !== 6) {
+      Alert.alert('OTP required', 'Enter the 6-digit customer OTP before confirming delivery.');
+      return;
+    }
     if (!photoUri) {
       Alert.alert('Photo required', 'Capture open-box proof before confirming delivery.');
       return;
