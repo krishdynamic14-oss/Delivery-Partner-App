@@ -61,6 +61,7 @@ function doPost(e) {
 function demoLogin_(body) {
   const partner = findPartnerByPhone_(body.phone);
   if (partner) return partner;
+  if (SHEET_ID) throw new Error('Partner not found for this mobile number');
   return {
     id: 'partner_ahmedabad',
     name: 'SURESHBHAI',

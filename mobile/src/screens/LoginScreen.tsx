@@ -1,19 +1,25 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field } from '../components/ui';
 import { colors } from '../theme';
 import { useAuth } from '../state/AuthContext';
 
 export function LoginScreen() {
-  const [phone, setPhone] = useState('9638285985');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
   async function submit() {
+    if (phone.replace(/\D/g, '').length !== 10) {
+      Alert.alert('Mobile number required', 'Enter the 10-digit delivery partner number from the sheet.');
+      return;
+    }
     setLoading(true);
     try {
       await login(phone);
+    } catch (err) {
+      Alert.alert('Login failed', err instanceof Error ? err.message : 'Could not sign in.');
     } finally {
       setLoading(false);
     }

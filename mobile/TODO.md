@@ -17,7 +17,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Expo app scaffold | [x] | [x] | `npm run typecheck`, Expo config validation |
 | GitHub feature branch | [x] | [x] | Branch pushed to origin |
 | Expo web preview | [x] | [x] | `http://localhost:8083` returns app UI |
-| Secure partner session | [x] | [ ] | Login, restart app, confirm session persists |
+| Secure partner session | [x] | [ ] | Login with real delivery partner number, restart app, confirm session persists |
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
@@ -79,7 +79,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [~] Add script-property based column alias mapping (`DB_COLUMN_ALIASES_JSON`)
 - [~] Add script-property based sheet names (`DB_ORDERS_SHEET`, `DB_PAYMENT_LOG_SHEET`)
 - [ ] Configure `EXPO_PUBLIC_GAS_API_URL` in `mobile/.env`
-- [ ] Replace demo login with real partner lookup
+- [~] Replace demo login with real partner lookup
 - [ ] Add token/session validation in GAS
 - [ ] Enforce district-level access in GAS
 - [ ] Fetch real assigned orders by district
