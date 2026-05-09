@@ -91,12 +91,12 @@ function getOrdersByDistrictAndPartner_(district, partnerName, token) {
   const headers = values.shift();
   const accessor = buildAccessor_(headers);
   const districtUpper = String(district || '').toUpperCase();
-  const partnerUpper = String(partnerName || '').toUpperCase();
+  const partnerUpper = normalizeText_(partnerName);
   return values
     .map((row) => rowToOrder_(accessor, row))
     .filter((order) => {
       const districtOk = !districtUpper || String(order.district).toUpperCase() === districtUpper;
-      const partnerOk = !partnerUpper || String(order.assignedTo).toUpperCase() === partnerUpper;
+      const partnerOk = !partnerUpper || normalizeText_(order.assignedTo) === partnerUpper;
       return districtOk && partnerOk;
     });
 }
@@ -174,9 +174,11 @@ function rowToOrder_(accessor, row) {
     .filter(Boolean)
     .join(', ');
   const area = String(accessor.read(row, 'AREA') || accessor.read(row, 'PIN_CODE') || accessor.read(row, 'DISTRICT') || '');
+  const remarks = String(accessor.read(row, 'REMARKS') || '');
+  const remarksUpper = remarks.toUpperCase();
   const status = String(accessor.read(row, 'DELIVERY_COUNTED') || '').toUpperCase() === 'DONE'
     ? 'delivered'
-    : String(accessor.read(row, 'REMARKS') || '').indexOf('FAILED:') === 0
+    : remarksUpper.indexOf('FAILED:') === 0 || remarksUpper.indexOf('CANCEL') !== -1 || remarksUpper.indexOf('RTO') !== -1
       ? 'failed'
       : 'pending';
   return {
@@ -193,9 +195,9 @@ function rowToOrder_(accessor, row) {
     paymentType: normalizePaymentMode_(accessor.read(row, 'PAYMENT_MODE'), accessor.read(row, 'AMOUNT')),
     status: status,
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
-    assignedTo: String(accessor.read(row, 'POSTMAN') || ''),
+    assignedTo: String(accessor.read(row, 'POSTMAN') || '').trim(),
     updatedAt: new Date().toISOString(),
-    remarks: String(accessor.read(row, 'REMARKS') || ''),
+    remarks: remarks,
   };
 }
 
@@ -382,4 +384,8 @@ function findPartnerByPhone_(phone) {
 
 function onlyDigits_(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeText_(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 }

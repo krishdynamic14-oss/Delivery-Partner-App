@@ -26,7 +26,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | COD tracker UI | [x] | [ ] | Summary and order-wise amounts match orders |
 | Offline queue foundation | [x] | [ ] | Disable network, submit action, reconnect sync |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
-| Real Google Sheets sync | [ ] | [ ] | Fetch/update real Sheet1 data |
+| Real Google Sheets sync | [~] | [ ] | Read-only login and partner order fetch verified for MEHSANA partner |
 | Photo upload to Drive | [ ] | [ ] | Capture, upload, store URL |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
@@ -83,7 +83,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [~] Replace demo login with real partner lookup
 - [ ] Add token/session validation in GAS
 - [ ] Enforce district-level access in GAS
-- [ ] Fetch real assigned orders by district
+- [~] Fetch real assigned orders by district
 - [ ] Fetch single order detail from GAS
 - [ ] Mark delivered in Sheet1
 - [ ] Mark failed/RTO in Sheet1
