@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, Header, Money, Screen } from '../components/ui';
+import { Badge, Button, Card, Header, InfoRow, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
@@ -26,17 +26,21 @@ export function OrderDetailScreen({ route, navigation }: Props) {
         <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${order.phoneMasked}`} />
         <Card>
           <View style={styles.topRow}>
-            <Badge label={order.status} tone={order.status} />
+            <View style={styles.badges}>
+              <Badge label={order.status} tone={order.status} />
+              <Badge label={order.paymentType} tone="info" />
+            </View>
             <Money value={order.amount} />
           </View>
           <Text style={styles.product}>{order.product} × {order.quantity}</Text>
-          <Text style={styles.address}>{order.address}</Text>
+          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
+          <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
+          <InfoRow icon="map-outline" label="Area" value={`${order.area}, ${order.district}`} />
         </Card>
         <Card>
-          <Text style={styles.label}>Payment</Text>
-          <Text style={styles.value}>{order.paymentType}</Text>
-          <Text style={styles.label}>Attempts</Text>
-          <Text style={styles.value}>{order.attempts}</Text>
+          <InfoRow icon="credit-card-outline" label="Payment" value={order.paymentType} />
+          <InfoRow icon="repeat" label="Attempts" value={String(order.attempts)} />
+          <InfoRow icon="clock-outline" label="Last update" value={new Date(order.updatedAt).toLocaleString()} />
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
         <View style={{ gap: 10 }}>
@@ -52,9 +56,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  badges: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
   product: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
-  address: { color: colors.muted, lineHeight: 20 },
-  label: { color: colors.muted, fontSize: 12, marginTop: 8, textTransform: 'uppercase', fontWeight: '800' },
-  value: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 4 },
   remarks: { color: colors.red, marginTop: 12 },
 });

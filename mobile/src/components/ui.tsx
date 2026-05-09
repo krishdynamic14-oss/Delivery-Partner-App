@@ -1,5 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../theme';
 
@@ -58,6 +59,29 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
     <View style={styles.header}>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+}
+
+export function InfoRow({ icon, label, value }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIcon}>
+        <MaterialCommunityIcons name={icon} size={18} color={colors.amber} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+export function StepPill({ index, label, active = false, done = false }: { index: number; label: string; active?: boolean; done?: boolean }) {
+  return (
+    <View style={[styles.stepPill, active && styles.stepActive, done && styles.stepDone]}>
+      <Text style={[styles.stepIndex, (active || done) && styles.stepIndexActive]}>{done ? '✓' : index}</Text>
+      <Text style={[styles.stepLabel, (active || done) && styles.stepLabelActive]}>{label}</Text>
     </View>
   );
 }
@@ -155,4 +179,39 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     overflow: 'hidden',
   },
+  infoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  infoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,179,71,0.12)',
+  },
+  infoLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 3 },
+  infoValue: { color: colors.text, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  stepPill: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.glass,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  stepActive: { borderColor: colors.amber, backgroundColor: 'rgba(255,179,71,0.14)' },
+  stepDone: { borderColor: colors.green, backgroundColor: 'rgba(0,200,150,0.12)' },
+  stepIndex: { color: colors.muted, fontWeight: '900', marginBottom: 3 },
+  stepIndexActive: { color: colors.text },
+  stepLabel: { color: colors.muted, fontSize: 10, fontWeight: '800' },
+  stepLabelActive: { color: colors.text },
 });

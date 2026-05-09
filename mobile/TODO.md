@@ -32,7 +32,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
-| Core glass-style UI polish | [x] | [ ] | Verify login, dashboard, orders, COD, and tabs in web/Expo Go |
+| Core glass-style UI polish | [x] | [x] | Visual direction approved in preview; continue screen-by-screen polish |
 
 ## Product Goal
 
@@ -61,7 +61,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] Failed delivery / RTO submission screen
 - [x] COD tracker and settlement screen
 - [x] Profile and sync status screen
-- [ ] Splash/session check screen with branded loading state
+- [~] Splash/session check screen with branded loading state
 - [ ] PIN login screen
 - [ ] OTP verification screen for partner login
 - [ ] Notifications screen
@@ -98,7 +98,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [ ] Photo compression before upload
 - [ ] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
-- [ ] Failed delivery reason dropdown
+- [~] Failed delivery reason dropdown
 - [ ] Next-attempt date picker
 - [ ] Prevent duplicate submission during sync
 - [ ] Show sync conflict/error state per order
@@ -135,8 +135,8 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Use orange/amber for Dynamic Bazar brand and COD emphasis
 - [ ] Use green/red/blue only for clear operational states
 - [ ] Avoid oversized marketing sections inside the app
-- [ ] Make order cards dense, scannable, and thumb-friendly
-- [ ] Add clear empty, loading, syncing, offline, success, and error states
+- [~] Make order cards dense, scannable, and thumb-friendly
+- [~] Add clear empty, loading, syncing, offline, success, and error states
 - [ ] Add subtle motion for state changes without slowing field work
 - [ ] Ensure every screen works at small Android sizes
 - [x] Replace text-only tab icons with proper icon set

@@ -59,7 +59,8 @@ function AppNavigator() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator color={colors.orange} />
-        <Text style={{ color: colors.muted, marginTop: 12 }}>Loading Dynamic Bazar...</Text>
+        <Text style={{ color: colors.text, marginTop: 16, fontSize: 22, fontWeight: '900' }}>Dynamic Bazar</Text>
+        <Text style={{ color: colors.muted, marginTop: 6 }}>Preparing delivery workspace...</Text>
       </View>
     );
   }

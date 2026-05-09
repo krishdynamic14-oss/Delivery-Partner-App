@@ -1,8 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text } from 'react-native';
-import { Button, Card, Field, Header, Money, Screen } from '../components/ui';
+import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Badge, Button, Card, Field, Header, InfoRow, Money, Screen, StepPill } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
@@ -51,10 +51,21 @@ export function DeliveryScreen({ route, navigation }: Props) {
     <Screen>
       <ScrollView>
         <Header title="Confirm Delivery" subtitle={`#${order.orderNo} · ${order.customerName}`} />
+        <View style={styles.steps}>
+          <StepPill index={1} label="Call" done />
+          <StepPill index={2} label="OTP" active={!photoUri} />
+          <StepPill index={3} label="Photo" active={!!photoUri} />
+          <StepPill index={4} label="COD" />
+        </View>
         <Card>
+          <View style={styles.topRow}>
+            <Badge label={order.paymentType} tone="info" />
+            <Text style={styles.priority}>Priority route</Text>
+          </View>
           <Text style={styles.label}>Collect COD</Text>
           <Money value={order.amount} size={34} />
-          <Text style={styles.meta}>Call and OTP integrations are routed through GAS in production.</Text>
+          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
+          <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
         </Card>
         <Field value={otp} onChangeText={setOtp} keyboardType="number-pad" placeholder="Customer OTP" maxLength={6} />
         <Card>
@@ -69,6 +80,9 @@ export function DeliveryScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  steps: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  priority: { color: colors.amber, fontSize: 12, fontWeight: '900' },
   label: { color: colors.muted, textTransform: 'uppercase', fontWeight: '800', marginBottom: 8 },
   meta: { color: colors.muted, lineHeight: 20, marginBottom: 12 },
   photo: { height: 180, borderRadius: 12, marginBottom: 12 },
