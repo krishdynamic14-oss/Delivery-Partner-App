@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useMemo, useState } from 'react';
 import { colors } from './src/theme';
@@ -29,19 +30,24 @@ function TabNavigator() {
         tabBarActiveTintColor: colors.orange,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          position: 'absolute',
+          backgroundColor: 'rgba(14,14,22,0.92)',
           borderTopColor: colors.border,
-          height: 68,
-          paddingBottom: 10,
+          borderTopWidth: 1,
+          height: 72,
+          paddingBottom: 12,
           paddingTop: 8,
+          marginHorizontal: 14,
+          marginBottom: 10,
+          borderRadius: 22,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
       }}
     >
-      <Tabs.Screen name="Home" component={DashboardScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>HQ</Text> }} />
-      <Tabs.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>ORD</Text> }} />
-      <Tabs.Screen name="COD" component={CodScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>₹</Text> }} />
-      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>ME</Text> }} />
+      <Tabs.Screen name="Home" component={DashboardScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="package-variant-closed" color={color} size={size} /> }} />
+      <Tabs.Screen name="COD" component={CodScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cash-multiple" color={color} size={size} /> }} />
+      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} /> }} />
     </Tabs.Navigator>
   );
 }

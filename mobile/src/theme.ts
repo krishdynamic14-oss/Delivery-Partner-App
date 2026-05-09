@@ -1,10 +1,13 @@
 export const colors = {
-  bg: '#08080f',
-  surface: '#111118',
-  surface2: '#18181f',
-  border: 'rgba(255,255,255,0.09)',
+  bg: '#07070d',
+  surface: 'rgba(18,18,27,0.86)',
+  surface2: 'rgba(31,31,44,0.82)',
+  glass: 'rgba(255,255,255,0.075)',
+  glassStrong: 'rgba(255,255,255,0.12)',
+  border: 'rgba(255,255,255,0.12)',
   orange: '#ff6b00',
   amber: '#ffb347',
+  gold: '#ffd166',
   green: '#00c896',
   red: '#ff4b6e',
   blue: '#4e9cff',
@@ -16,5 +19,5 @@ export const colors = {
 export const spacing = {
   page: 18,
   card: 16,
-  radius: 16,
+  radius: 18,
 };

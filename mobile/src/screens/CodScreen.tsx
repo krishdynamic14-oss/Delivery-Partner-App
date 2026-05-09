@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text } from 'react-native';
-import { Button, Card, Field, Header, Money, Screen } from '../components/ui';
+import { Badge, Button, Card, Field, Header, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import { submitSettlement } from '../services/api';
@@ -42,6 +42,7 @@ export function CodScreen() {
           <Card>
             <Text style={styles.order}>#{item.orderNo} · {item.customerName}</Text>
             <Text style={styles.meta}>{item.status.toUpperCase()} · ₹{item.amount.toLocaleString('en-IN')}</Text>
+            <Badge label={item.status === 'delivered' ? 'collected' : 'pending cash'} tone={item.status === 'delivered' ? 'delivered' : 'pending'} />
           </Card>
         )}
       />

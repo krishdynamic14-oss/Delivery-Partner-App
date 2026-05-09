@@ -27,7 +27,7 @@ export function OrdersScreen() {
 
   return (
     <Screen>
-      <Header title="Orders" subtitle={`${filtered.length} visible · swipe actions come after MVP validation`} />
+      <Header title="Orders" subtitle={`${filtered.length} visible · pull to refresh latest assigned work`} />
       <Field value={query} onChangeText={setQuery} placeholder="Search order, customer, area, product" />
       <View style={styles.tabs}>
         {(['pending', 'delivered', 'failed', 'all'] as const).map((item) => (
@@ -71,8 +71,8 @@ function OrderCard({ order, onPress }: { order: DeliveryOrder; onPress: () => vo
 
 const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  tab: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
-  activeTab: { backgroundColor: colors.orange, borderColor: colors.orange },
+  tab: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },
+  activeTab: { backgroundColor: 'rgba(255,107,0,0.92)', borderColor: colors.orange },
   tabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
   activeTabText: { color: colors.text },
   row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },

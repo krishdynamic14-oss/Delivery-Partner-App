@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Header, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useAuth } from '../state/AuthContext';
@@ -20,11 +21,11 @@ export function DashboardScreen() {
       <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
         <Header title={`Namaskar, ${user?.name || 'Partner'}`} subtitle={`${user?.district || 'AHMEDABAD'} · Today`} />
         {pendingSync ? <Text style={styles.sync}>{pendingSync} offline update(s) pending sync</Text> : null}
-        <Card>
+        <LinearGradient colors={['rgba(255,107,0,0.24)', 'rgba(255,179,71,0.08)']} style={styles.hero}>
           <Text style={styles.label}>COD collected today</Text>
           <Money value={codSummary.collected} size={34} />
           <Text style={styles.meta}>Remaining ₹{codSummary.remaining.toLocaleString('en-IN')}</Text>
-        </Card>
+        </LinearGradient>
         <View style={styles.grid}>
           <Metric label="Total" value={orders.length} color={colors.blue} />
           <Metric label="Delivered" value={delivered} color={colors.green} />
@@ -56,6 +57,7 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
 
 const styles = StyleSheet.create({
   sync: { color: colors.amber, marginBottom: 12, fontWeight: '700' },
+  hero: { borderWidth: 1, borderColor: 'rgba(255,179,71,0.22)', borderRadius: 22, padding: 18, marginBottom: 12, overflow: 'hidden' },
   label: { color: colors.muted, fontSize: 12, textTransform: 'uppercase', fontWeight: '800', marginBottom: 8 },
   meta: { color: colors.muted, marginTop: 8, fontSize: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

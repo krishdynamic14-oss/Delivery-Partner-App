@@ -32,6 +32,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
+| Core glass-style UI polish | [x] | [ ] | Verify login, dashboard, orders, COD, and tabs in web/Expo Go |
 
 ## Product Goal
 
@@ -128,8 +129,8 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 
 Create a premium, field-usable mobile UI. The app should feel like a polished logistics tool, not a rough admin form.
 
-- [ ] Build an outstanding dark mobile UI inspired by the current prototype
-- [ ] Use restrained glassmorphism/glass-door styling for hero cards, bottom bars, and priority panels
+- [~] Build an outstanding dark mobile UI inspired by the current prototype
+- [~] Use restrained glassmorphism/glass-door styling for hero cards, bottom bars, and priority panels
 - [ ] Keep text readable in sunlight and on low-end Android screens
 - [ ] Use orange/amber for Dynamic Bazar brand and COD emphasis
 - [ ] Use green/red/blue only for clear operational states
@@ -138,7 +139,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Add clear empty, loading, syncing, offline, success, and error states
 - [ ] Add subtle motion for state changes without slowing field work
 - [ ] Ensure every screen works at small Android sizes
-- [ ] Replace text-only tab icons with proper icon set
+- [x] Replace text-only tab icons with proper icon set
 - [ ] Add polished splash screen and adaptive app icon
 - [ ] Add Gujarati/Hindi/English language-ready copy structure
 
