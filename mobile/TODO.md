@@ -21,10 +21,10 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
-| Delivery confirmation UI | [x] | [ ] | OTP validation, photo proof, delivered state |
-| Failed delivery UI | [x] | [ ] | Reason/notes submit and failed state |
+| Delivery confirmation UI | [x] | [~] | OTP validation, photo proof, delivered state, sync/queued alert added |
+| Failed delivery UI | [x] | [~] | Reason validation, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
-| Offline queue foundation | [x] | [ ] | Disable network, submit action, reconnect sync |
+| Offline queue foundation | [x] | [~] | Failed GAS/network writes are queued; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
 | Photo upload to Drive | [ ] | [ ] | Capture, upload, store URL |
@@ -104,8 +104,8 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
 - [ ] Next-attempt date picker
-- [ ] Prevent duplicate submission during sync
-- [ ] Show sync conflict/error state per order
+- [x] Prevent duplicate submission during sync
+- [~] Show sync conflict/error state per order
 
 ## COD Workflow
 
@@ -124,7 +124,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] Offline queue foundation
 - [x] Queue count visible in profile/dashboard
 - [ ] Dedicated sync status component
-- [ ] Retry queue with visible per-action failures
+- [~] Retry queue with visible per-action failures
 - [ ] Store queued photo files safely until upload
 - [ ] Automatic sync on reconnect
 - [ ] Manual force sync action with result summary

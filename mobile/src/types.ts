@@ -44,6 +44,11 @@ export type QueueAction =
   | { id: string; type: 'fail'; orderId: string; payload: FailPayload; createdAt: string }
   | { id: string; type: 'settle'; orderId: 'cod'; payload: SettlementPayload; createdAt: string };
 
+export type ActionSubmitResult = {
+  status: 'synced' | 'queued';
+  message: string;
+};
+
 export type DeliverPayload = {
   codCollected: number;
   photoUri?: string;

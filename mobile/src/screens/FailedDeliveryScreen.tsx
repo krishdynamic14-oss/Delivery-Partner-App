@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Field, Header, Screen } from '../components/ui';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
@@ -17,10 +17,17 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   const reasons = ['Customer not available', 'Phone not answered', 'Refused delivery', 'Wrong address', 'Item damaged'];
 
   async function submit() {
+    if (!reason.trim()) {
+      Alert.alert('Reason required', 'Select or enter a failed delivery reason.');
+      return;
+    }
     setLoading(true);
     try {
-      await failOrder(route.params.orderId, { reason, notes, nextAttemptDate });
+      const result = await failOrder(route.params.orderId, { reason: reason.trim(), notes: notes.trim(), nextAttemptDate: nextAttemptDate.trim() });
+      Alert.alert(result.status === 'synced' ? 'Failed delivery synced' : 'Failed delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });
+    } catch (err) {
+      Alert.alert('Failed delivery not saved', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoading(false);
     }

@@ -41,8 +41,11 @@ export function DeliveryScreen({ route, navigation }: Props) {
     }
     setLoading(true);
     try {
-      await deliverOrder(currentOrder.id, { codCollected: currentOrder.amount, photoUri, otp });
+      const result = await deliverOrder(currentOrder.id, { codCollected: currentOrder.amount, photoUri, otp });
+      Alert.alert(result.status === 'synced' ? 'Delivery synced' : 'Delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });
+    } catch (err) {
+      Alert.alert('Delivery not saved', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoading(false);
     }
