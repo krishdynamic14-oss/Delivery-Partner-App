@@ -1,0 +1,111 @@
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useState } from 'react';
+import { colors } from './src/theme';
+import { AuthProvider, useAuth } from './src/state/AuthContext';
+import { OrdersProvider } from './src/state/OrdersContext';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { DashboardScreen } from './src/screens/DashboardScreen';
+import { OrdersScreen } from './src/screens/OrdersScreen';
+import { OrderDetailScreen } from './src/screens/OrderDetailScreen';
+import { DeliveryScreen } from './src/screens/DeliveryScreen';
+import { FailedDeliveryScreen } from './src/screens/FailedDeliveryScreen';
+import { CodScreen } from './src/screens/CodScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import type { RootStackParamList, TabParamList } from './src/types';
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tabs = createBottomTabNavigator<TabParamList>();
+
+function TabNavigator() {
+  return (
+    <Tabs.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.orange,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 68,
+          paddingBottom: 10,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+      }}
+    >
+      <Tabs.Screen name="Home" component={DashboardScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>HQ</Text> }} />
+      <Tabs.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>ORD</Text> }} />
+      <Tabs.Screen name="COD" component={CodScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>₹</Text> }} />
+      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: ({ color }) => <Text style={{ color }}>ME</Text> }} />
+    </Tabs.Navigator>
+  );
+}
+
+function AppNavigator() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator color={colors.orange} />
+        <Text style={{ color: colors.muted, marginTop: 12 }}>Loading Dynamic Bazar...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer
+      theme={{
+        ...DefaultTheme,
+        colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border },
+      }}
+    >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="Tabs" component={TabNavigator} />
+            <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
+            <Stack.Screen name="Delivery" component={DeliveryScreen} />
+            <Stack.Screen name="FailedDelivery" component={FailedDeliveryScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+function Bootstrapper() {
+  const { user } = useAuth();
+  const ordersValue = useMemo(() => ({ district: user?.district || 'AHMEDABAD' }), [user?.district]);
+  return (
+    <OrdersProvider district={ordersValue.district}>
+      <AppNavigator />
+    </OrdersProvider>
+  );
+}
+
+export default function App() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  if (!ready) return null;
+
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <Bootstrapper />
+        <StatusBar style="light" />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}

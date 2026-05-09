@@ -4,6 +4,33 @@ A mobile-first delivery management web app for managing festive-season COD deliv
 
 > Built with plain HTML, CSS, and Vanilla JS — no framework, no build step.
 
+## React Native MVP
+
+The React Native Android MVP has been started under `mobile/` on the `feature-react-native-mvp` branch. The existing HTML prototype remains in this repo as the design/reference implementation.
+
+Native app status:
+- Expo + TypeScript scaffold complete.
+- Partner login placeholder with secure local session.
+- Dashboard, orders, order detail, delivery confirmation, failed delivery, COD tracker, and profile screens added.
+- Offline queue and cached orders foundation added.
+- GAS-ready API client added with demo fallback data.
+- Starter Google Apps Script API added under `gas/DeliveryAppAPI.gs`.
+
+Run it:
+
+```bash
+cd mobile
+npm install
+npm run android
+```
+
+Connect Google Apps Script:
+
+```bash
+cp .env.example .env
+# set EXPO_PUBLIC_GAS_API_URL to the deployed GAS Web App URL
+```
+
 ---
 
 ## Live Preview
