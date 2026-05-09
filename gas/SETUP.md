@@ -41,3 +41,13 @@ Expected result:
 - `resolved.ORDER_NO` is `ORDER NUMBER`
 - `resolved.POSTMAN` is `DELIVERY PARTNER NAME`
 - `resolved.MOBILE` is `MOBILE NUMBER`
+
+## Payment Log Columns
+
+`cod.settle` now creates a header row automatically in `PAYMENT LOG`:
+
+```text
+TIMESTAMP, SETTLEMENT ID, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, SETTLEMENT AMOUNT, METHOD, REFERENCE, ASSIGNED COD, COLLECTED COD, REMAINING COD, COD ORDER COUNT, DELIVERED COD COUNT, PENDING COD COUNT, SOURCE
+```
+
+If old rows already exist without headers, the script inserts the header row above them.

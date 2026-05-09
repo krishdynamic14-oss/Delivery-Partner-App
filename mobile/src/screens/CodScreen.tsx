@@ -12,9 +12,23 @@ export function CodScreen() {
   const { orders, codSummary } = useOrders();
   const [amount, setAmount] = useState(String(codSummary.collected));
   const codOrders = orders.filter((order) => order.paymentType === 'COD');
+  const deliveredCodCount = codOrders.filter((order) => order.status === 'delivered').length;
+  const pendingCodCount = codOrders.filter((order) => order.status !== 'delivered').length;
 
   async function settle() {
-    const payload = { amount: Number(amount || 0), method: 'Cash' as const };
+    const payload = {
+      amount: Number(amount || 0),
+      method: 'Cash' as const,
+      partnerName: user?.name,
+      partnerPhone: user?.phone,
+      district: user?.district,
+      assignedCod: codSummary.assigned,
+      collectedCod: codSummary.collected,
+      remainingCod: codSummary.remaining,
+      codOrderCount: codOrders.length,
+      deliveredCodCount,
+      pendingCodCount,
+    };
     try {
       await submitSettlement(payload, user?.token);
       Alert.alert('Settlement submitted', 'Payment log entry created.');
@@ -28,9 +42,15 @@ export function CodScreen() {
     <Screen>
       <Header title="COD Tracker" subtitle="Order-wise collection status" />
       <Card>
+        <Text style={styles.label}>Settlement owner</Text>
+        <Text style={styles.order}>{user?.name || 'Delivery Partner'}</Text>
+        <Text style={styles.meta}>{user?.district || '-'} · {user?.phone || '-'}</Text>
+      </Card>
+      <Card>
         <Text style={styles.label}>Collected</Text>
         <Money value={codSummary.collected} size={34} />
         <Text style={styles.meta}>Assigned ₹{codSummary.assigned.toLocaleString('en-IN')} · Remaining ₹{codSummary.remaining.toLocaleString('en-IN')}</Text>
+        <Text style={styles.meta}>COD orders {codOrders.length} · Delivered {deliveredCodCount} · Pending {pendingCodCount}</Text>
       </Card>
       <Field value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder="Settlement amount" />
       <Button label="Submit Cash Settlement" onPress={settle} />

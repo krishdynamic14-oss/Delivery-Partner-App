@@ -123,8 +123,25 @@ function submitCodSettlement_(body, token) {
   assertToken_(token);
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(PAYMENT_LOG_SHEET_NAME) || ss.insertSheet(PAYMENT_LOG_SHEET_NAME);
+  ensurePaymentLogHeader_(sheet);
   const settlementId = 'SET-' + Date.now();
-  sheet.appendRow([new Date(), settlementId, body.amount, body.method, body.reference || '']);
+  sheet.appendRow([
+    new Date(),
+    settlementId,
+    body.partnerName || '',
+    body.partnerPhone || '',
+    body.district || '',
+    Number(body.amount || 0),
+    body.method || '',
+    body.reference || '',
+    Number(body.assignedCod || 0),
+    Number(body.collectedCod || 0),
+    Number(body.remainingCod || 0),
+    Number(body.codOrderCount || 0),
+    Number(body.deliveredCodCount || 0),
+    Number(body.pendingCodCount || 0),
+    'mobile-app',
+  ]);
   return { settlementId: settlementId };
 }
 
@@ -152,6 +169,10 @@ function updateOrderRow_(orderId, updates) {
 
 function rowToOrder_(accessor, row) {
   const orderNo = String(accessor.read(row, 'ORDER_NO') || '');
+  const address = [accessor.read(row, 'ADDRESS'), accessor.read(row, 'PIN_CODE')]
+    .filter(Boolean)
+    .join(', ');
+  const area = String(accessor.read(row, 'AREA') || accessor.read(row, 'PIN_CODE') || accessor.read(row, 'DISTRICT') || '');
   const status = String(accessor.read(row, 'DELIVERY_COUNTED') || '').toUpperCase() === 'DONE'
     ? 'delivered'
     : String(accessor.read(row, 'REMARKS') || '').indexOf('FAILED:') === 0
@@ -162,8 +183,8 @@ function rowToOrder_(accessor, row) {
     orderNo: orderNo.replace('#', ''),
     customerName: String(accessor.read(row, 'CUSTOMER_NAME') || ''),
     phoneMasked: maskPhone_(String(accessor.read(row, 'MOBILE') || '')),
-    address: String(accessor.read(row, 'ADDRESS') || ''),
-    area: String(accessor.read(row, 'AREA') || ''),
+    address: String(address || ''),
+    area: area,
     district: String(accessor.read(row, 'DISTRICT') || ''),
     product: String(accessor.read(row, 'PRODUCT') || ''),
     quantity: Number(accessor.read(row, 'QTY') || 1),
@@ -272,6 +293,35 @@ function inspectColumns_() {
     resolved: accessor.resolved,
     aliases: accessor.aliases,
   };
+}
+
+function ensurePaymentLogHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'SETTLEMENT ID',
+    'DELIVERY PARTNER NAME',
+    'DELIVERY PARTNER NUMBER',
+    'DISTRICT',
+    'SETTLEMENT AMOUNT',
+    'METHOD',
+    'REFERENCE',
+    'ASSIGNED COD',
+    'COLLECTED COD',
+    'REMAINING COD',
+    'COD ORDER COUNT',
+    'DELIVERED COD COUNT',
+    'PENDING COD COUNT',
+    'SOURCE',
+  ];
+
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (currentFirstCell === 'TIMESTAMP') return;
+
+  if (sheet.getLastRow() > 0 && currentFirstCell) {
+    sheet.insertRowBefore(1);
+  }
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
 }
 
 function findPartnerByPhone_(phone) {

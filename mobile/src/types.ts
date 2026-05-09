@@ -61,6 +61,15 @@ export type SettlementPayload = {
   amount: number;
   method: 'Cash' | 'UPI' | 'Bank';
   reference?: string;
+  partnerName?: string;
+  partnerPhone?: string;
+  district?: string;
+  assignedCod?: number;
+  collectedCod?: number;
+  remainingCod?: number;
+  codOrderCount?: number;
+  deliveredCodCount?: number;
+  pendingCodCount?: number;
 };
 
 export type TabParamList = {

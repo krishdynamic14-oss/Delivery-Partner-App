@@ -6,6 +6,7 @@ import { Badge, Button, Card, Field, Header, InfoRow, Money, Screen, StepPill } 
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
+import { openNavigation } from '../services/maps';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Delivery'>;
 
@@ -66,6 +67,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
           <Money value={order.amount} size={34} />
           <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
           <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
+          <Button label="Open Route in Maps" tone="secondary" onPress={() => openNavigation(order.address, order.district)} />
         </Card>
         <Field value={otp} onChangeText={setOtp} keyboardType="number-pad" placeholder="Customer OTP" maxLength={6} />
         <Card>

@@ -4,6 +4,7 @@ import { Badge, Button, Card, Header, InfoRow, Money, Screen } from '../componen
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
+import { openNavigation } from '../services/maps';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderDetail'>;
 
@@ -36,6 +37,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
           <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
           <InfoRow icon="map-outline" label="Area" value={`${order.area}, ${order.district}`} />
+          <InfoRow icon="account-hard-hat-outline" label="Delivery partner" value={order.assignedTo || 'Not assigned'} />
         </Card>
         <Card>
           <InfoRow icon="credit-card-outline" label="Payment" value={order.paymentType} />
@@ -44,8 +46,9 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
         <View style={{ gap: 10 }}>
+          <Button label="Open Route in Maps" onPress={() => openNavigation(order.address, order.district)} />
           <Button label="Call Customer (Masked)" tone="secondary" onPress={() => Alert.alert('Masked call', `Bonvoice call request will be sent for ${order.phoneMasked}.`)} />
-          <Button label="Start Delivery Confirmation" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} />
+          <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} />
           <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} />
           <Button label="Back to Orders" tone="secondary" onPress={() => navigation.goBack()} />
         </View>

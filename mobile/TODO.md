@@ -111,11 +111,12 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] COD summary from local orders
 - [x] COD order-wise breakdown
 - [x] Settlement submission stub
-- [ ] Real settlement entry in Google Sheet
+- [~] Real settlement entry in Google Sheet
 - [ ] Settlement method selector: Cash / UPI / Bank
 - [ ] UPI/bank reference validation
 - [ ] Settlement history
 - [ ] Outstanding COD warning if not settled by day end
+- [x] Add partner, district, and COD breakdown to settlement payload/log
 
 ## Offline And Sync
 
