@@ -67,6 +67,8 @@ Recommended GAS Script Properties:
 - `DB_PAYMENT_LOG_SHEET`: settlement sheet name (default `PAYMENT LOG`)
 - `DB_COLUMN_ALIASES_JSON`: optional JSON override for logical column aliases
 
+Current project setup values are documented in `../gas/SETUP.md`.
+
 Example `DB_COLUMN_ALIASES_JSON`:
 
 ```json

@@ -30,13 +30,13 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     const cached = await loadOrders();
     if (cached.length) setOrders(cached);
     try {
-      const fresh = await fetchOrders(district, user?.token);
+      const fresh = await fetchOrders(district, user?.token, user?.name);
       setOrders(fresh);
       await saveOrders(fresh);
     } finally {
       setLoading(false);
     }
-  }, [district, user?.token]);
+  }, [district, user?.name, user?.token]);
 
   useEffect(() => {
     refresh();

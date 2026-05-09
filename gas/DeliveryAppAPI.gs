@@ -5,19 +5,32 @@ const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProper
 const DEFAULT_COLUMN_ALIASES = {
   ORDER_NO: ['ORDER NO', 'ORDER', 'ORDER_NO', 'ORDER NUMBER'],
   CUSTOMER_NAME: ['CUSTOMER NAME', 'NAME', 'CUSTOMER'],
-  MOBILE: ['MOBILE', 'PHONE', 'PHONE NO', 'CUSTOMER MOBILE'],
+  MOBILE: ['MOBILE NUMBER', 'MOBILE', 'PHONE', 'PHONE NO', 'CUSTOMER MOBILE'],
+  WHATSAPP: ['WHATSAPP NUMBER', 'WHATSAPP', 'WA NUMBER'],
   ADDRESS: ['ADDRESS', 'FULL ADDRESS'],
   AREA: ['AREA', 'CITY', 'LOCALITY'],
+  PIN_CODE: ['PIN CODE', 'PIN', 'PINCODE'],
   DISTRICT: ['DISTRICT'],
   PRODUCT: ['PRODUCT', 'PRODUCT NAME', 'ITEM'],
-  QTY: ['QTY', 'QUANTITY'],
+  QTY: ['QUANTITY', 'QTY'],
   AMOUNT: ['AMOUNT', 'COD', 'TOTAL AMOUNT'],
+  PAYMENT_MODE: ['PAYMENT MODE', 'PAYMENT TYPE'],
+  ORDER_DATE: ['ORDER DATE'],
+  ORDER_BY: ['ORDER BY'],
   ATTEMPT: ['ATTEMPT', 'ATTEMPTS'],
-  POSTMAN: ['POSTMAN', 'PARTNER', 'DELIVERY PARTNER'],
+  POSTMAN: ['DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER'],
+  POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER'],
+  GIVE_TO_PARTNER: ['GIVE TO PARTNER'],
+  SENT_IN_GROUP: ['SENT IN GROUP'],
   REMARKS: ['REMARKS', 'NOTE', 'NOTES'],
+  REMARK2: ['REMARK2', 'REMARK 2'],
+  ORDER_COUNTED: ['ORDER_COUNTED', 'ORDER COUNTED'],
   DELIVERY_COUNTED: ['DELIVERY_COUNTED', 'DELIVERY COUNTED', 'DELIVERY STATUS'],
   DELIVERY_DATE: ['DELIVERY DATE', 'DELIVERY_DATE'],
   PROCESSED: ['PROCESSED'],
+  BILL_LINK: ['BILL LINK'],
+  PAYMENT_DATE: ['PAYMENT DATE'],
+  RCVD_AMOUNT: ['RCVD AMOUNT', 'RECEIVED AMOUNT'],
   DELIVERY_PHOTO: ['DELIVERY_PHOTO', 'DELIVERY PHOTO', 'PHOTO URL'],
 };
 
@@ -46,6 +59,8 @@ function doPost(e) {
 }
 
 function demoLogin_(body) {
+  const partner = findPartnerByPhone_(body.phone);
+  if (partner) return partner;
   return {
     id: 'partner_ahmedabad',
     name: 'SURESHBHAI',
@@ -152,7 +167,7 @@ function rowToOrder_(accessor, row) {
     product: String(accessor.read(row, 'PRODUCT') || ''),
     quantity: Number(accessor.read(row, 'QTY') || 1),
     amount: Number(accessor.read(row, 'AMOUNT') || 0),
-    paymentType: Number(accessor.read(row, 'AMOUNT') || 0) > 0 ? 'COD' : 'Prepaid',
+    paymentType: normalizePaymentMode_(accessor.read(row, 'PAYMENT_MODE'), accessor.read(row, 'AMOUNT')),
     status: status,
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
     assignedTo: String(accessor.read(row, 'POSTMAN') || ''),
@@ -174,6 +189,13 @@ function getToken_(e, input) {
 
 function maskPhone_(phone) {
   return phone.length >= 4 ? 'XXXXXX' + phone.slice(-4) : phone;
+}
+
+function normalizePaymentMode_(paymentMode, amount) {
+  const mode = String(paymentMode || '').toUpperCase();
+  if (mode.indexOf('PREPAID') !== -1 || mode.indexOf('PAID') !== -1) return 'Prepaid';
+  if (mode.indexOf('COD') !== -1 || mode.indexOf('CASH') !== -1) return 'COD';
+  return Number(amount || 0) > 0 ? 'COD' : 'Prepaid';
 }
 
 function json_(data) {
@@ -249,4 +271,35 @@ function inspectColumns_() {
     resolved: accessor.resolved,
     aliases: accessor.aliases,
   };
+}
+
+function findPartnerByPhone_(phone) {
+  if (!phone) return null;
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return null;
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  const normalizedPhone = onlyDigits_(phone);
+
+  for (let i = 0; i < values.length; i += 1) {
+    const row = values[i];
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER'));
+    if (partnerPhone && partnerPhone.slice(-10) === normalizedPhone.slice(-10)) {
+      const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner');
+      const district = String(accessor.read(row, 'DISTRICT') || '');
+      return {
+        id: 'partner_' + normalizedPhone.slice(-10),
+        name: name,
+        phone: normalizedPhone.slice(-10),
+        district: district,
+        role: 'partner',
+        token: 'partner-' + normalizedPhone.slice(-10),
+      };
+    }
+  }
+  return null;
+}
+
+function onlyDigits_(value) {
+  return String(value || '').replace(/\D/g, '');
 }
