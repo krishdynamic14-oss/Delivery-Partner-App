@@ -2,6 +2,10 @@
 
 React Native / Expo MVP for the Dynamic Bazar delivery partner Android app.
 
+## Build Checklist
+
+The implementation checklist lives in [`TODO.md`](./TODO.md). Keep it updated as the source of truth for what is done, pending, and intentionally out of scope.
+
 ## Run Locally
 
 ```bash
