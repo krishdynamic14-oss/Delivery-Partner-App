@@ -148,6 +148,16 @@ function submitCodSettlement_(body, token) {
   return { settlementId: settlementId };
 }
 
+function authorizeRequiredServices() {
+  const orderSheet = getOrderSheet_();
+  const proofFolder = getProofFolder_();
+  return {
+    ok: true,
+    ordersSheet: orderSheet.getName(),
+    proofFolder: proofFolder.getName(),
+  };
+}
+
 function uploadDeliveryProof_(body) {
   if (!body.photoBase64) return '';
   const folder = getProofFolder_();

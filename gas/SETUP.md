@@ -16,6 +16,19 @@ DB_PROOF_FOLDER_ID=<Google Drive folder ID for delivery proof photos>
 If your orders tab is not named `Sheet1`, change `DB_ORDERS_SHEET` to the exact tab name.
 If `DB_PROOF_FOLDER_ID` is not set, proof photos are uploaded to the script owner's Drive root folder. Use a dedicated folder before real partner rollout.
 
+## First-Time Authorization
+
+After adding photo proof support, Apps Script needs new Google Drive permission. If the app shows an error like `You do not have permission to call DriveApp.getFolderById`, do this once:
+
+1. Open the Apps Script editor.
+2. Confirm `DB_PROOF_FOLDER_ID` is saved in Script Properties.
+3. In the function dropdown, select `authorizeRequiredServices`.
+4. Click **Run**.
+5. Approve the Google permissions, including Drive access.
+6. Deploy -> Manage deployments -> edit deployment -> Version: **New version** -> Deploy.
+
+This authorization is required because delivery proof upload uses `DriveApp`.
+
 ## Current Header Row
 
 ```text
