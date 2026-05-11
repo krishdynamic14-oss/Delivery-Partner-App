@@ -32,7 +32,8 @@ If the URL is not set, the app runs in demo mode with mock orders.
 
 ## Current MVP Coverage
 
-- Partner login placeholder with secure local session storage.
+- Team login with hidden admin/partner role mapping and secure local session storage.
+- Admin dashboard and all-orders monitoring shell.
 - Native dashboard with COD and order KPIs.
 - Orders list with pending, delivered, failed, and all tabs.
 - Order search by order number, customer, area, product, or masked phone.
@@ -55,6 +56,7 @@ Starter Google Apps Script lives at:
 Deploy it as a Web App and set `DB_SHEET_ID` in Script Properties. The mobile client currently calls actions through POST JSON:
 
 - `auth.demoLogin`
+- `orders.all`
 - `orders.byDistrict`
 - `orders.deliver`
 - `orders.fail`

@@ -11,11 +11,11 @@ export function ProfileScreen() {
 
   return (
     <Screen>
-      <Header title="Profile" subtitle="Partner settings and sync status" />
+      <Header title="Profile" subtitle={`${user?.role === 'admin' ? 'Admin' : 'Partner'} settings and sync status`} />
       <Card>
         <View style={styles.avatar}><Text style={styles.avatarText}>{user?.name?.[0] || 'D'}</Text></View>
         <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.meta}>{user?.district} · Delivery Partner</Text>
+        <Text style={styles.meta}>{user?.district} · {user?.role === 'admin' ? 'Admin' : 'Delivery Partner'}</Text>
         <InfoRow icon="phone-outline" label="Mobile" value={user?.phone || '-'} />
         <InfoRow icon="cloud-sync-outline" label="Pending offline actions" value={String(pendingSync)} />
       </Card>

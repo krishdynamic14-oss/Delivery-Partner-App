@@ -17,10 +17,13 @@ import { DeliveryScreen } from './src/screens/DeliveryScreen';
 import { FailedDeliveryScreen } from './src/screens/FailedDeliveryScreen';
 import { CodScreen } from './src/screens/CodScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import type { RootStackParamList, TabParamList } from './src/types';
+import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
+import { AdminOrdersScreen } from './src/screens/AdminOrdersScreen';
+import type { AdminTabParamList, RootStackParamList, TabParamList } from './src/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<TabParamList>();
+const AdminTabs = createBottomTabNavigator<AdminTabParamList>();
 
 function TabNavigator() {
   return (
@@ -52,6 +55,36 @@ function TabNavigator() {
   );
 }
 
+function AdminTabNavigator() {
+  return (
+    <AdminTabs.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.orange,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: {
+          position: 'absolute',
+          backgroundColor: 'rgba(14,14,22,0.92)',
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: 72,
+          paddingBottom: 12,
+          paddingTop: 8,
+          marginHorizontal: 14,
+          marginBottom: 10,
+          borderRadius: 22,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+      }}
+    >
+      <AdminTabs.Screen name="AdminHome" component={AdminDashboardScreen} options={{ title: 'Home', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard-outline" color={color} size={size} /> }} />
+      <AdminTabs.Screen name="AdminOrders" component={AdminOrdersScreen} options={{ title: 'Orders', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="clipboard-list-outline" color={color} size={size} /> }} />
+      <AdminTabs.Screen name="AdminCOD" component={CodScreen} options={{ title: 'COD', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cash-register" color={color} size={size} /> }} />
+      <AdminTabs.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="shield-account-outline" color={color} size={size} /> }} />
+    </AdminTabs.Navigator>
+  );
+}
+
 function AppNavigator() {
   const { user, loading } = useAuth();
 
@@ -77,7 +110,9 @@ function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
           <>
-            <Stack.Screen name="Tabs" component={TabNavigator} />
+            {user.role === 'admin'
+              ? <Stack.Screen name="AdminTabs" component={AdminTabNavigator} />
+              : <Stack.Screen name="Tabs" component={TabNavigator} />}
             <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
             <Stack.Screen name="Delivery" component={DeliveryScreen} />
             <Stack.Screen name="FailedDelivery" component={FailedDeliveryScreen} />

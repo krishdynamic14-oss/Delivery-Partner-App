@@ -108,9 +108,17 @@ export type TabParamList = {
   Profile: undefined;
 };
 
+export type AdminTabParamList = {
+  AdminHome: undefined;
+  AdminOrders: undefined;
+  AdminCOD: undefined;
+  AdminProfile: undefined;
+};
+
 export type RootStackParamList = {
   Login: undefined;
   Tabs: NavigatorScreenParams<TabParamList>;
+  AdminTabs: NavigatorScreenParams<AdminTabParamList>;
   OrderDetail: { orderId: string };
   Delivery: { orderId: string };
   FailedDelivery: { orderId: string };

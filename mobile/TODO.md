@@ -30,6 +30,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Photo upload to Drive | [ ] | [ ] | Paused for MVP; delivery submit no longer sends base64 or calls Drive by default |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
+| Admin dashboard shell | [~] | [ ] | Admin role opens hidden admin tabs and all-order monitoring |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
@@ -55,6 +56,8 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 
 - [x] Login placeholder screen
 - [~] Hidden role mapping from one login screen
+- [~] Admin dashboard shell
+- [~] Admin all-orders monitoring screen
 - [x] Dashboard with COD and order KPIs
 - [x] Orders list with status tabs
 - [x] Search by order number, customer, area, product, or masked phone
@@ -86,6 +89,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [ ] Add token/session validation in GAS
 - [ ] Enforce district-level access in GAS
 - [~] Fetch real assigned orders by district
+- [~] Fetch all orders for hidden admin role
 - [ ] Fetch single order detail from GAS
 - [x] Mark delivered in Sheet1
 - [~] Mark failed/RTO in Sheet1

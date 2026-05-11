@@ -3,12 +3,14 @@ import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native
 import { Badge, Button, Card, Header, InfoRow, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
+import { useAuth } from '../state/AuthContext';
 import type { RootStackParamList } from '../types';
 import { openNavigation } from '../services/maps';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderDetail'>;
 
 export function OrderDetailScreen({ route, navigation }: Props) {
+  const { user } = useAuth();
   const { orders } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
 
@@ -23,6 +25,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
 
   const proofUrl = order.photoUrl || '';
   const hasRemoteProof = proofUrl.startsWith('http');
+  const isAdmin = user?.role === 'admin';
 
   return (
     <Screen>
@@ -53,8 +56,8 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           <Button label="Open Route in Maps" onPress={() => openNavigation(order.address, order.district)} />
           {hasRemoteProof ? <Button label="Open Proof Photo" tone="secondary" onPress={() => Linking.openURL(proofUrl)} /> : null}
           <Button label="Call Customer (Masked)" tone="secondary" onPress={() => Alert.alert('Masked call', `Bonvoice call request will be sent for ${order.phoneMasked}.`)} />
-          <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} />
-          <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} />
+          {!isAdmin ? <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} /> : null}
+          {!isAdmin ? <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} /> : null}
           <Button label="Back to Orders" tone="secondary" onPress={() => navigation.goBack()} />
         </View>
       </ScrollView>

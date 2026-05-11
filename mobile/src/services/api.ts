@@ -30,6 +30,7 @@ export async function loginWithPhone(phone: string): Promise<Partner> {
 }
 
 export async function fetchOrders(district: string, token?: string, partnerName?: string): Promise<DeliveryOrder[]> {
+  if (GAS_URL && district === 'ALL') return request<DeliveryOrder[]>('orders.all', {}, token);
   if (GAS_URL) return request<DeliveryOrder[]>('orders.byDistrictAndPartner', { district, partnerName }, token);
   return mockOrders.filter((order) => order.district === district || order.assignedTo === 'SURESHBHAI');
 }

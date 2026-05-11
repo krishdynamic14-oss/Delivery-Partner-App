@@ -45,6 +45,7 @@ function doPost(e) {
 
     const routes = {
       'auth.demoLogin': () => demoLogin_(body),
+      'orders.all': () => getAllOrders_(token),
       'orders.byDistrict': () => getOrdersByDistrict_(body.district, token),
       'orders.byDistrictAndPartner': () => getOrdersByDistrictAndPartner_(body.district, body.partnerName, token),
       'orders.deliver': () => markOrderDelivered_(body, token),
@@ -104,6 +105,16 @@ function getOrdersByDistrict_(district, token) {
   return values
     .map((row) => rowToOrder_(accessor, row))
     .filter((order) => String(order.district).toUpperCase() === String(district).toUpperCase());
+}
+
+function getAllOrders_(token) {
+  assertToken_(token);
+  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return [];
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  return values.map((row) => rowToOrder_(accessor, row));
 }
 
 function getOrdersByDistrictAndPartner_(district, partnerName, token) {
