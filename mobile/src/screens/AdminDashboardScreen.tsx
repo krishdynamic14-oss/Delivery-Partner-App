@@ -1,8 +1,9 @@
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Button, Card, Header, Money, Screen } from '../components/ui';
+import { Badge, Card, Money, Screen } from '../components/ui';
 import { SyncStatusCard } from '../components/SyncStatusCard';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
@@ -18,83 +19,156 @@ export function AdminDashboardScreen() {
   const collectedCod = codOrders.filter((order) => order.status === 'delivered').reduce((sum, order) => sum + order.amount, 0);
   const assignedCod = codOrders.reduce((sum, order) => sum + order.amount, 0);
   const partnerCount = new Set(orders.map((order) => order.assignedTo).filter(Boolean)).size;
-  const topPartners = getTopPartners(orders);
+  const recentActivity = getRecentActivity(orders);
+  const performanceScore = orders.length ? Math.round((delivered / orders.length) * 100) : 0;
 
   return (
     <Screen>
       <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
-        <Header title="Admin Dashboard" subtitle="All districts · live order monitoring" />
-        <SyncStatusCard compact />
-        <LinearGradient colors={['rgba(255,107,0,0.26)', 'rgba(78,156,255,0.08)']} style={styles.hero}>
-          <Text style={styles.label}>COD collected</Text>
-          <Money value={collectedCod} size={34} />
-          <Text style={styles.meta}>Assigned COD ₹{assignedCod.toLocaleString('en-IN')}</Text>
-        </LinearGradient>
-        <View style={styles.grid}>
-          <Metric label="Orders" value={orders.length} color={colors.blue} />
-          <Metric label="Pending" value={pending} color={colors.amber} />
-          <Metric label="Delivered" value={delivered} color={colors.green} />
-          <Metric label="Failed" value={failed} color={colors.red} />
-        </View>
-        <Card>
-          <Text style={styles.section}>Field team</Text>
-          <Text style={styles.large}>{partnerCount}</Text>
-          <Text style={styles.meta}>Assigned delivery partners visible in current Sheet data.</Text>
-        </Card>
-        <Card>
-          <Text style={styles.section}>Top partners</Text>
-          {topPartners.length ? topPartners.map((partner) => (
-            <View key={partner.name} style={styles.partnerRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.partner}>{partner.name}</Text>
-                <Text style={styles.meta}>{partner.delivered} delivered · {partner.pending} pending</Text>
-              </View>
-              <Money value={partner.cod} size={18} />
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>A</Text></View>
+            <View>
+              <Text style={styles.hqTitle}>Mahotsav HQ</Text>
+              <Text style={styles.hqSub}>Admin Panel</Text>
             </View>
-          )) : <Text style={styles.meta}>No partner data found.</Text>}
-        </Card>
-        <View style={styles.actions}>
-          <Button label="View All Orders" onPress={() => navigation.navigate('AdminOrders')} />
-          <Button label="COD Overview" tone="secondary" onPress={() => navigation.navigate('AdminCOD')} />
+          </View>
+          <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>Live</Text></View>
         </View>
+
+        <View style={styles.stockAlert}>
+          <MaterialCommunityIcons name="alert" size={16} color={colors.amber} />
+          <Text style={styles.stockText}>{failed} failed/RTO needs review</Text>
+        </View>
+
+        <View style={styles.greeting}>
+          <Text style={styles.greetingTitle}>Good Morning</Text>
+          <Text style={styles.greetingSub}>Dynamic Bazar operations · {new Date().toLocaleDateString('en-IN')}</Text>
+        </View>
+
+        <LinearGradient colors={['rgba(255,107,0,0.34)', 'rgba(255,179,71,0.12)', 'rgba(18,18,27,0.88)']} style={styles.hero}>
+          <Text style={styles.heroLabel}>Total COD Collected</Text>
+          <Money value={collectedCod} size={38} />
+          <Text style={styles.trend}>Assigned ₹{assignedCod.toLocaleString('en-IN')} · {codOrders.length} COD orders</Text>
+        </LinearGradient>
+
+        <View style={styles.grid}>
+          <Metric icon="package-variant-closed" label="Today's Orders" value={orders.length} color={colors.blue} sub={`${performanceScore}% delivered`} />
+          <Metric icon="moped" label="Active Partners" value={partnerCount} color={colors.green} sub={`${pending} pending`} />
+          <Metric icon="speedometer" label="Performance" value={`${performanceScore}%`} color={colors.amber} sub="Live from Sheet" />
+          <Metric icon="backup-restore" label="RTO Pending" value={failed} color={colors.red} sub="Needs admin check" />
+        </View>
+
+        <View style={styles.quickGrid}>
+          <QuickAction icon="account-plus-outline" title="Assign Orders" subtitle={`${pending} pending`} color={colors.orange} onPress={() => navigation.navigate('AdminOrders')} />
+          <QuickAction icon="map-marker-radius-outline" title="Live Map" subtitle={`${partnerCount} active`} color={colors.blue} />
+          <QuickAction icon="wallet-outline" title="Settlement" subtitle="EOD handover" color={colors.green} onPress={() => navigation.navigate('AdminCOD')} />
+          <QuickAction icon="chart-bar" title="Earnings" subtitle={`₹${collectedCod.toLocaleString('en-IN')}`} color="#8b5cf6" onPress={() => navigation.navigate('AdminCOD')} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Live Activity</Text>
+        {recentActivity.length ? recentActivity.map((order) => <ActivityRow key={order.id} order={order} />) : (
+          <Card><Text style={styles.meta}>No activity visible yet.</Text></Card>
+        )}
+        <SyncStatusCard compact />
       </ScrollView>
     </Screen>
   );
 }
 
-function Metric({ label, value, color }: { label: string; value: number; color: string }) {
+function Metric({ icon, label, value, color, sub }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: number | string; color: string; sub: string }) {
   return (
-    <Card>
+    <View style={styles.metricTile}>
+      <View style={[styles.metricIcon, { backgroundColor: `${color}22` }]}>
+        <MaterialCommunityIcons name={icon} size={17} color={color} />
+      </View>
       <Text style={styles.label}>{label}</Text>
       <Text style={[styles.metric, { color }]}>{value}</Text>
+      <Text style={styles.metricSub}>{sub}</Text>
+    </View>
+  );
+}
+
+function QuickAction({ icon, title, subtitle, color, onPress }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; subtitle: string; color: string; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.quickTile, pressed && styles.pressed]}>
+      <LinearGradient colors={[color, `${color}aa`]} style={styles.quickIcon}>
+        <MaterialCommunityIcons name={icon} size={19} color={colors.text} />
+      </LinearGradient>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.quickTitle}>{title}</Text>
+        <Text style={styles.quickSub}>{subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function ActivityRow({ order }: { order: DeliveryOrder }) {
+  const tone = order.status === 'delivered' ? colors.green : order.status === 'failed' ? colors.red : colors.amber;
+  const icon = order.status === 'delivered' ? 'check-circle-outline' : order.status === 'failed' ? 'backup-restore' : 'truck-delivery-outline';
+  return (
+    <Card>
+      <View style={styles.activityRow}>
+        <View style={[styles.activityIcon, { backgroundColor: `${tone}22` }]}>
+          <MaterialCommunityIcons name={icon} size={18} color={tone} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.activityOrder}>#{order.orderNo}</Text>
+          <Text style={styles.activityMeta}>{order.district} · {order.assignedTo || 'Unassigned'}</Text>
+        </View>
+        <View style={styles.activityRight}>
+          <Money value={order.amount} size={15} />
+          <Badge label={order.status} tone={order.status} />
+        </View>
+      </View>
     </Card>
   );
 }
 
-function getTopPartners(orders: DeliveryOrder[]) {
-  const byPartner = new Map<string, { name: string; delivered: number; pending: number; cod: number }>();
-  orders.forEach((order) => {
-    const name = order.assignedTo || 'Unassigned';
-    const current = byPartner.get(name) || { name, delivered: 0, pending: 0, cod: 0 };
-    if (order.status === 'delivered') current.delivered += 1;
-    if (order.status === 'pending') current.pending += 1;
-    if (order.status === 'delivered' && order.paymentType === 'COD') current.cod += order.amount;
-    byPartner.set(name, current);
-  });
-  return Array.from(byPartner.values())
-    .sort((a, b) => b.delivered - a.delivered || b.cod - a.cod)
+function getRecentActivity(orders: DeliveryOrder[]) {
+  return [...orders]
+    .sort((a, b) => {
+      const statusRank = { delivered: 3, failed: 2, pending: 1 };
+      return statusRank[b.status] - statusRank[a.status];
+    })
     .slice(0, 5);
 }
 
 const styles = StyleSheet.create({
-  hero: { borderWidth: 1, borderColor: 'rgba(255,179,71,0.22)', borderRadius: 22, padding: 18, marginBottom: 12, overflow: 'hidden' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.text, fontWeight: '900', fontSize: 18 },
+  hqTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  hqSub: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },
+  liveDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.green },
+  liveText: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  stockAlert: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7, backgroundColor: 'rgba(255,179,71,0.14)', borderColor: 'rgba(255,179,71,0.32)', borderWidth: 1, marginBottom: 14 },
+  stockText: { color: colors.amber, fontWeight: '900', fontSize: 12 },
+  greeting: { marginBottom: 16 },
+  greetingTitle: { color: colors.text, fontSize: 22, fontWeight: '900' },
+  greetingSub: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  hero: { borderWidth: 1, borderColor: 'rgba(255,179,71,0.22)', borderRadius: 24, padding: 20, marginBottom: 12, overflow: 'hidden' },
+  heroLabel: { color: colors.muted, fontSize: 12, textTransform: 'uppercase', fontWeight: '900', marginBottom: 8 },
+  trend: { color: colors.green, marginTop: 10, fontSize: 12, fontWeight: '800' },
   label: { color: colors.muted, fontSize: 12, textTransform: 'uppercase', fontWeight: '800', marginBottom: 8 },
   meta: { color: colors.muted, marginTop: 4, fontSize: 12, lineHeight: 18 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metric: { fontSize: 28, fontWeight: '900' },
-  section: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 8 },
-  large: { color: colors.green, fontSize: 32, fontWeight: '900' },
-  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  partner: { color: colors.text, fontWeight: '900' },
-  actions: { gap: 10, marginBottom: 22 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 4 },
+  metricTile: { width: '48%', minHeight: 138, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, marginBottom: 10 },
+  metricIcon: { width: 31, height: 31, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  metric: { fontSize: 26, fontWeight: '900' },
+  metricSub: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 14 },
+  quickTile: { width: '48%', minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, marginBottom: 10 },
+  pressed: { opacity: 0.72 },
+  quickIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  quickTitle: { color: colors.text, fontWeight: '900', fontSize: 12 },
+  quickSub: { color: colors.muted, fontSize: 10, marginTop: 3 },
+  sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '900', marginBottom: 10, marginTop: 2 },
+  activityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  activityIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  activityOrder: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  activityMeta: { color: colors.muted, fontSize: 11, marginTop: 4 },
+  activityRight: { alignItems: 'flex-end', gap: 5 },
 });
