@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import type { AdminTabParamList, DeliveryOrder } from '../types';
 export function AdminDashboardScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<AdminTabParamList>>();
   const { orders, loading, refresh } = useOrders();
+  const todayOrders = orders.filter((order) => isToday(parseSheetDate(order.orderDate) || parseSheetDate(order.deliveryDate)));
   const delivered = orders.filter((order) => order.status === 'delivered').length;
   const failed = orders.filter((order) => order.status === 'failed').length;
   const pending = orders.filter((order) => order.status === 'pending').length;
@@ -27,7 +28,7 @@ export function AdminDashboardScreen() {
       <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
         <View style={styles.topBar}>
           <View style={styles.brandRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>A</Text></View>
+            <View style={styles.avatar}><Image source={require('../../assets/icon.png')} style={styles.logoImage} /></View>
             <View>
               <Text style={styles.hqTitle}>Mahotsav HQ</Text>
               <Text style={styles.hqSub}>Admin Panel</Text>
@@ -53,7 +54,7 @@ export function AdminDashboardScreen() {
         </LinearGradient>
 
         <View style={styles.grid}>
-          <Metric icon="package-variant-closed" label="Today's Orders" value={orders.length} color={colors.blue} sub={`${performanceScore}% delivered`} />
+          <Metric icon="package-variant-closed" label="Today's Orders" value={todayOrders.length} color={colors.blue} sub={`${orders.length} total orders`} />
           <Metric icon="moped" label="Active Partners" value={partnerCount} color={colors.green} sub={`${pending} pending`} />
           <Metric icon="speedometer" label="Performance" value={`${performanceScore}%`} color={colors.amber} sub="Live from Sheet" />
           <Metric icon="backup-restore" label="RTO Pending" value={failed} color={colors.red} sub="Needs admin check" />
@@ -135,11 +136,29 @@ function getRecentActivity(orders: DeliveryOrder[]) {
     .slice(0, 5);
 }
 
+function parseSheetDate(value?: string) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (dmy) {
+    const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
+    return new Date(year, Number(dmy[2]) - 1, Number(dmy[1]));
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isToday(date: Date | null) {
+  if (!date) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+}
+
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.text, fontWeight: '900', fontSize: 18 },
+  avatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  logoImage: { width: 42, height: 42, resizeMode: 'contain' },
   hqTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
   hqSub: { color: colors.muted, fontSize: 12, marginTop: 2 },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },

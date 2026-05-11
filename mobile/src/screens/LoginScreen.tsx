@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field } from '../components/ui';
 import { colors } from '../theme';
@@ -28,7 +28,9 @@ export function LoginScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={styles.screen}>
       <View style={styles.glow} />
-      <LinearGradient colors={[colors.orange, colors.amber]} style={styles.logo}><Text style={styles.logoText}>DB</Text></LinearGradient>
+      <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,107,0,0.18)']} style={styles.logo}>
+        <Image source={require('../../assets/icon.png')} style={styles.logoImage} />
+      </LinearGradient>
       <Text style={styles.eyebrow}>Dynamic Bazar Team App</Text>
       <Text style={styles.title}>Dynamic Bazar</Text>
       <Text style={styles.subtitle}>Secure workspace for order tracking, delivery updates, COD handover, and field operations.</Text>
@@ -45,8 +47,8 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.bg, overflow: 'hidden' },
   glow: { position: 'absolute', width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(255,107,0,0.18)', top: -120, right: -150 },
-  logo: { width: 78, height: 78, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 22, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
-  logoText: { color: colors.text, fontWeight: '900', fontSize: 26 },
+  logo: { width: 78, height: 78, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 22, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  logoImage: { width: 74, height: 74, resizeMode: 'contain' },
   eyebrow: { color: colors.amber, textTransform: 'uppercase', fontSize: 12, fontWeight: '900', marginBottom: 8 },
   title: { color: colors.text, fontSize: 32, fontWeight: '900', marginBottom: 10, letterSpacing: 0 },
   subtitle: { color: colors.muted, marginBottom: 28, fontSize: 15, lineHeight: 22 },
