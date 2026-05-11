@@ -7,7 +7,7 @@ import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import { fetchStockMaster } from '../services/api';
-import type { StockItem } from '../types';
+import type { StockItem, StockPartnerBreakdown } from '../types';
 
 export function AdminStockScreen() {
   const { user } = useAuth();
@@ -38,6 +38,7 @@ export function AdminStockScreen() {
   const ok = products.filter((product) => product.status === 'ok');
   const forecast = [...critical, ...low, ...ok].slice(0, 4);
   const totalUnits = products.reduce((sum, product) => sum + product.remainingQty, 0);
+  const districtStocks = getDistrictStocks(products);
   const refreshing = loading || ordersLoading;
 
   return (
@@ -46,7 +47,7 @@ export function AdminStockScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Inventory</Text>
-            <Text style={styles.sub}>Stock Master · {products.length} products</Text>
+            <Text style={styles.sub}>District-wise Stock · {districtStocks.length} districts</Text>
           </View>
           <View style={styles.syncPill}><View style={styles.syncDot} /><Text style={styles.syncText}>Synced</Text></View>
         </View>
@@ -91,10 +92,13 @@ export function AdminStockScreen() {
           <MiniStat label="Healthy" value={ok.length} color={colors.green} />
         </View>
 
-        {[...critical, ...low].map((product) => <ProductCard key={product.product} product={product} />)}
+        <Text style={styles.sectionTitleOutside}>District-wise Stock</Text>
+        {districtStocks.length ? districtStocks.map((district) => <DistrictStockCard key={district.district} district={district} />) : (
+          <Card><Text style={styles.meta}>No district stock visible yet.</Text></Card>
+        )}
 
-        <Text style={styles.sectionTitleOutside}>In Stock</Text>
-        {ok.map((product) => <ProductCard key={product.product} product={product} />)}
+        <Text style={styles.sectionTitleOutside}>Product Totals</Text>
+        {[...critical, ...low, ...ok].map((product) => <ProductCard key={product.product} product={product} />)}
       </ScrollView>
     </Screen>
   );
@@ -164,6 +168,123 @@ function ProductCard({ product }: { product: StockItem }) {
   );
 }
 
+function DistrictStockCard({ district }: { district: DistrictStock }) {
+  const tone = district.remainingQty <= 5 ? 'failed' : district.remainingQty <= 15 ? 'pending' : 'delivered';
+  const color = tone === 'failed' ? colors.red : tone === 'pending' ? colors.amber : colors.green;
+  const stockPercent = district.sentQty > 0 ? Math.max(0, Math.min(100, Math.round((district.remainingQty / district.sentQty) * 100))) : 0;
+  return (
+    <Card>
+      <View style={styles.productTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.districtTitle}>{district.district}</Text>
+          <Text style={styles.meta}>{district.productCount} products · {district.sentQty} sent · {district.deliveredQty} delivered</Text>
+        </View>
+        <Badge label={`${district.remainingQty} left`} tone={tone} />
+      </View>
+      <View style={styles.stockBar}>
+        <LinearGradient colors={[color, `${color}99`]} style={[styles.stockFill, { width: `${stockPercent}%` }]} />
+      </View>
+      <View style={styles.stockMeta}>
+        <Text style={styles.meta}><Text style={styles.strong}>{district.remainingQty}</Text> remaining</Text>
+        <Text style={styles.meta}>{district.pendingQty} pending/reserved</Text>
+      </View>
+      {district.items.map((item) => <DistrictProductRow key={`${district.district}-${item.product}`} item={item} />)}
+    </Card>
+  );
+}
+
+function DistrictProductRow({ item }: { item: DistrictProductStock }) {
+  const tone = item.remainingQty <= 5 ? colors.red : item.remainingQty <= 15 ? colors.amber : colors.green;
+  return (
+    <View style={styles.districtProductRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.districtProductName}>{item.product}</Text>
+        <Text style={styles.meta}>{item.sentQty} sent · {item.deliveredQty} delivered · {item.pendingQty} pending</Text>
+      </View>
+      <Text style={[styles.districtProductQty, { color: tone }]}>{item.remainingQty}</Text>
+    </View>
+  );
+}
+
+type DistrictProductStock = {
+  product: string;
+  sentQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  failedQty: number;
+  remainingQty: number;
+};
+
+type DistrictStock = {
+  district: string;
+  sentQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  failedQty: number;
+  remainingQty: number;
+  productCount: number;
+  items: DistrictProductStock[];
+};
+
+function getDistrictStocks(products: StockItem[]) {
+  const byDistrict = new Map<string, DistrictStock>();
+  products.forEach((product) => {
+    product.partners.forEach((line) => {
+      const districtName = getDistrictName(line);
+      const current = byDistrict.get(districtName) || {
+        district: districtName,
+        sentQty: 0,
+        deliveredQty: 0,
+        pendingQty: 0,
+        failedQty: 0,
+        remainingQty: 0,
+        productCount: 0,
+        items: [],
+      };
+      current.sentQty += line.sentQty;
+      current.deliveredQty += line.deliveredQty;
+      current.pendingQty += line.pendingQty;
+      current.failedQty += line.failedQty;
+      current.remainingQty += line.remainingQty;
+      current.items.push({
+        product: product.product,
+        sentQty: line.sentQty,
+        deliveredQty: line.deliveredQty,
+        pendingQty: line.pendingQty,
+        failedQty: line.failedQty,
+        remainingQty: line.remainingQty,
+      });
+      current.productCount = new Set(current.items.map((item) => item.product)).size;
+      byDistrict.set(districtName, current);
+    });
+  });
+
+  return Array.from(byDistrict.values())
+    .map((district) => ({
+      ...district,
+      items: mergeDistrictProducts(district.items).sort((a, b) => a.remainingQty - b.remainingQty || a.product.localeCompare(b.product)),
+    }))
+    .sort((a, b) => a.remainingQty - b.remainingQty || a.district.localeCompare(b.district));
+}
+
+function mergeDistrictProducts(items: DistrictProductStock[]) {
+  const byProduct = new Map<string, DistrictProductStock>();
+  items.forEach((item) => {
+    const current = byProduct.get(item.product) || { product: item.product, sentQty: 0, deliveredQty: 0, pendingQty: 0, failedQty: 0, remainingQty: 0 };
+    current.sentQty += item.sentQty;
+    current.deliveredQty += item.deliveredQty;
+    current.pendingQty += item.pendingQty;
+    current.failedQty += item.failedQty;
+    current.remainingQty += item.remainingQty;
+    byProduct.set(item.product, current);
+  });
+  return Array.from(byProduct.values());
+}
+
+function getDistrictName(line: StockPartnerBreakdown) {
+  return (line.district || line.name || 'Unassigned').trim().toUpperCase();
+}
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   title: { color: colors.text, fontSize: 27, fontWeight: '900' },
@@ -181,6 +302,10 @@ const styles = StyleSheet.create({
   forecastHint: { color: colors.muted, fontSize: 10, marginLeft: 'auto' },
   forecastRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
   productTitle: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  districtTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  districtProductRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 10, marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  districtProductName: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  districtProductQty: { fontSize: 22, fontWeight: '900', minWidth: 38, textAlign: 'right' },
   meta: { color: colors.muted, fontSize: 11, marginTop: 4 },
   daysBox: { alignItems: 'flex-end', minWidth: 54 },
   daysValue: { fontSize: 20, fontWeight: '900' },

@@ -43,6 +43,7 @@ export type StockPartnerBreakdown = {
   name: string;
   numberMasked: string;
   district: string;
+  scopeType?: 'PARTNER' | 'LOCATION';
   sentQty: number;
   deliveredQty: number;
   pendingQty: number;
