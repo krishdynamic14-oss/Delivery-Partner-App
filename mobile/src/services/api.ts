@@ -40,8 +40,8 @@ export async function markDelivered(orderId: string, payload: DeliverPayload, to
 }
 
 export async function markFailed(orderId: string, payload: FailPayload, token?: string) {
-  if (GAS_URL) return request<{ updated: true }>('orders.fail', { orderId, ...payload }, token);
-  return { updated: true };
+  if (GAS_URL) return request<{ updated: true; photoUrl?: string }>('orders.fail', { orderId, ...payload }, token);
+  return { updated: true, photoUrl: payload.photoUri };
 }
 
 export async function submitSettlement(payload: SettlementPayload, token?: string) {

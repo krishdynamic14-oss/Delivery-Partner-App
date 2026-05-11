@@ -1,6 +1,7 @@
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Field, Header, Screen } from '../components/ui';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
@@ -13,17 +14,51 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   const [reason, setReason] = useState('Customer not available');
   const [notes, setNotes] = useState('');
   const [nextAttemptDate, setNextAttemptDate] = useState('');
+  const [photo, setPhoto] = useState<{
+    uri: string;
+    mimeType?: string;
+    fileName?: string;
+  }>();
   const [loading, setLoading] = useState(false);
-  const reasons = ['Customer not available', 'Phone not answered', 'Refused delivery', 'Wrong address', 'Item damaged'];
+  const reasons = ['Customer not available', 'Phone not answered', 'Refused delivery', 'Cancelled by customer', 'Wrong address', 'Item damaged'];
+  const requiresHouseProof = /refused|cancel/i.test(reason);
+
+  async function pickImage() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Camera permission needed', 'Allow camera access to capture house proof.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.55 }));
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      setPhoto({
+        uri: asset.uri,
+        mimeType: asset.mimeType || 'image/jpeg',
+        fileName: asset.fileName ?? `failed-proof-${route.params.orderId}-${Date.now()}.jpg`,
+      });
+    }
+  }
 
   async function submit() {
     if (!reason.trim()) {
       Alert.alert('Reason required', 'Select or enter a failed delivery reason.');
       return;
     }
+    if (requiresHouseProof && !photo?.uri) {
+      Alert.alert('House photo required', 'Capture the customer house proof before marking this order refused or cancelled.');
+      return;
+    }
     setLoading(true);
     try {
-      const result = await failOrder(route.params.orderId, { reason: reason.trim(), notes: notes.trim(), nextAttemptDate: nextAttemptDate.trim() });
+      const result = await failOrder(route.params.orderId, {
+        reason: reason.trim(),
+        notes: notes.trim(),
+        nextAttemptDate: nextAttemptDate.trim(),
+        photoUri: photo?.uri,
+        photoMimeType: photo?.mimeType,
+        photoFileName: photo?.fileName,
+      });
       Alert.alert(result.status === 'synced' ? 'Failed delivery synced' : 'Failed delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });
     } catch (err) {
@@ -50,6 +85,11 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
         <Field value={reason} onChangeText={setReason} placeholder="Custom reason" />
         <Field value={nextAttemptDate} onChangeText={setNextAttemptDate} placeholder="Next attempt date" />
         <Field value={notes} onChangeText={setNotes} placeholder="Notes" multiline numberOfLines={4} />
+        <Card>
+          <Text style={styles.label}>{requiresHouseProof ? 'House proof required' : 'House proof optional'}</Text>
+          {photo?.uri ? <Image source={{ uri: photo.uri }} style={styles.photo} /> : <Text style={styles.meta}>Capture the customer house or delivery location when the customer refuses or cancels.</Text>}
+          <Button label="Capture House Photo" tone="secondary" onPress={pickImage} />
+        </Card>
         <Button label="Submit Failed Delivery" tone="danger" loading={loading} onPress={submit} />
       </ScrollView>
     </Screen>
@@ -63,4 +103,6 @@ const styles = StyleSheet.create({
   reasonActive: { borderColor: colors.red, backgroundColor: 'rgba(255,75,110,0.15)' },
   reasonText: { color: colors.muted, fontWeight: '800', fontSize: 12 },
   reasonTextActive: { color: colors.text },
+  meta: { color: colors.muted, lineHeight: 20, marginBottom: 12 },
+  photo: { height: 180, borderRadius: 12, marginBottom: 12 },
 });

@@ -22,7 +22,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
 | Delivery confirmation UI | [x] | [x] | Real phone test confirmed delivery sync after Drive upload pause |
-| Failed delivery UI | [x] | [~] | Reason validation, notes submit, failed state, sync/queued alert added |
+| Failed delivery UI | [x] | [~] | Reason validation, house proof required for refused/cancel, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
@@ -103,6 +103,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [ ] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
+- [~] Refused/cancelled delivery requires house photo proof
 - [ ] Next-attempt date picker
 - [x] Prevent duplicate submission during sync
 - [~] Show sync conflict/error state per order
@@ -171,7 +172,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Partner sees only assigned district orders
 - [ ] Search and tabs return expected orders
 - [x] Delivered action updates UI, local cache, and Sheet1
-- [ ] Failed action updates UI, local cache, and Sheet1
+- [ ] Failed/refused action updates UI, local cache, and Sheet1 with proof rule
 - [x] COD totals match Sheet data
 - [ ] Offline delivery queues and syncs after reconnect
 - [x] Photo capture works on real Android device

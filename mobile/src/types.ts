@@ -81,6 +81,9 @@ export type FailPayload = {
   reason: string;
   notes?: string;
   nextAttemptDate?: string;
+  photoUri?: string;
+  photoMimeType?: string;
+  photoFileName?: string;
 };
 
 export type SettlementPayload = {

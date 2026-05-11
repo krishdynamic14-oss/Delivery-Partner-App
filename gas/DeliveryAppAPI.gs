@@ -118,18 +118,21 @@ function markOrderDelivered_(body, token) {
 function markOrderFailed_(body, token) {
   assertToken_(token);
   const reason = String(body.reason || 'Failed delivery').trim();
+  const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
   const detail = [];
   if (body.notes) detail.push('Notes: ' + String(body.notes).trim());
   if (body.nextAttemptDate) detail.push('Next attempt: ' + String(body.nextAttemptDate).trim());
+  if (body.photoUri || photoUrl) detail.push('House proof captured');
 
   const updates = {
     REMARKS: 'FAILED: ' + reason,
     DELIVERY_COUNTED: 'FAILED',
     PROCESSED: 'FAILED',
   };
+  if (photoUrl) updates.DELIVERY_PHOTO = photoUrl;
   if (detail.length) updates.REMARK2 = detail.join(' | ');
   updateOrderRow_(body.orderId, updates);
-  return { updated: true };
+  return { updated: true, photoUrl: photoUrl || '' };
 }
 
 function submitCodSettlement_(body, token) {
