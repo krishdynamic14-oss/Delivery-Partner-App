@@ -37,7 +37,10 @@ export function AdminStockScreen() {
   const low = products.filter((product) => product.status === 'low');
   const ok = products.filter((product) => product.status === 'ok');
   const forecast = [...critical, ...low, ...ok].slice(0, 4);
-  const totalUnits = products.reduce((sum, product) => sum + product.remainingQty, 0);
+  const totalSent = products.reduce((sum, product) => sum + product.sentQty, 0);
+  const totalDelivered = products.reduce((sum, product) => sum + product.deliveredQty, 0);
+  const totalPending = products.reduce((sum, product) => sum + product.pendingQty, 0);
+  const totalStockLeft = products.reduce((sum, product) => sum + product.remainingQty, 0);
   const districtStocks = getDistrictStocks(products);
   const refreshing = loading || ordersLoading;
 
@@ -86,10 +89,10 @@ export function AdminStockScreen() {
         </View>
 
         <View style={styles.kpiGrid}>
-          <MiniStat label="Total Units" value={totalUnits} color={colors.blue} />
-          <MiniStat label="Critical" value={critical.length} color={colors.red} />
-          <MiniStat label="Low" value={low.length} color={colors.amber} />
-          <MiniStat label="Healthy" value={ok.length} color={colors.green} />
+          <MiniStat label="Total Sent" value={totalSent} color={colors.blue} />
+          <MiniStat label="Delivered" value={totalDelivered} color={colors.green} />
+          <MiniStat label="Pending" value={totalPending} color={colors.amber} />
+          <MiniStat label="Stock Left" value={totalStockLeft} color={colors.orange} />
         </View>
 
         <Text style={styles.sectionTitleOutside}>District-wise Stock</Text>
@@ -97,8 +100,6 @@ export function AdminStockScreen() {
           <Card><Text style={styles.meta}>No district stock visible yet.</Text></Card>
         )}
 
-        <Text style={styles.sectionTitleOutside}>Product Totals</Text>
-        {[...critical, ...low, ...ok].map((product) => <ProductCard key={product.product} product={product} />)}
       </ScrollView>
     </Screen>
   );
@@ -135,36 +136,6 @@ function ForecastRow({ product }: { product: StockItem }) {
         <Text style={styles.daysLabel}>days left</Text>
       </View>
     </View>
-  );
-}
-
-function ProductCard({ product }: { product: StockItem }) {
-  const tone = product.status === 'ok' ? 'delivered' : product.status === 'low' ? 'pending' : 'failed';
-  const color = product.status === 'ok' ? colors.green : product.status === 'low' ? colors.amber : colors.red;
-  return (
-    <Card>
-      <View style={styles.productTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.productTitle}>{product.product}</Text>
-          <Text style={styles.meta}>SKU: {product.sku}</Text>
-        </View>
-        <Badge label={product.status === 'ok' ? 'OK' : product.status.toUpperCase()} tone={tone} />
-      </View>
-      <View style={styles.stockBar}>
-        <LinearGradient colors={[color, `${color}99`]} style={[styles.stockFill, { width: `${product.stockPercent}%` }]} />
-      </View>
-      <View style={styles.stockMeta}>
-        <Text style={styles.meta}><Text style={styles.strong}>{product.remainingQty}</Text> remaining</Text>
-        <Text style={styles.meta}>{product.sentQty} sent · {product.deliveredQty} delivered</Text>
-      </View>
-      <Text style={styles.partnerMeta}>{product.pendingQty} pending/reserved · {product.partners.length} locations/partners</Text>
-      {product.status !== 'ok' ? (
-        <Pressable onPress={() => Alert.alert('Restock request sent', `${product.product} has been marked for restock.`)} style={({ pressed }) => [styles.restockButton, pressed && styles.pressed]}>
-          <MaterialCommunityIcons name="plus-circle-outline" size={14} color={colors.red} />
-          <Text style={styles.restockText}>Restock Now</Text>
-        </Pressable>
-      ) : null}
-    </Card>
   );
 }
 
