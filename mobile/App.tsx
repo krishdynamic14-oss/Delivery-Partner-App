@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useMemo, useState } from 'react';
 import { colors } from './src/theme';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
@@ -29,6 +29,7 @@ const Tabs = createBottomTabNavigator<TabParamList>();
 const AdminTabs = createBottomTabNavigator<AdminTabParamList>();
 
 function TabNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -37,15 +38,21 @@ function TabNavigator() {
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
           position: 'absolute',
+          left: 14,
+          right: 14,
+          bottom: Math.max(10, insets.bottom + 8),
           backgroundColor: 'rgba(14,14,22,0.92)',
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 12,
+          height: 66,
+          paddingBottom: 8,
           paddingTop: 8,
-          marginHorizontal: 14,
-          marginBottom: 10,
           borderRadius: 22,
+          shadowColor: '#000',
+          shadowOpacity: 0.36,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 10 },
+          elevation: 18,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
       }}
@@ -59,6 +66,7 @@ function TabNavigator() {
 }
 
 function AdminTabNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <AdminTabs.Navigator
       screenOptions={{
@@ -67,15 +75,21 @@ function AdminTabNavigator() {
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
           position: 'absolute',
+          left: 14,
+          right: 14,
+          bottom: Math.max(10, insets.bottom + 8),
           backgroundColor: 'rgba(14,14,22,0.92)',
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 12,
+          height: 66,
+          paddingBottom: 8,
           paddingTop: 8,
-          marginHorizontal: 14,
-          marginBottom: 10,
           borderRadius: 22,
+          shadowColor: '#000',
+          shadowOpacity: 0.36,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 10 },
+          elevation: 18,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
       }}

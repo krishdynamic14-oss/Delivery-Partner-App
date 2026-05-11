@@ -41,6 +41,7 @@ export function OrdersScreen() {
         keyExtractor={(item) => item.id}
         refreshing={loading}
         onRefresh={refresh}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={<Text style={styles.empty}>No orders match this view.</Text>}
         renderItem={({ item }) => <OrderCard order={item} onPress={() => navigation.navigate('OrderDetail', { orderId: item.id })} />}
       />
@@ -55,7 +56,7 @@ function OrderCard({ order, onPress }: { order: DeliveryOrder; onPress: () => vo
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.orderNo}>#{order.orderNo}</Text>
-            <Text style={styles.area}>{order.customerName} · {order.area}</Text>
+            <Text style={styles.address}>{order.address || order.area || 'Address not available'}</Text>
             <Text style={styles.product}>{order.product}</Text>
             <View style={styles.badgeRow}>
               <Badge label={order.status} tone={order.status} />
@@ -75,9 +76,10 @@ const styles = StyleSheet.create({
   activeTab: { backgroundColor: 'rgba(255,107,0,0.92)', borderColor: colors.orange },
   tabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
   activeTabText: { color: colors.text },
+  listContent: { paddingBottom: 18 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   orderNo: { color: colors.text, fontSize: 16, fontWeight: '900' },
-  area: { color: colors.muted, marginTop: 4, marginBottom: 4 },
+  address: { color: colors.muted, marginTop: 4, marginBottom: 4, lineHeight: 18 },
   product: { color: colors.text, marginBottom: 10 },
   badgeRow: { flexDirection: 'row', gap: 8 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 34 },

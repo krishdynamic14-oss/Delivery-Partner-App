@@ -2,11 +2,17 @@ import { PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
 export function Screen({ children }: PropsWithChildren) {
+  const insets = useSafeAreaInsets();
   return (
-    <LinearGradient colors={['#170b08', colors.bg, '#07111d']} locations={[0, 0.42, 1]} style={styles.screen}>
+    <LinearGradient
+      colors={['#170b08', colors.bg, '#07111d']}
+      locations={[0, 0.42, 1]}
+      style={[styles.screen, { paddingTop: Math.max(42, insets.top + 18), paddingBottom: insets.bottom + 104 }]}
+    >
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
       {children}
@@ -90,7 +96,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: spacing.page,
-    paddingTop: 56,
   },
   glowTop: {
     position: 'absolute',
