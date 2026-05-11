@@ -104,13 +104,14 @@ function getOrdersByDistrictAndPartner_(district, partnerName, token) {
 
 function markOrderDelivered_(body, token) {
   assertToken_(token);
-  const photoUrl = body.photoUrl || uploadDeliveryProof_(body);
-  updateOrderRow_(body.orderId, {
+  const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
+  const updates = {
     DELIVERY_COUNTED: 'DONE',
     DELIVERY_DATE: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd-MM-yyyy'),
     PROCESSED: 'DONE',
-    DELIVERY_PHOTO: photoUrl || '',
-  });
+  };
+  if (photoUrl) updates.DELIVERY_PHOTO = photoUrl;
+  updateOrderRow_(body.orderId, updates);
   return { updated: true, photoUrl: photoUrl || '' };
 }
 

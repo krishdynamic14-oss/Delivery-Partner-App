@@ -138,16 +138,20 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
         setOrders(syncedOrders);
         await saveOrders(syncedOrders);
-        return { status: 'synced', message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet.', photoUrl: result.photoUrl };
+        return {
+          status: 'synced',
+          message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet. Proof photo stays on this device for now.',
+          photoUrl: result.photoUrl,
+        };
       } catch (err) {
         const message = getErrorMessage(err);
-        await persistSyncMeta({ status: 'error', message: 'Delivery proof sync failed. Please retry online.', lastError: message });
+        await persistSyncMeta({ status: 'error', message: 'Delivery sync failed. Please retry online.', lastError: message });
         throw new Error(message);
       }
     }
 
-    await persistSyncMeta({ status: 'offline', message: 'Photo proof delivery needs network. Reconnect and try again.' });
-    throw new Error('Photo proof delivery needs network. Reconnect and try again.');
+    await persistSyncMeta({ status: 'offline', message: 'Delivery submit needs network. Reconnect and try again.' });
+    throw new Error('Delivery submit needs network. Reconnect and try again.');
   }
 
   async function failOrder(orderId: string, payload: FailPayload): Promise<ActionSubmitResult> {

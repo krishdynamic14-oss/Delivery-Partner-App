@@ -16,7 +16,6 @@ export function DeliveryScreen({ route, navigation }: Props) {
   const [otp, setOtp] = useState('482619');
   const [photo, setPhoto] = useState<{
     uri: string;
-    base64?: string;
     mimeType?: string;
     fileName?: string;
   }>();
@@ -31,12 +30,11 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Camera permission needed', 'Allow camera access to capture delivery proof.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.55 }));
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.55 }));
     if (!result.canceled) {
       const asset = result.assets[0];
       setPhoto({
         uri: asset.uri,
-        base64: asset.base64 || undefined,
         mimeType: asset.mimeType || 'image/jpeg',
         fileName: asset.fileName ?? `delivery-proof-${currentOrder.id}-${Date.now()}.jpg`,
       });
@@ -52,19 +50,15 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Photo required', 'Capture open-box proof before confirming delivery.');
       return;
     }
-    if (!photo.base64) {
-      Alert.alert('Photo data missing', 'Capture the proof photo again before confirming delivery.');
-      return;
-    }
     setLoading(true);
     try {
       const result = await deliverOrder(currentOrder.id, {
         codCollected: currentOrder.amount,
         photoUri: photo.uri,
-        photoBase64: photo.base64,
         photoMimeType: photo.mimeType,
         photoFileName: photo.fileName,
         otp,
+        notes: 'Proof photo captured locally.',
       });
       Alert.alert(result.status === 'synced' ? 'Delivery synced' : 'Delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });

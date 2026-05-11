@@ -10,15 +10,17 @@ Set these in Apps Script: Project Settings -> Script Properties.
 DB_SHEET_ID=1ju3wdk_i-n9UHwXOcwJn6_ytw7Qj4_LbY4T0jq5Py2k
 DB_ORDERS_SHEET=Sheet1
 DB_PAYMENT_LOG_SHEET=PAYMENT LOG
-DB_PROOF_FOLDER_ID=<Google Drive folder ID for delivery proof photos>
+DB_PROOF_FOLDER_ID=<optional Google Drive folder ID for delivery proof photos>
 ```
 
 If your orders tab is not named `Sheet1`, change `DB_ORDERS_SHEET` to the exact tab name.
-If `DB_PROOF_FOLDER_ID` is not set, proof photos are uploaded to the script owner's Drive root folder. Use a dedicated folder before real partner rollout.
+`DB_PROOF_FOLDER_ID` is only needed when Drive proof upload is enabled. The current mobile MVP keeps proof photos on the phone and does not upload them to Drive during delivery submit.
 
-## First-Time Authorization
+## Optional Drive Authorization
 
-After adding photo proof support, Apps Script needs full Google Drive write permission. If the app shows an error like `You do not have permission to call DriveApp.getFolderById` or `You do not have permission to call DriveApp.Folder.createFile`, do this once:
+Drive upload is paused for the current MVP because Apps Script Drive permissions were blocking real delivery testing. Normal `orders.deliver` requests do not call `DriveApp`.
+
+Only do this section later if we re-enable Drive upload by sending `uploadProof: true` from the app:
 
 1. Open the Apps Script editor.
 2. Click Project Settings and enable **Show "appsscript.json" manifest file in editor**.
@@ -43,7 +45,7 @@ When deploying the Web App, use:
 - **Execute as**: Me
 - **Who has access**: Anyone
 
-This authorization is required because delivery proof upload uses `DriveApp`.
+This authorization is required only for the optional Drive proof upload path.
 
 ## Current Header Row
 
@@ -89,16 +91,25 @@ If old rows already exist without headers, the script inserts the header row abo
 
 ## Delivery Proof Upload
 
-`orders.deliver` accepts proof image fields from the mobile app:
+Current MVP behavior:
+
+- The app captures proof photo locally.
+- The app does not send `photoBase64`.
+- The delivery submit updates the order in Google Sheets without calling Drive.
+
+Optional future Drive upload behavior:
+
+`orders.deliver` can accept proof image fields if the request also sends `uploadProof: true`:
 
 ```json
 {
   "orderId": "DP240",
+  "uploadProof": true,
   "photoBase64": "<base64 image data>",
   "photoMimeType": "image/jpeg",
   "photoFileName": "delivery-proof-DP240.jpg"
 }
 ```
 
-The script uploads the image to `DB_PROOF_FOLDER_ID`, makes it viewable by link, and writes the Drive file URL to the configured delivery photo column.
+In that opt-in path, the script uploads the image to `DB_PROOF_FOLDER_ID`, makes it viewable by link, and writes the Drive file URL to the configured delivery photo column.
 If the orders sheet does not already have a `DELIVERY_PHOTO` column, the script creates it at the end of the header row on first successful proof upload.

@@ -21,13 +21,13 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
-| Delivery confirmation UI | [x] | [~] | OTP validation, photo proof data, delivered state, sync/queued alert added |
+| Delivery confirmation UI | [x] | [~] | OTP validation, local photo proof, delivered state, sync/error alert added |
 | Failed delivery UI | [x] | [~] | Reason validation, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
-| Photo upload to Drive | [~] | [ ] | GAS upload path and app payload added; photo submit now requires online sync |
+| Photo upload to Drive | [ ] | [ ] | Paused for MVP; delivery submit no longer sends base64 or calls Drive by default |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
@@ -99,8 +99,8 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] Queue offline delivered/failed/settlement actions
 - [ ] Real customer masked call through Bonvoice
 - [ ] Real customer delivery OTP validation
-- [~] Photo compression before upload
-- [~] Google Drive upload through GAS
+- [ ] Photo compression before upload
+- [ ] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
 - [ ] Next-attempt date picker
@@ -175,7 +175,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [x] COD totals match Sheet data
 - [ ] Offline delivery queues and syncs after reconnect
 - [ ] Photo capture works on real Android device
-- [~] Photo URL is stored against correct order
+- [ ] Remote photo URL is stored against correct order
 - [ ] App handles bad network without crashing
 - [ ] App handles GAS API errors clearly
 - [ ] App works on Android 8, 11, 13+, and one low-end device
