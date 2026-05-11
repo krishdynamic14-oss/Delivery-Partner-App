@@ -1,12 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Header, InfoRow, Screen } from '../components/ui';
+import { SyncStatusCard } from '../components/SyncStatusCard';
 import { colors } from '../theme';
 import { useAuth } from '../state/AuthContext';
 import { useOrders } from '../state/OrdersContext';
 
 export function ProfileScreen() {
   const { user, logout } = useAuth();
-  const { pendingSync, syncOfflineQueue } = useOrders();
+  const { pendingSync } = useOrders();
 
   return (
     <Screen>
@@ -18,7 +19,7 @@ export function ProfileScreen() {
         <InfoRow icon="phone-outline" label="Mobile" value={user?.phone || '-'} />
         <InfoRow icon="cloud-sync-outline" label="Pending offline actions" value={String(pendingSync)} />
       </Card>
-      <Button label="Sync Offline Queue" tone="secondary" onPress={syncOfflineQueue} />
+      <SyncStatusCard />
       <Text style={{ height: 12 }} />
       <Button label="Logout" tone="danger" onPress={logout} />
     </Screen>

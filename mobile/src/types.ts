@@ -49,6 +49,23 @@ export type ActionSubmitResult = {
   message: string;
 };
 
+export type SyncStatus = 'idle' | 'syncing' | 'success' | 'warning' | 'error' | 'offline';
+
+export type SyncMeta = {
+  status: SyncStatus;
+  message: string;
+  lastSyncAt?: string;
+  lastError?: string;
+};
+
+export type SyncQueueResult = {
+  synced: number;
+  remaining: number;
+  failed: number;
+  status: Exclude<SyncStatus, 'idle' | 'syncing'>;
+  message: string;
+};
+
 export type DeliverPayload = {
   codCollected: number;
   photoUri?: string;

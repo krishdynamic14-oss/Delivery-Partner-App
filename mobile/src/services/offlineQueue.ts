@@ -1,18 +1,37 @@
 import NetInfo from '@react-native-community/netinfo';
 import { loadQueue, saveQueue } from './storage';
 import { markDelivered, markFailed, submitSettlement } from './api';
-import type { QueueAction } from '../types';
+import type { QueueAction, SyncQueueResult } from '../types';
 
 export async function enqueueAction(action: QueueAction) {
   const queue = await loadQueue();
   await saveQueue([...queue, action]);
 }
 
-export async function syncQueue(token?: string) {
+export async function syncQueue(token?: string): Promise<SyncQueueResult> {
   const state = await NetInfo.fetch();
-  if (!state.isConnected) return { synced: 0, remaining: (await loadQueue()).length };
+  if (!state.isConnected) {
+    const remaining = (await loadQueue()).length;
+    return {
+      synced: 0,
+      remaining,
+      failed: 0,
+      status: 'offline',
+      message: remaining ? `${remaining} action(s) waiting for network.` : 'Offline. Nothing pending.',
+    };
+  }
 
   const queue = await loadQueue();
+  if (!queue.length) {
+    return {
+      synced: 0,
+      remaining: 0,
+      failed: 0,
+      status: 'success',
+      message: 'All actions are already synced.',
+    };
+  }
+
   const remaining: QueueAction[] = [];
   let synced = 0;
 
@@ -28,5 +47,14 @@ export async function syncQueue(token?: string) {
   }
 
   await saveQueue(remaining);
-  return { synced, remaining: remaining.length };
+  const failed = remaining.length;
+  return {
+    synced,
+    remaining: failed,
+    failed,
+    status: failed ? 'warning' : 'success',
+    message: failed
+      ? `${synced} synced. ${failed} action(s) still need retry.`
+      : `${synced} queued action(s) synced successfully.`,
+  };
 }
