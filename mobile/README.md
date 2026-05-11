@@ -91,14 +91,16 @@ Column mapping inspection action:
 
 ## Build
 
+Detailed APK build steps are in [`APK_BUILD.md`](./APK_BUILD.md).
+
 Preview APK:
 
 ```bash
-npx eas build --platform android --profile preview
+npm run build:apk
 ```
 
 Production AAB:
 
 ```bash
-npx eas build --platform android --profile production
+npm run build:aab
 ```
