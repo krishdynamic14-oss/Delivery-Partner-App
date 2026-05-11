@@ -64,6 +64,7 @@ export function AdminDashboardScreen() {
           <QuickAction icon="map-marker-radius-outline" title="Live Map" subtitle={`${partnerCount} active`} color={colors.blue} onPress={() => navigation.navigate('AdminMap')} />
           <QuickAction icon="wallet-outline" title="Settlement" subtitle="EOD handover" color={colors.green} onPress={() => navigation.navigate('AdminEarnings')} />
           <QuickAction icon="chart-bar" title="Earnings" subtitle={`₹${collectedCod.toLocaleString('en-IN')}`} color="#8b5cf6" onPress={() => navigation.navigate('AdminEarnings')} />
+          <QuickAction icon="warehouse" title="Stock" subtitle={`${failed} alerts`} color={colors.red} onPress={() => navigation.navigate('AdminStock')} />
         </View>
 
         <Text style={styles.sectionTitle}>Live Activity</Text>

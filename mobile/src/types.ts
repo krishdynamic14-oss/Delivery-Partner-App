@@ -113,6 +113,7 @@ export type AdminTabParamList = {
   AdminOrders: undefined;
   AdminMap: undefined;
   AdminEarnings: undefined;
+  AdminStock: undefined;
   AdminProfile: undefined;
 };
 
