@@ -143,11 +143,12 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
           await saveOrders(syncedOrders);
         }
         return { status: 'synced', message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet.', photoUrl: result.photoUrl };
-      } catch {
+      } catch (err) {
+        const message = getErrorMessage(err);
         await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() });
         setPendingSync((count) => count + 1);
-        await persistSyncMeta({ status: 'warning', message: 'Delivery queued because GAS sync failed.', lastError: 'GAS sync failed.' });
-        return { status: 'queued', message: 'Delivery saved locally. It will sync when GAS is reachable.' };
+        await persistSyncMeta({ status: 'warning', message: 'Delivery queued because GAS sync failed.', lastError: message });
+        return { status: 'queued', message: `Delivery saved locally. GAS error: ${message}` };
       }
     }
 
@@ -166,11 +167,12 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
       try {
         await markFailed(orderId, payload, user?.token);
         return { status: 'synced', message: 'Failed delivery updated in Google Sheet.' };
-      } catch {
+      } catch (err) {
+        const message = getErrorMessage(err);
         await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() });
         setPendingSync((count) => count + 1);
-        await persistSyncMeta({ status: 'warning', message: 'Failed delivery queued because GAS sync failed.', lastError: 'GAS sync failed.' });
-        return { status: 'queued', message: 'Failed delivery saved locally. It will sync when GAS is reachable.' };
+        await persistSyncMeta({ status: 'warning', message: 'Failed delivery queued because GAS sync failed.', lastError: message });
+        return { status: 'queued', message: `Failed delivery saved locally. GAS error: ${message}` };
       }
     }
 
