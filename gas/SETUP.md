@@ -18,14 +18,30 @@ If `DB_PROOF_FOLDER_ID` is not set, proof photos are uploaded to the script owne
 
 ## First-Time Authorization
 
-After adding photo proof support, Apps Script needs new Google Drive permission. If the app shows an error like `You do not have permission to call DriveApp.getFolderById`, do this once:
+After adding photo proof support, Apps Script needs full Google Drive write permission. If the app shows an error like `You do not have permission to call DriveApp.getFolderById` or `You do not have permission to call DriveApp.Folder.createFile`, do this once:
 
 1. Open the Apps Script editor.
-2. Confirm `DB_PROOF_FOLDER_ID` is saved in Script Properties.
-3. In the function dropdown, select `authorizeRequiredServices`.
-4. Click **Run**.
-5. Approve the Google permissions, including Drive access.
-6. Deploy -> Manage deployments -> edit deployment -> Version: **New version** -> Deploy.
+2. Click Project Settings and enable **Show "appsscript.json" manifest file in editor**.
+3. Open `appsscript.json`.
+4. Add these OAuth scopes. You can copy the full example from `gas/appsscript.example.json` in this repo:
+
+```json
+"oauthScopes": [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive"
+]
+```
+
+5. Confirm `DB_PROOF_FOLDER_ID` is saved in Script Properties.
+6. In the function dropdown, select `authorizeRequiredServices`.
+7. Click **Run**.
+8. Approve the Google permissions, including Drive access.
+9. Deploy -> Manage deployments -> edit deployment -> Version: **New version** -> Deploy.
+
+When deploying the Web App, use:
+
+- **Execute as**: Me
+- **Who has access**: Anyone
 
 This authorization is required because delivery proof upload uses `DriveApp`.
 
