@@ -5,7 +5,7 @@ import type { QueueAction, SyncQueueResult } from '../types';
 
 export async function enqueueAction(action: QueueAction) {
   const queue = await loadQueue();
-  await saveQueue([...queue, action]);
+  await saveQueue([...queue, sanitizeQueueAction(action)]);
 }
 
 export async function syncQueue(token?: string): Promise<SyncQueueResult> {
@@ -57,4 +57,10 @@ export async function syncQueue(token?: string): Promise<SyncQueueResult> {
       ? `${synced} synced. ${failed} action(s) still need retry.`
       : `${synced} queued action(s) synced successfully.`,
   };
+}
+
+function sanitizeQueueAction(action: QueueAction): QueueAction {
+  if (action.type !== 'deliver') return action;
+  const { photoBase64, ...payload } = action.payload;
+  return { ...action, payload };
 }

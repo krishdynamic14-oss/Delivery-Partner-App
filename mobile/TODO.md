@@ -27,7 +27,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
-| Photo upload to Drive | [~] | [ ] | GAS upload path and app payload added; needs redeploy and Android proof test |
+| Photo upload to Drive | [~] | [ ] | GAS upload path and app payload added; photo submit now requires online sync |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
@@ -125,7 +125,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [x] Queue count visible in profile/dashboard
 - [x] Dedicated sync status component
 - [~] Retry queue with visible per-action failures
-- [~] Store queued photo files safely until upload
+- [ ] Store queued photo files safely until upload
 - [~] Automatic sync on reconnect
 - [x] Manual force sync action with result summary
 - [x] Last sync timestamp

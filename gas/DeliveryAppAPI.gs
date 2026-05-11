@@ -109,7 +109,7 @@ function markOrderDelivered_(body, token) {
     DELIVERY_COUNTED: 'DONE',
     DELIVERY_DATE: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd-MM-yyyy'),
     PROCESSED: 'DONE',
-    DELIVERY_PHOTO: photoUrl || body.photoUri || '',
+    DELIVERY_PHOTO: photoUrl || '',
   });
   return { updated: true, photoUrl: photoUrl || '' };
 }

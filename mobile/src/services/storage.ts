@@ -39,8 +39,17 @@ export async function saveQueue(queue: QueueAction[]) {
 }
 
 export async function loadQueue(): Promise<QueueAction[]> {
-  const raw = await AsyncStorage.getItem(QUEUE_KEY);
-  return raw ? JSON.parse(raw) : [];
+  try {
+    const raw = await AsyncStorage.getItem(QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    await AsyncStorage.removeItem(QUEUE_KEY);
+    return [];
+  }
+}
+
+export async function clearQueue() {
+  await AsyncStorage.removeItem(QUEUE_KEY);
 }
 
 export async function saveSyncMeta(meta: SyncMeta) {
