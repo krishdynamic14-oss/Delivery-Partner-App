@@ -11,10 +11,12 @@ DB_SHEET_ID=1ju3wdk_i-n9UHwXOcwJn6_ytw7Qj4_LbY4T0jq5Py2k
 DB_ORDERS_SHEET=Sheet1
 DB_PAYMENT_LOG_SHEET=PAYMENT LOG
 DB_PROOF_FOLDER_ID=<optional Google Drive folder ID for delivery proof photos>
+DB_ADMIN_PHONES=9876543210,9123456780
 ```
 
 If your orders tab is not named `Sheet1`, change `DB_ORDERS_SHEET` to the exact tab name.
 `DB_PROOF_FOLDER_ID` is only needed when Drive proof upload is enabled. The current mobile MVP keeps proof photos on the phone and does not upload them to Drive during delivery submit.
+`DB_ADMIN_PHONES` is a comma-separated hidden admin allowlist. The mobile app does not show an admin login option; admin role is returned only when the entered mobile number matches this list.
 
 ## Optional Drive Authorization
 

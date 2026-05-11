@@ -2,6 +2,7 @@ const SHEET_ID = PropertiesService.getScriptProperties().getProperty('DB_SHEET_I
 const ORDERS_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_ORDERS_SHEET') || 'Sheet1';
 const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PAYMENT_LOG_SHEET') || 'PAYMENT LOG';
 const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
+const ADMIN_PHONES = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PHONES') || '';
 
 const DEFAULT_COLUMN_ALIASES = {
   ORDER_NO: ['ORDER NO', 'ORDER', 'ORDER_NO', 'ORDER NUMBER'],
@@ -61,6 +62,8 @@ function doPost(e) {
 }
 
 function demoLogin_(body) {
+  const admin = findAdminByPhone_(body.phone);
+  if (admin) return admin;
   const partner = findPartnerByPhone_(body.phone);
   if (partner) return partner;
   if (SHEET_ID) throw new Error('Partner not found for this mobile number');
@@ -71,6 +74,24 @@ function demoLogin_(body) {
     district: 'AHMEDABAD',
     role: 'partner',
     token: 'demo-token',
+  };
+}
+
+function findAdminByPhone_(phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (!normalizedPhone || !ADMIN_PHONES) return null;
+  const adminPhones = ADMIN_PHONES
+    .split(/[,\n]/)
+    .map((value) => onlyDigits_(value).slice(-10))
+    .filter(Boolean);
+  if (adminPhones.indexOf(normalizedPhone) === -1) return null;
+  return {
+    id: 'admin_' + normalizedPhone,
+    name: 'Dynamic Bazar Admin',
+    phone: normalizedPhone,
+    district: 'ALL',
+    role: 'admin',
+    token: 'admin-' + normalizedPhone,
   };
 }
 

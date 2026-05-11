@@ -12,7 +12,7 @@ export function LoginScreen() {
 
   async function submit() {
     if (phone.replace(/\D/g, '').length !== 10) {
-      Alert.alert('Mobile number required', 'Enter the 10-digit delivery partner number from the sheet.');
+      Alert.alert('Mobile number required', 'Enter the registered 10-digit mobile number.');
       return;
     }
     setLoading(true);
@@ -29,15 +29,15 @@ export function LoginScreen() {
     <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={styles.screen}>
       <View style={styles.glow} />
       <LinearGradient colors={[colors.orange, colors.amber]} style={styles.logo}><Text style={styles.logoText}>DB</Text></LinearGradient>
-      <Text style={styles.eyebrow}>Delivery Partner App</Text>
-      <Text style={styles.title}>Dynamic Bazar Delivery</Text>
-      <Text style={styles.subtitle}>Fast COD tracking, photo proof, failed delivery records, and offline sync for field teams.</Text>
+      <Text style={styles.eyebrow}>Dynamic Bazar Team App</Text>
+      <Text style={styles.title}>Dynamic Bazar</Text>
+      <Text style={styles.subtitle}>Secure workspace for order tracking, delivery updates, COD handover, and field operations.</Text>
       <Card>
         <Text style={styles.fieldLabel}>Registered mobile number</Text>
         <Field keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} placeholder="10-digit mobile number" />
         <Button label="Continue" loading={loading} onPress={submit} />
       </Card>
-      <Text style={styles.note}>Demo mode signs in as SURESHBHAI until EXPO_PUBLIC_GAS_API_URL is configured.</Text>
+      <Text style={styles.note}>Your access is assigned automatically from your registered mobile number.</Text>
     </KeyboardAvoidingView>
   );
 }

@@ -17,7 +17,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Expo app scaffold | [x] | [x] | `npm run typecheck`, Expo config validation |
 | GitHub feature branch | [x] | [x] | Branch pushed to origin |
 | Expo web preview | [x] | [x] | `http://localhost:8083` returns app UI |
-| Secure partner session | [x] | [ ] | Login with real delivery partner number, restart app, confirm session persists |
+| Secure role-based session | [~] | [ ] | Login maps hidden admin/partner role from backend; restart app and confirm session persists |
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
@@ -29,6 +29,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
 | Photo upload to Drive | [ ] | [ ] | Paused for MVP; delivery submit no longer sends base64 or calls Drive by default |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
+| Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
 | Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
@@ -36,7 +37,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 
 ## Product Goal
 
-Build a production-ready Android delivery partner app for Dynamic Bazar that lets partners log in, view assigned district orders, confirm deliveries with OTP/photo/COD, record failed deliveries, track COD, work offline, and sync with Google Sheets through Google Apps Script.
+Build a production-ready Android operations app for Dynamic Bazar. Admin and delivery partners use the same login screen; the backend maps each registered mobile number to the correct role. Partners view assigned orders, confirm deliveries with OTP/photo/COD, record failed deliveries, track COD, work offline, and sync with Google Sheets through Google Apps Script.
 
 ## Current Foundation
 
@@ -53,6 +54,7 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 ## MVP Screens
 
 - [x] Login placeholder screen
+- [~] Hidden role mapping from one login screen
 - [x] Dashboard with COD and order KPIs
 - [x] Orders list with status tabs
 - [x] Search by order number, customer, area, product, or masked phone
