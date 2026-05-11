@@ -156,7 +156,9 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
 
   async function failOrder(orderId: string, payload: FailPayload): Promise<ActionSubmitResult> {
     const state = await NetInfo.fetch();
-    const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'failed' as const, remarks: `FAILED: ${payload.reason}`, attempts: order.attempts + 1, updatedAt: new Date().toISOString() } : order);
+    const failureDetail = [payload.notes, payload.nextAttemptDate ? `Next attempt: ${payload.nextAttemptDate}` : ''].filter(Boolean).join(' | ');
+    const remarks = `FAILED: ${payload.reason}${failureDetail ? ` | ${failureDetail}` : ''}`;
+    const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'failed' as const, remarks, attempts: order.attempts + 1, updatedAt: new Date().toISOString() } : order);
     setOrders(updatedOrders);
     await saveOrders(updatedOrders);
     if (state.isConnected) {

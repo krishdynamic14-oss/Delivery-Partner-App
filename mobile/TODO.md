@@ -21,7 +21,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
-| Delivery confirmation UI | [x] | [~] | OTP validation, local photo proof, delivered state, sync/error alert added |
+| Delivery confirmation UI | [x] | [x] | Real phone test confirmed delivery sync after Drive upload pause |
 | Failed delivery UI | [x] | [~] | Reason validation, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
@@ -85,8 +85,8 @@ Build a production-ready Android delivery partner app for Dynamic Bazar that let
 - [ ] Enforce district-level access in GAS
 - [~] Fetch real assigned orders by district
 - [ ] Fetch single order detail from GAS
-- [ ] Mark delivered in Sheet1
-- [ ] Mark failed/RTO in Sheet1
+- [x] Mark delivered in Sheet1
+- [~] Mark failed/RTO in Sheet1
 - [x] Write COD settlement to `PAYMENT LOG`
 - [ ] Upload delivery photo and store photo URL
 - [ ] Return consistent API error codes/messages
@@ -170,11 +170,11 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Logout clears local session
 - [ ] Partner sees only assigned district orders
 - [ ] Search and tabs return expected orders
-- [ ] Delivered action updates UI, local cache, and Sheet1
+- [x] Delivered action updates UI, local cache, and Sheet1
 - [ ] Failed action updates UI, local cache, and Sheet1
 - [x] COD totals match Sheet data
 - [ ] Offline delivery queues and syncs after reconnect
-- [ ] Photo capture works on real Android device
+- [x] Photo capture works on real Android device
 - [ ] Remote photo URL is stored against correct order
 - [ ] App handles bad network without crashing
 - [ ] App handles GAS API errors clearly
