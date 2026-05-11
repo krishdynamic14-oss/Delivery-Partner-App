@@ -45,12 +45,13 @@ const STOCK_COLUMN_ALIASES = {
   QTY_SENT: ['QTY SENT', 'SENT QTY', 'STOCK SENT', 'QUANTITY', 'QTY', 'PCS', 'PIECES'],
   POSTMAN: ['DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER', 'DP NAME'],
   POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER', 'DP NUMBER', 'MOBILE NUMBER', 'MOBILE'],
-  DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA'],
+  DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA', 'LOCATION'],
+  LOCATION: ['LOCATION', 'DISTRICT', 'AREA', 'ASSIGNED DISTRICT'],
   NOTES: ['NOTES', 'REMARKS', 'NOTE'],
 };
 
 const DP_COLUMN_ALIASES = {
-  POSTMAN: ['DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER', 'DP NAME', 'NAME'],
+  POSTMAN: ['PARTNER NAME', 'DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER', 'DP NAME', 'NAME'],
   POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER', 'DP NUMBER', 'MOBILE NUMBER', 'MOBILE', 'PHONE'],
   DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA', 'CITY'],
   STATUS: ['STATUS', 'ACTIVE', 'IS ACTIVE'],
@@ -459,19 +460,25 @@ function getStockMaster_(token) {
     orderValues.forEach((row) => {
       const product = normalizeText_(orderAccessor.read(row, 'PRODUCT'));
       const partner = normalizeText_(orderAccessor.read(row, 'POSTMAN'));
-      if (!product || !partner) return;
-      const key = product + '|' + partner;
-      if (!orderUsage[key]) orderUsage[key] = { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
+      const district = normalizeText_(orderAccessor.read(row, 'DISTRICT'));
+      if (!product) return;
+      const keys = [];
+      if (partner) keys.push(product + '|PARTNER|' + partner);
+      if (district) keys.push(product + '|LOCATION|' + district);
+      if (!keys.length) return;
       const qty = Number(orderAccessor.read(row, 'QTY') || 1);
       const deliveryStatus = String(orderAccessor.read(row, 'DELIVERY_COUNTED') || '').toUpperCase();
       const remarks = String(orderAccessor.read(row, 'REMARKS') || '').toUpperCase();
-      if (deliveryStatus === 'DONE') {
-        orderUsage[key].deliveredQty += qty;
-      } else if (deliveryStatus === 'FAILED' || remarks.indexOf('FAILED:') === 0 || remarks.indexOf('CANCEL') !== -1 || remarks.indexOf('RTO') !== -1) {
-        orderUsage[key].failedQty += qty;
-      } else {
-        orderUsage[key].pendingQty += qty;
-      }
+      keys.forEach((key) => {
+        if (!orderUsage[key]) orderUsage[key] = { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
+        if (deliveryStatus === 'DONE') {
+          orderUsage[key].deliveredQty += qty;
+        } else if (deliveryStatus === 'FAILED' || remarks.indexOf('FAILED:') === 0 || remarks.indexOf('CANCEL') !== -1 || remarks.indexOf('RTO') !== -1) {
+          orderUsage[key].failedQty += qty;
+        } else {
+          orderUsage[key].pendingQty += qty;
+        }
+      });
     });
   }
 
@@ -479,21 +486,25 @@ function getStockMaster_(token) {
   stockValues.forEach((row) => {
     const productName = String(stockAccessor.read(row, 'PRODUCT') || '').trim();
     const partnerName = String(stockAccessor.read(row, 'POSTMAN') || '').trim();
-    if (!productName && !partnerName) return;
+    const locationName = String(stockAccessor.read(row, 'LOCATION') || '').trim();
+    if (!productName && !partnerName && !locationName) return;
     const qtySent = Number(stockAccessor.read(row, 'QTY_SENT') || 0);
     if (!qtySent) return;
     const productKey = normalizeText_(productName || 'Unknown Product');
-    const partnerKey = normalizeText_(partnerName || 'Unassigned');
-    const stockKey = productKey + '|' + partnerKey;
+    const scopeType = partnerName ? 'PARTNER' : 'LOCATION';
+    const scopeName = partnerName || locationName || 'Unassigned';
+    const scopeKey = normalizeText_(scopeName);
+    const stockKey = productKey + '|' + scopeType + '|' + scopeKey;
     if (!stockByPartner[stockKey]) {
       stockByPartner[stockKey] = {
         productKey: productKey,
-        partnerKey: partnerKey,
+        scopeType: scopeType,
+        scopeKey: scopeKey,
         productName: productName || 'Unknown Product',
-        partnerName: partnerName || 'Unassigned',
+        partnerName: scopeName,
         sku: String(stockAccessor.read(row, 'SKU') || makeSku_(productName)).trim(),
         phone: onlyDigits_(stockAccessor.read(row, 'POSTMAN_NUMBER')),
-        district: String(stockAccessor.read(row, 'DISTRICT') || '').trim(),
+        district: String(stockAccessor.read(row, 'DISTRICT') || locationName).trim(),
         qtySent: 0,
       };
     }
@@ -503,7 +514,7 @@ function getStockMaster_(token) {
   const stockByProduct = {};
   Object.keys(stockByPartner).forEach((stockKey) => {
     const line = stockByPartner[stockKey];
-    const usage = orderUsage[line.productKey + '|' + line.partnerKey] || { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
+    const usage = orderUsage[line.productKey + '|' + line.scopeType + '|' + line.scopeKey] || { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
 
     if (!stockByProduct[line.productKey]) {
       stockByProduct[line.productKey] = {
@@ -528,6 +539,7 @@ function getStockMaster_(token) {
       name: line.partnerName,
       numberMasked: maskPhone_(line.phone),
       district: line.district,
+      scopeType: line.scopeType,
       sentQty: line.qtySent,
       deliveredQty: usage.deliveredQty,
       pendingQty: usage.pendingQty,
@@ -656,6 +668,8 @@ function findPartnerByPhoneInMaster_(phone) {
     const row = values[i];
     const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER'));
     if (partnerPhone && partnerPhone.slice(-10) === normalizedPhone.slice(-10)) {
+      const status = String(accessor.read(row, 'STATUS') || 'ACTIVE').trim();
+      if (isCancelledStatus_(status)) return null;
       const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim();
       const district = String(accessor.read(row, 'DISTRICT') || '').trim();
       return {
@@ -706,4 +720,9 @@ function buildAccessorFromAliases_(headers, aliases) {
 function makeSku_(name) {
   const code = String(name || 'ITEM').replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 3).map((part) => part.slice(0, 2).toUpperCase()).join('-');
   return 'DB-' + (code || 'ITEM');
+}
+
+function isCancelledStatus_(status) {
+  const normalized = normalizeText_(status);
+  return normalized.indexOf('CANCEL') !== -1 || normalized.indexOf('INACTIVE') !== -1 || normalized.indexOf('REMOVED') !== -1 || normalized === 'NO';
 }

@@ -153,7 +153,7 @@ function ProductCard({ product }: { product: StockItem }) {
         <Text style={styles.meta}><Text style={styles.strong}>{product.remainingQty}</Text> remaining</Text>
         <Text style={styles.meta}>{product.sentQty} sent · {product.deliveredQty} delivered</Text>
       </View>
-      <Text style={styles.partnerMeta}>{product.pendingQty} pending/reserved · {product.partners.length} delivery partners</Text>
+      <Text style={styles.partnerMeta}>{product.pendingQty} pending/reserved · {product.partners.length} locations/partners</Text>
       {product.status !== 'ok' ? (
         <Pressable onPress={() => Alert.alert('Restock request sent', `${product.product} has been marked for restock.`)} style={({ pressed }) => [styles.restockButton, pressed && styles.pressed]}>
           <MaterialCommunityIcons name="plus-circle-outline" size={14} color={colors.red} />

@@ -25,31 +25,34 @@ If your stock or delivery partner tabs use different names, change `DB_STOCK_MAS
 
 The admin Stock tab reads `Stock Master`. This sheet is treated as stock sent to delivery partners.
 
-Supported header names:
+Your current supported header names:
 
 ```text
-DATE, PRODUCT, SKU, QTY SENT, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, NOTES
+PRODUCT, QUANTITY, DATE, LOCATION
 ```
 
-Flexible aliases are also supported, for example `PRODUCT NAME`, `ITEM`, `QUANTITY`, `QTY`, `POSTMAN`, `DP NAME`, `DP NUMBER`, and `ASSIGNED DISTRICT`.
+Flexible aliases are also supported, for example `PRODUCT NAME`, `ITEM`, `QTY`, `QTY SENT`, `STOCK SENT`, `DISTRICT`, and `AREA`.
 
 Stock calculation:
 
-- `sentQty` comes from `Stock Master`.
-- `deliveredQty`, `pendingQty`, and `failedQty` come from the orders sheet, matched by product + delivery partner name.
+- `sentQty` comes from `Stock Master` quantity.
+- If `Stock Master` has no partner column, stock is matched by `PRODUCT + LOCATION`.
+- `deliveredQty`, `pendingQty`, and `failedQty` come from the orders sheet, matched by product + district/location.
 - `remainingQty = sentQty - deliveredQty`.
 
 ## DP MASTER Sheet
 
 Partner login and partner metadata now prefer `DP MASTER`. Only delivery partners listed here should be able to login as partners.
 
-Supported header names:
+Your current supported header names:
 
 ```text
-DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, STATUS
+DISTRICT, PARTNER NAME, MOBILE NUMBER, STATUS
 ```
 
-Flexible aliases are also supported, for example `POSTMAN`, `DP NAME`, `MOBILE NUMBER`, `PHONE`, and `ASSIGNED DISTRICT`.
+Flexible aliases are also supported, for example `DELIVERY PARTNER NAME`, `POSTMAN`, `DP NAME`, `PHONE`, and `ASSIGNED DISTRICT`.
+
+If `STATUS` contains `CANCEL`, `INACTIVE`, `REMOVED`, or `NO`, that mobile number is blocked from partner login.
 
 ## Optional Drive Authorization
 
