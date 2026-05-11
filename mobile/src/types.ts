@@ -27,6 +27,8 @@ export type DeliveryOrder = {
   status: OrderStatus;
   attempts: number;
   assignedTo: string;
+  orderDate?: string;
+  deliveryDate?: string;
   updatedAt: string;
   photoUrl?: string;
   remarks?: string;

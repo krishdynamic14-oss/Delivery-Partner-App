@@ -305,6 +305,8 @@ function rowToOrder_(accessor, row) {
     status: status,
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
     assignedTo: String(accessor.read(row, 'POSTMAN') || '').trim(),
+    orderDate: String(accessor.read(row, 'ORDER_DATE') || ''),
+    deliveryDate: String(accessor.read(row, 'DELIVERY_DATE') || ''),
     updatedAt: new Date().toISOString(),
     photoUrl: String(accessor.read(row, 'DELIVERY_PHOTO') || ''),
     remarks: remarks,

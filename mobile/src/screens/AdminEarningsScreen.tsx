@@ -1,30 +1,40 @@
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Card, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
-import type { AdminTabParamList, DeliveryOrder } from '../types';
+import type { DeliveryOrder } from '../types';
 
-const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const RANGE_OPTIONS = [
+  { label: 'Today', days: 1 },
+  { label: '3D', days: 3 },
+  { label: '7D', days: 7 },
+  { label: '15D', days: 15 },
+  { label: '30D', days: 30 },
+];
 
 export function AdminEarningsScreen() {
-  const navigation = useNavigation<BottomTabNavigationProp<AdminTabParamList>>();
+  const [rangeDays, setRangeDays] = useState(7);
+  const [showSettlementReport, setShowSettlementReport] = useState(false);
   const { orders, loading, refresh } = useOrders();
   const codOrders = orders.filter((order) => order.paymentType === 'COD');
   const deliveredCod = codOrders.filter((order) => order.status === 'delivered');
   const pendingCod = codOrders.filter((order) => order.status !== 'delivered');
-  const dailyCod = deliveredCod.reduce((sum, order) => sum + order.amount, 0);
+  const rangeDeliveredCod = deliveredCod.filter((order) => isWithinDays(getOrderCollectionDate(order), rangeDays));
+  const todayDeliveredCod = deliveredCod.filter((order) => isWithinDays(getOrderCollectionDate(order), 1));
+  const dailyCod = todayDeliveredCod.reduce((sum, order) => sum + order.amount, 0);
+  const rangeCod = rangeDeliveredCod.reduce((sum, order) => sum + order.amount, 0);
   const totalAssigned = codOrders.reduce((sum, order) => sum + order.amount, 0);
   const pendingAmount = pendingCod.reduce((sum, order) => sum + order.amount, 0);
   const activePostmen = new Set(orders.map((order) => order.assignedTo).filter(Boolean)).size;
   const target = Math.max(totalAssigned, dailyCod, 1);
   const targetProgress = Math.min(100, Math.round((dailyCod / target) * 100));
   const topPostmen = getTopPostmen(orders);
-  const weekly = getWeeklyBuckets(deliveredCod);
-  const peak = Math.max(...weekly, 1);
+  const partnerToday = getPartnerDailyReport(orders);
+  const buckets = getCollectionBuckets(deliveredCod, rangeDays);
+  const peak = Math.max(...buckets.map((bucket) => bucket.amount), 1);
 
   return (
     <Screen>
@@ -48,16 +58,28 @@ export function AdminEarningsScreen() {
           </View>
         </LinearGradient>
 
-        <Pressable onPress={() => navigation.navigate('AdminProfile')} style={({ pressed }) => [styles.settlementCta, pressed && styles.pressed]}>
+        <Pressable onPress={() => setShowSettlementReport((visible) => !visible)} style={({ pressed }) => [styles.settlementCta, pressed && styles.pressed]}>
           <LinearGradient colors={[colors.green, '#009070']} style={styles.ctaIcon}>
             <MaterialCommunityIcons name="wallet-outline" size={22} color={colors.text} />
           </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={styles.ctaTitle}>End-of-Day Settlement</Text>
-            <Text style={styles.ctaSub}>Pending COD handover · ₹{pendingAmount.toLocaleString('en-IN')}</Text>
+            <Text style={styles.ctaTitle}>Today's Collection Report</Text>
+            <Text style={styles.ctaSub}>Collected ₹{dailyCod.toLocaleString('en-IN')} · Pending ₹{pendingAmount.toLocaleString('en-IN')}</Text>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+          <MaterialCommunityIcons name={showSettlementReport ? 'chevron-up' : 'chevron-down'} size={22} color={colors.muted} />
         </Pressable>
+
+        {showSettlementReport ? (
+          <Card>
+            <View style={styles.reportGrid}>
+              <Kpi label="Today COD" value={`₹${dailyCod.toLocaleString('en-IN')}`} color={colors.green} />
+              <Kpi label="Orders Done" value={todayDeliveredCod.length} color={colors.blue} />
+              <Kpi label="Pending COD" value={`₹${pendingAmount.toLocaleString('en-IN')}`} color={colors.amber} />
+              <Kpi label="Pending Orders" value={pendingCod.length} color={colors.red} />
+            </View>
+            <Text style={styles.meta}>Use this report for end-of-day handover. It is calculated from delivered COD orders with today's delivery date.</Text>
+          </Card>
+        ) : null}
 
         <Card>
           <View style={styles.targetTop}>
@@ -75,18 +97,33 @@ export function AdminEarningsScreen() {
 
         <Card>
           <View style={styles.chartHeader}>
-            <Text style={styles.sectionTitle}>7-Day COD Collection</Text>
-            <Text style={styles.exportText}>Live Sheet</Text>
+            <Text style={styles.sectionTitle}>{rangeDays === 1 ? 'Today' : `${rangeDays}-Day`} COD Collection</Text>
+            <Text style={styles.exportText}>₹{rangeCod.toLocaleString('en-IN')}</Text>
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rangeTabs}>
+            {RANGE_OPTIONS.map((option) => (
+              <Pressable key={option.days} onPress={() => setRangeDays(option.days)} style={[styles.rangeTab, rangeDays === option.days && styles.rangeTabActive]}>
+                <Text style={[styles.rangeTabText, rangeDays === option.days && styles.rangeTabTextActive]}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
           <View style={styles.chart}>
-            {weekly.map((value, index) => (
-              <View key={WEEK_DAYS[index]} style={styles.barCol}>
-                <View style={[styles.bar, value === peak && styles.barHi, { height: Math.max(18, Math.round((value / peak) * 82)) }]} />
-                <Text style={styles.barLabel}>{WEEK_DAYS[index]}</Text>
+            {buckets.map((bucket) => (
+              <View key={bucket.label} style={styles.barCol}>
+                <View style={[styles.bar, bucket.amount === peak && styles.barHi, { height: Math.max(18, Math.round((bucket.amount / peak) * 82)) }]} />
+                <Text style={styles.barValue}>₹{shortMoney(bucket.amount)}</Text>
+                <Text style={styles.barLabel}>{bucket.label}</Text>
               </View>
             ))}
           </View>
         </Card>
+
+        <Text style={styles.sectionTitleOutside}>Delivery Partner Today</Text>
+        {partnerToday.length ? partnerToday.map((postman) => (
+          <PartnerTodayRow key={postman.name} postman={postman} />
+        )) : (
+          <Card><Text style={styles.meta}>No delivery partner activity visible today.</Text></Card>
+        )}
 
         <Text style={styles.sectionTitleOutside}>Top Postmen</Text>
         {topPostmen.length ? topPostmen.map((postman, index) => (
@@ -112,6 +149,26 @@ export function AdminEarningsScreen() {
         ))}
       </ScrollView>
     </Screen>
+  );
+}
+
+function PartnerTodayRow({ postman }: { postman: PartnerDailyReport }) {
+  return (
+    <Card>
+      <View style={styles.pmRow}>
+        <View style={[styles.pmAvatar, { backgroundColor: postman.color }]}>
+          <Text style={styles.pmAvatarText}>{initials(postman.name)}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pmName}>{postman.name}</Text>
+          <Text style={styles.meta}>{postman.deliveredToday} delivered today · {postman.pending} pending now</Text>
+        </View>
+        <View style={styles.orderRight}>
+          <Money value={postman.codToday} size={16} />
+          <Badge label={`${postman.pending} pending`} tone={postman.pending ? 'pending' : 'delivered'} />
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -150,6 +207,14 @@ type PostmanEarning = {
   color: string;
 };
 
+type PartnerDailyReport = {
+  name: string;
+  deliveredToday: number;
+  pending: number;
+  codToday: number;
+  color: string;
+};
+
 function getTopPostmen(orders: DeliveryOrder[]) {
   const palette = [colors.orange, colors.blue, colors.green, colors.red, '#8b5cf6'];
   const byPostman = new Map<string, PostmanEarning>();
@@ -166,10 +231,76 @@ function getTopPostmen(orders: DeliveryOrder[]) {
     .slice(0, 5);
 }
 
-function getWeeklyBuckets(orders: DeliveryOrder[]) {
-  const total = orders.reduce((sum, order) => sum + order.amount, 0);
-  if (!total) return [0, 0, 0, 0, 0, 0, 0];
-  return [0.13, 0.16, 0.11, 0.2, 0.14, 0.17, 0.09].map((share) => Math.round(total * share));
+function getPartnerDailyReport(orders: DeliveryOrder[]) {
+  const palette = [colors.orange, colors.blue, colors.green, colors.red, '#8b5cf6'];
+  const byPostman = new Map<string, PartnerDailyReport>();
+  orders.forEach((order) => {
+    const name = order.assignedTo || 'Unassigned';
+    const current = byPostman.get(name) || { name, deliveredToday: 0, pending: 0, codToday: 0, color: palette[byPostman.size % palette.length] };
+    if (order.status === 'pending') current.pending += 1;
+    if (order.status === 'delivered' && isWithinDays(getOrderCollectionDate(order), 1)) {
+      current.deliveredToday += 1;
+      if (order.paymentType === 'COD') current.codToday += order.amount;
+    }
+    byPostman.set(name, current);
+  });
+  return Array.from(byPostman.values())
+    .filter((postman) => postman.deliveredToday || postman.pending)
+    .sort((a, b) => b.deliveredToday - a.deliveredToday || b.codToday - a.codToday || b.pending - a.pending);
+}
+
+function getCollectionBuckets(orders: DeliveryOrder[], days: number) {
+  const today = startOfDay(new Date());
+  return Array.from({ length: days }).map((_, reverseIndex) => {
+    const offset = days - reverseIndex - 1;
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const amount = orders
+      .filter((order) => isSameDay(getOrderCollectionDate(order), date))
+      .reduce((sum, order) => sum + order.amount, 0);
+    return { label: days === 1 ? 'Today' : `${date.getDate()}/${date.getMonth() + 1}`, amount };
+  });
+}
+
+function getOrderCollectionDate(order: DeliveryOrder) {
+  return parseSheetDate(order.deliveryDate) || parseSheetDate(order.orderDate) || parseSheetDate(order.updatedAt);
+}
+
+function parseSheetDate(value?: string) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (dmy) {
+    const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
+    return new Date(year, Number(dmy[2]) - 1, Number(dmy[1]));
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isWithinDays(date: Date | null, days: number) {
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const diff = Math.round((today.getTime() - target.getTime()) / 86400000);
+  return diff >= 0 && diff < days;
+}
+
+function isSameDay(a: Date | null, b: Date) {
+  if (!a) return false;
+  const left = startOfDay(a);
+  const right = startOfDay(b);
+  return left.getTime() === right.getTime();
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function shortMoney(value: number) {
+  if (value >= 100000) return `${Math.round(value / 100000)}L`;
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  return String(value);
 }
 
 function initials(name: string) {
@@ -183,6 +314,7 @@ const styles = StyleSheet.create({
   sub: { color: colors.muted, marginTop: 5, fontSize: 12 },
   iconButton: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.border },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  reportGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 4 },
   kpiBox: { width: '48%', borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12, backgroundColor: colors.dim, marginBottom: 10 },
   kpiLabel: { color: colors.muted, fontSize: 10, textTransform: 'uppercase', fontWeight: '900', marginBottom: 5 },
   kpiValue: { fontSize: 18, fontWeight: '900' },
@@ -201,10 +333,16 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   exportText: { color: colors.orange, fontSize: 11, fontWeight: '800' },
+  rangeTabs: { marginBottom: 12 },
+  rangeTab: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, marginRight: 7 },
+  rangeTabActive: { borderColor: colors.orange, backgroundColor: 'rgba(255,107,0,0.16)' },
+  rangeTabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
+  rangeTabTextActive: { color: colors.orange },
   chart: { height: 118, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   barCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
   bar: { width: 18, borderRadius: 8, backgroundColor: colors.orange, opacity: 0.7 },
   barHi: { backgroundColor: colors.amber, opacity: 1 },
+  barValue: { color: colors.muted, fontSize: 9, marginTop: 4 },
   barLabel: { color: colors.muted, fontSize: 10, marginTop: 7 },
   pmRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rank: { color: colors.muted, width: 26, fontWeight: '900' },
