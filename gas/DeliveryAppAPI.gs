@@ -1,6 +1,8 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('DB_SHEET_ID');
 const ORDERS_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_ORDERS_SHEET') || 'Sheet1';
 const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PAYMENT_LOG_SHEET') || 'PAYMENT LOG';
+const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_MASTER_SHEET') || 'Stock Master';
+const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
 const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
 const ADMIN_PHONES = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PHONES') || '';
 
@@ -36,6 +38,24 @@ const DEFAULT_COLUMN_ALIASES = {
   DELIVERY_PHOTO: ['DELIVERY_PHOTO', 'DELIVERY PHOTO', 'PHOTO URL'],
 };
 
+const STOCK_COLUMN_ALIASES = {
+  DATE: ['DATE', 'STOCK DATE', 'SENT DATE', 'DISPATCH DATE'],
+  PRODUCT: ['PRODUCT', 'PRODUCT NAME', 'ITEM', 'ITEM NAME'],
+  SKU: ['SKU', 'ITEM CODE', 'PRODUCT CODE', 'CODE'],
+  QTY_SENT: ['QTY SENT', 'SENT QTY', 'STOCK SENT', 'QUANTITY', 'QTY', 'PCS', 'PIECES'],
+  POSTMAN: ['DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER', 'DP NAME'],
+  POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER', 'DP NUMBER', 'MOBILE NUMBER', 'MOBILE'],
+  DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA'],
+  NOTES: ['NOTES', 'REMARKS', 'NOTE'],
+};
+
+const DP_COLUMN_ALIASES = {
+  POSTMAN: ['DELIVERY PARTNER NAME', 'POSTMAN', 'PARTNER', 'DELIVERY PARTNER', 'DP NAME', 'NAME'],
+  POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER', 'DP NUMBER', 'MOBILE NUMBER', 'MOBILE', 'PHONE'],
+  DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA', 'CITY'],
+  STATUS: ['STATUS', 'ACTIVE', 'IS ACTIVE'],
+};
+
 function doPost(e) {
   try {
     const input = JSON.parse(e.postData.contents || '{}');
@@ -51,6 +71,7 @@ function doPost(e) {
       'orders.deliver': () => markOrderDelivered_(body, token),
       'orders.fail': () => markOrderFailed_(body, token),
       'cod.settle': () => submitCodSettlement_(body, token),
+      'stock.master': () => getStockMaster_(token),
       'meta.columns': () => inspectColumns_(),
       'meta.partners': () => inspectPartners_(),
     };
@@ -387,6 +408,9 @@ function inspectColumns_() {
 }
 
 function inspectPartners_() {
+  const fromMaster = getDpMasterPartners_();
+  if (fromMaster.length) return fromMaster;
+
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return [];
   const headers = values.shift();
@@ -412,6 +436,151 @@ function inspectPartners_() {
   });
 
   return Object.keys(byPartner).map((key) => byPartner[key]);
+}
+
+function getStockMaster_(token) {
+  assertToken_(token);
+  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const stockSheet = ss.getSheetByName(STOCK_MASTER_SHEET_NAME);
+  if (!stockSheet) throw new Error('Stock Master sheet not found: ' + STOCK_MASTER_SHEET_NAME);
+
+  const stockValues = stockSheet.getDataRange().getValues();
+  if (!stockValues.length) return [];
+  const stockHeaders = stockValues.shift();
+  const stockAccessor = buildAccessorFromAliases_(stockHeaders, STOCK_COLUMN_ALIASES);
+
+  const orderValues = getOrderSheet_().getDataRange().getValues();
+  const orderHeaders = orderValues.length ? orderValues.shift() : [];
+  const orderAccessor = orderHeaders.length ? buildAccessor_(orderHeaders) : null;
+  const orderUsage = {};
+
+  if (orderAccessor) {
+    orderValues.forEach((row) => {
+      const product = normalizeText_(orderAccessor.read(row, 'PRODUCT'));
+      const partner = normalizeText_(orderAccessor.read(row, 'POSTMAN'));
+      if (!product || !partner) return;
+      const key = product + '|' + partner;
+      if (!orderUsage[key]) orderUsage[key] = { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
+      const qty = Number(orderAccessor.read(row, 'QTY') || 1);
+      const deliveryStatus = String(orderAccessor.read(row, 'DELIVERY_COUNTED') || '').toUpperCase();
+      const remarks = String(orderAccessor.read(row, 'REMARKS') || '').toUpperCase();
+      if (deliveryStatus === 'DONE') {
+        orderUsage[key].deliveredQty += qty;
+      } else if (deliveryStatus === 'FAILED' || remarks.indexOf('FAILED:') === 0 || remarks.indexOf('CANCEL') !== -1 || remarks.indexOf('RTO') !== -1) {
+        orderUsage[key].failedQty += qty;
+      } else {
+        orderUsage[key].pendingQty += qty;
+      }
+    });
+  }
+
+  const stockByPartner = {};
+  stockValues.forEach((row) => {
+    const productName = String(stockAccessor.read(row, 'PRODUCT') || '').trim();
+    const partnerName = String(stockAccessor.read(row, 'POSTMAN') || '').trim();
+    if (!productName && !partnerName) return;
+    const qtySent = Number(stockAccessor.read(row, 'QTY_SENT') || 0);
+    if (!qtySent) return;
+    const productKey = normalizeText_(productName || 'Unknown Product');
+    const partnerKey = normalizeText_(partnerName || 'Unassigned');
+    const stockKey = productKey + '|' + partnerKey;
+    if (!stockByPartner[stockKey]) {
+      stockByPartner[stockKey] = {
+        productKey: productKey,
+        partnerKey: partnerKey,
+        productName: productName || 'Unknown Product',
+        partnerName: partnerName || 'Unassigned',
+        sku: String(stockAccessor.read(row, 'SKU') || makeSku_(productName)).trim(),
+        phone: onlyDigits_(stockAccessor.read(row, 'POSTMAN_NUMBER')),
+        district: String(stockAccessor.read(row, 'DISTRICT') || '').trim(),
+        qtySent: 0,
+      };
+    }
+    stockByPartner[stockKey].qtySent += qtySent;
+  });
+
+  const stockByProduct = {};
+  Object.keys(stockByPartner).forEach((stockKey) => {
+    const line = stockByPartner[stockKey];
+    const usage = orderUsage[line.productKey + '|' + line.partnerKey] || { deliveredQty: 0, pendingQty: 0, failedQty: 0 };
+
+    if (!stockByProduct[line.productKey]) {
+      stockByProduct[line.productKey] = {
+        product: line.productName,
+        sku: line.sku,
+        sentQty: 0,
+        deliveredQty: 0,
+        pendingQty: 0,
+        failedQty: 0,
+        remainingQty: 0,
+        partners: [],
+      };
+    }
+
+    const remainingQty = Math.max(0, line.qtySent - usage.deliveredQty);
+    stockByProduct[line.productKey].sentQty += line.qtySent;
+    stockByProduct[line.productKey].deliveredQty += usage.deliveredQty;
+    stockByProduct[line.productKey].pendingQty += usage.pendingQty;
+    stockByProduct[line.productKey].failedQty += usage.failedQty;
+    stockByProduct[line.productKey].remainingQty += remainingQty;
+    stockByProduct[line.productKey].partners.push({
+      name: line.partnerName,
+      numberMasked: maskPhone_(line.phone),
+      district: line.district,
+      sentQty: line.qtySent,
+      deliveredQty: usage.deliveredQty,
+      pendingQty: usage.pendingQty,
+      failedQty: usage.failedQty,
+      remainingQty: remainingQty,
+    });
+  });
+
+  return Object.keys(stockByProduct).map((key) => {
+    const item = stockByProduct[key];
+    const sellRate = Math.max(1, Math.ceil(item.deliveredQty / 7));
+    const daysLeft = item.remainingQty > 0 ? Math.ceil(item.remainingQty / sellRate) : 0;
+    const stockPercent = item.sentQty > 0 ? Math.max(0, Math.min(100, Math.round((item.remainingQty / item.sentQty) * 100))) : 0;
+    const status = item.remainingQty <= 5 || daysLeft <= 2 ? 'critical' : item.remainingQty <= 15 || daysLeft <= 5 ? 'low' : 'ok';
+    return {
+      product: item.product,
+      sku: item.sku || makeSku_(item.product),
+      sentQty: item.sentQty,
+      deliveredQty: item.deliveredQty,
+      pendingQty: item.pendingQty,
+      failedQty: item.failedQty,
+      remainingQty: item.remainingQty,
+      sellRate: sellRate,
+      daysLeft: daysLeft,
+      stockPercent: stockPercent,
+      status: status,
+      partners: item.partners,
+    };
+  }).sort((a, b) => a.daysLeft - b.daysLeft || a.remainingQty - b.remainingQty);
+}
+
+function getDpMasterPartners_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return [];
+  const headers = values.shift();
+  const accessor = buildAccessorFromAliases_(headers, DP_COLUMN_ALIASES);
+  return values.map((row) => {
+    const name = String(accessor.read(row, 'POSTMAN') || '').trim();
+    const phone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER'));
+    const district = String(accessor.read(row, 'DISTRICT') || '').trim();
+    const status = String(accessor.read(row, 'STATUS') || 'ACTIVE').trim();
+    if (!name && !phone) return null;
+    return {
+      name: name,
+      numberMasked: maskPhone_(phone),
+      district: district,
+      status: status,
+      orderCount: 0,
+    };
+  }).filter(Boolean);
 }
 
 function ensurePaymentLogHeader_(sheet) {
@@ -445,10 +614,42 @@ function ensurePaymentLogHeader_(sheet) {
 
 function findPartnerByPhone_(phone) {
   if (!phone) return null;
+  const fromMaster = findPartnerByPhoneInMaster_(phone);
+  if (fromMaster) return fromMaster;
+
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return null;
   const headers = values.shift();
   const accessor = buildAccessor_(headers);
+  const normalizedPhone = onlyDigits_(phone);
+
+  for (let i = 0; i < values.length; i += 1) {
+    const row = values[i];
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER'));
+    if (partnerPhone && partnerPhone.slice(-10) === normalizedPhone.slice(-10)) {
+      const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim();
+      const district = String(accessor.read(row, 'DISTRICT') || '').trim();
+      return {
+        id: 'partner_' + normalizedPhone.slice(-10),
+        name: name,
+        phone: normalizedPhone.slice(-10),
+        district: district,
+        role: 'partner',
+        token: 'partner-' + normalizedPhone.slice(-10),
+      };
+    }
+  }
+  return null;
+}
+
+function findPartnerByPhoneInMaster_(phone) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
+  if (!sheet) return null;
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return null;
+  const headers = values.shift();
+  const accessor = buildAccessorFromAliases_(headers, DP_COLUMN_ALIASES);
   const normalizedPhone = onlyDigits_(phone);
 
   for (let i = 0; i < values.length; i += 1) {
@@ -476,4 +677,33 @@ function onlyDigits_(value) {
 
 function normalizeText_(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function buildAccessorFromAliases_(headers, aliases) {
+  const indexByHeader = {};
+  headers.forEach((name, idx) => { indexByHeader[String(name).trim().toUpperCase()] = idx; });
+  const resolved = {};
+  Object.keys(aliases).forEach((logical) => {
+    const candidates = aliases[logical].map((c) => String(c).trim().toUpperCase());
+    const matched = candidates.find((key) => key in indexByHeader);
+    if (matched) resolved[logical] = headers[indexByHeader[matched]];
+  });
+  return {
+    resolve: function resolve(logical) {
+      return resolved[logical] || '';
+    },
+    read: function read(row, logical) {
+      const headerName = resolved[logical];
+      if (!headerName) return '';
+      return row[indexByHeader[String(headerName).trim().toUpperCase()]];
+    },
+    headers: headers,
+    resolved: resolved,
+    aliases: aliases,
+  };
+}
+
+function makeSku_(name) {
+  const code = String(name || 'ITEM').replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 3).map((part) => part.slice(0, 2).toUpperCase()).join('-');
+  return 'DB-' + (code || 'ITEM');
 }

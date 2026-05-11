@@ -39,6 +39,32 @@ export type CodSummary = {
   prepaidCount: number;
 };
 
+export type StockPartnerBreakdown = {
+  name: string;
+  numberMasked: string;
+  district: string;
+  sentQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  failedQty: number;
+  remainingQty: number;
+};
+
+export type StockItem = {
+  product: string;
+  sku: string;
+  sentQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  failedQty: number;
+  remainingQty: number;
+  sellRate: number;
+  daysLeft: number;
+  stockPercent: number;
+  status: 'critical' | 'low' | 'ok';
+  partners: StockPartnerBreakdown[];
+};
+
 export type QueueAction =
   | { id: string; type: 'deliver'; orderId: string; payload: DeliverPayload; createdAt: string }
   | { id: string; type: 'fail'; orderId: string; payload: FailPayload; createdAt: string }

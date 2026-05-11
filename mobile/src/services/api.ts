@@ -1,4 +1,4 @@
-import type { CodSummary, DeliverPayload, DeliveryOrder, FailPayload, Partner, SettlementPayload } from '../types';
+import type { CodSummary, DeliverPayload, DeliveryOrder, FailPayload, Partner, SettlementPayload, StockItem } from '../types';
 import { mockOrders } from '../data/mockOrders';
 
 const GAS_URL = process.env.EXPO_PUBLIC_GAS_API_URL;
@@ -48,6 +48,11 @@ export async function markFailed(orderId: string, payload: FailPayload, token?: 
 export async function submitSettlement(payload: SettlementPayload, token?: string) {
   if (GAS_URL) return request<{ settlementId: string }>('cod.settle', payload, token);
   return { settlementId: `SET-${Date.now()}` };
+}
+
+export async function fetchStockMaster(token?: string): Promise<StockItem[]> {
+  if (GAS_URL) return request<StockItem[]>('stock.master', {}, token);
+  return [];
 }
 
 export function getCodSummary(orders: DeliveryOrder[]): CodSummary {

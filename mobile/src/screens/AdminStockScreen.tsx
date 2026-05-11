@@ -1,35 +1,67 @@
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Card, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
-import type { DeliveryOrder } from '../types';
+import { useAuth } from '../state/AuthContext';
+import { fetchStockMaster } from '../services/api';
+import type { StockItem } from '../types';
 
 export function AdminStockScreen() {
-  const { orders, loading, refresh } = useOrders();
-  const products = getInventory(orders);
+  const { user } = useAuth();
+  const { loading: ordersLoading, refresh: refreshOrders } = useOrders();
+  const [products, setProducts] = useState<StockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const fresh = await fetchStockMaster(user?.token);
+      setProducts(fresh);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load Stock Master.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.token]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const critical = products.filter((product) => product.status === 'critical');
   const low = products.filter((product) => product.status === 'low');
   const ok = products.filter((product) => product.status === 'ok');
   const forecast = [...critical, ...low, ...ok].slice(0, 4);
-  const totalUnits = products.reduce((sum, product) => sum + product.unitsLeft, 0);
+  const totalUnits = products.reduce((sum, product) => sum + product.remainingQty, 0);
+  const refreshing = loading || ordersLoading;
 
   return (
     <Screen>
-      <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.orange} />}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Inventory</Text>
-            <Text style={styles.sub}>Mahotsav Season Stock · {products.length} products</Text>
+            <Text style={styles.sub}>Stock Master · {products.length} products</Text>
           </View>
           <View style={styles.syncPill}><View style={styles.syncDot} /><Text style={styles.syncText}>Synced</Text></View>
         </View>
 
         <View style={styles.actionGrid}>
           <ActionButton icon="note-edit-outline" label="Update Stock" color={colors.orange} onPress={() => Alert.alert('Update Stock', 'Manual stock editing screen will be connected after stock sheet fields are finalized.')} />
-          <ActionButton icon="cloud-sync-outline" label="Sync Sheets" color={colors.green} onPress={refresh} />
+          <ActionButton icon="cloud-sync-outline" label="Sync Sheets" color={colors.green} onPress={() => { void refreshOrders(); void refresh(); }} />
         </View>
+
+        {error ? (
+          <View style={styles.errorBanner}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.red} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         <Card>
           <View style={styles.forecastHeader}>
@@ -37,7 +69,7 @@ export function AdminStockScreen() {
             <Text style={styles.sectionTitle}>Inventory Forecast</Text>
             <Text style={styles.forecastHint}>current sell rate</Text>
           </View>
-          {forecast.length ? forecast.map((product) => <ForecastRow key={product.name} product={product} />) : (
+          {forecast.length ? forecast.map((product) => <ForecastRow key={product.product} product={product} />) : (
             <Text style={styles.meta}>No product movement visible yet.</Text>
           )}
           <Pressable onPress={() => Alert.alert('Reorder request', `${critical.length + low.length} low-stock items marked for reorder.`)} style={({ pressed }) => [styles.reorderButton, pressed && styles.pressed]}>
@@ -59,10 +91,10 @@ export function AdminStockScreen() {
           <MiniStat label="Healthy" value={ok.length} color={colors.green} />
         </View>
 
-        {[...critical, ...low].map((product) => <ProductCard key={product.name} product={product} />)}
+        {[...critical, ...low].map((product) => <ProductCard key={product.product} product={product} />)}
 
         <Text style={styles.sectionTitleOutside}>In Stock</Text>
-        {ok.map((product) => <ProductCard key={product.name} product={product} />)}
+        {ok.map((product) => <ProductCard key={product.product} product={product} />)}
       </ScrollView>
     </Screen>
   );
@@ -86,13 +118,13 @@ function MiniStat({ label, value, color }: { label: string; value: number; color
   );
 }
 
-function ForecastRow({ product }: { product: InventoryProduct }) {
+function ForecastRow({ product }: { product: StockItem }) {
   const color = product.daysLeft <= 2 ? colors.red : product.daysLeft <= 5 ? colors.amber : colors.green;
   return (
     <View style={styles.forecastRow}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.productTitle}>{product.name}</Text>
-        <Text style={styles.meta}>{product.unitsLeft} units · {product.sellRate}/day</Text>
+        <Text style={styles.productTitle}>{product.product}</Text>
+        <Text style={styles.meta}>{product.remainingQty} remaining · {product.sellRate}/day</Text>
       </View>
       <View style={styles.daysBox}>
         <Text style={[styles.daysValue, { color }]}>~{product.daysLeft}</Text>
@@ -102,14 +134,14 @@ function ForecastRow({ product }: { product: InventoryProduct }) {
   );
 }
 
-function ProductCard({ product }: { product: InventoryProduct }) {
+function ProductCard({ product }: { product: StockItem }) {
   const tone = product.status === 'ok' ? 'delivered' : product.status === 'low' ? 'pending' : 'failed';
   const color = product.status === 'ok' ? colors.green : product.status === 'low' ? colors.amber : colors.red;
   return (
     <Card>
       <View style={styles.productTop}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.productTitle}>{product.name}</Text>
+          <Text style={styles.productTitle}>{product.product}</Text>
           <Text style={styles.meta}>SKU: {product.sku}</Text>
         </View>
         <Badge label={product.status === 'ok' ? 'OK' : product.status.toUpperCase()} tone={tone} />
@@ -118,71 +150,18 @@ function ProductCard({ product }: { product: InventoryProduct }) {
         <LinearGradient colors={[color, `${color}99`]} style={[styles.stockFill, { width: `${product.stockPercent}%` }]} />
       </View>
       <View style={styles.stockMeta}>
-        <Text style={styles.meta}><Text style={styles.strong}>{product.unitsLeft}</Text> units left</Text>
-        <Text style={styles.meta}>{product.sold} sold · ~{product.daysLeft} days</Text>
+        <Text style={styles.meta}><Text style={styles.strong}>{product.remainingQty}</Text> remaining</Text>
+        <Text style={styles.meta}>{product.sentQty} sent · {product.deliveredQty} delivered</Text>
       </View>
+      <Text style={styles.partnerMeta}>{product.pendingQty} pending/reserved · {product.partners.length} delivery partners</Text>
       {product.status !== 'ok' ? (
-        <Pressable onPress={() => Alert.alert('Restock request sent', `${product.name} has been marked for restock.`)} style={({ pressed }) => [styles.restockButton, pressed && styles.pressed]}>
+        <Pressable onPress={() => Alert.alert('Restock request sent', `${product.product} has been marked for restock.`)} style={({ pressed }) => [styles.restockButton, pressed && styles.pressed]}>
           <MaterialCommunityIcons name="plus-circle-outline" size={14} color={colors.red} />
           <Text style={styles.restockText}>Restock Now</Text>
         </Pressable>
       ) : null}
     </Card>
   );
-}
-
-type InventoryProduct = {
-  name: string;
-  sku: string;
-  sold: number;
-  unitsLeft: number;
-  sellRate: number;
-  daysLeft: number;
-  stockPercent: number;
-  status: 'critical' | 'low' | 'ok';
-};
-
-function getInventory(orders: DeliveryOrder[]) {
-  const byProduct = new Map<string, { name: string; sold: number }>();
-  orders.forEach((order) => {
-    const name = order.product || 'Unknown Product';
-    const current = byProduct.get(name) || { name, sold: 0 };
-    current.sold += Number(order.quantity || 1);
-    byProduct.set(name, current);
-  });
-
-  const products = Array.from(byProduct.values()).map((product, index) => {
-    const sellRate = Math.max(1, Math.ceil(product.sold / 7));
-    const baseStock = [12, 5, 9, 28, 44, 36, 22, 18][index % 8];
-    const unitsLeft = Math.max(0, baseStock - Math.floor(product.sold / 40));
-    const daysLeft = Math.max(1, Math.ceil(unitsLeft / sellRate));
-    const stockPercent = Math.max(3, Math.min(100, Math.round((unitsLeft / Math.max(60, unitsLeft + product.sold)) * 100)));
-    const status: InventoryProduct['status'] = daysLeft <= 2 || unitsLeft <= 6 ? 'critical' : daysLeft <= 5 || unitsLeft <= 14 ? 'low' : 'ok';
-    return {
-      name: product.name,
-      sku: makeSku(product.name),
-      sold: product.sold,
-      unitsLeft,
-      sellRate,
-      daysLeft,
-      stockPercent,
-      status,
-    };
-  });
-
-  if (products.length) return products.sort((a, b) => a.daysLeft - b.daysLeft || a.unitsLeft - b.unitsLeft);
-
-  return [
-    { name: 'Power Bank 10000mAh XL', sku: 'DB-PB-10K', sold: 312, unitsLeft: 12, sellRate: 6, daysLeft: 2, stockPercent: 8, status: 'critical' as const },
-    { name: 'Wireless Headphones BT-5', sku: 'DB-WH-BT5', sold: 248, unitsLeft: 5, sellRate: 3, daysLeft: 1, stockPercent: 3, status: 'critical' as const },
-    { name: 'Fast Charging Dock 65W', sku: 'DB-FC-65W', sold: 174, unitsLeft: 9, sellRate: 2, daysLeft: 5, stockPercent: 10, status: 'low' as const },
-    { name: 'Portable Soundbar Mini', sku: 'DB-SB-MINI', sold: 196, unitsLeft: 28, sellRate: 2, daysLeft: 14, stockPercent: 62, status: 'ok' as const },
-  ];
-}
-
-function makeSku(name: string) {
-  const code = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 3).map((part) => part.slice(0, 2).toUpperCase()).join('-');
-  return `DB-${code || 'ITEM'}`;
 }
 
 const styles = StyleSheet.create({
@@ -211,6 +190,8 @@ const styles = StyleSheet.create({
   alertBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(255,75,110,0.22)', backgroundColor: 'rgba(255,75,110,0.08)', marginBottom: 12 },
   alertText: { color: colors.red, flex: 1, fontSize: 12, fontWeight: '900' },
   alertCount: { color: colors.text, backgroundColor: colors.red, borderRadius: 999, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, fontSize: 10, fontWeight: '900' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(255,75,110,0.22)', backgroundColor: 'rgba(255,75,110,0.08)', marginBottom: 12 },
+  errorText: { color: colors.red, flex: 1, fontSize: 12, fontWeight: '800' },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 4 },
   miniStat: { width: '48%', borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.glass, padding: 12, marginBottom: 10 },
   miniLabel: { color: colors.muted, fontSize: 10, textTransform: 'uppercase', fontWeight: '900', marginBottom: 5 },
@@ -219,6 +200,7 @@ const styles = StyleSheet.create({
   stockBar: { height: 6, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 9, overflow: 'hidden' },
   stockFill: { height: '100%', borderRadius: 99 },
   stockMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 9 },
+  partnerMeta: { color: colors.muted, fontSize: 11, marginBottom: 9 },
   strong: { color: colors.text, fontWeight: '900' },
   restockButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,75,110,0.22)', backgroundColor: 'rgba(255,75,110,0.1)' },
   restockText: { color: colors.red, fontSize: 11, fontWeight: '900' },
