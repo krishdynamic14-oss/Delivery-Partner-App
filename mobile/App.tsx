@@ -19,6 +19,8 @@ import { CodScreen } from './src/screens/CodScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
 import { AdminOrdersScreen } from './src/screens/AdminOrdersScreen';
+import { AdminEarningsScreen } from './src/screens/AdminEarningsScreen';
+import { AdminLiveMapScreen } from './src/screens/AdminLiveMapScreen';
 import type { AdminTabParamList, RootStackParamList, TabParamList } from './src/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -79,7 +81,8 @@ function AdminTabNavigator() {
     >
       <AdminTabs.Screen name="AdminHome" component={AdminDashboardScreen} options={{ title: 'Home', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard-outline" color={color} size={size} /> }} />
       <AdminTabs.Screen name="AdminOrders" component={AdminOrdersScreen} options={{ title: 'Orders', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="clipboard-list-outline" color={color} size={size} /> }} />
-      <AdminTabs.Screen name="AdminCOD" component={CodScreen} options={{ title: 'COD', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cash-register" color={color} size={size} /> }} />
+      <AdminTabs.Screen name="AdminMap" component={AdminLiveMapScreen} options={{ title: 'Map', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="map-marker-radius-outline" color={color} size={size} /> }} />
+      <AdminTabs.Screen name="AdminEarnings" component={AdminEarningsScreen} options={{ title: 'Earnings', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="chart-bar" color={color} size={size} /> }} />
       <AdminTabs.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="shield-account-outline" color={color} size={size} /> }} />
     </AdminTabs.Navigator>
   );
