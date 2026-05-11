@@ -135,8 +135,14 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     await saveOrders(updatedOrders);
     if (state.isConnected) {
       try {
-        await markDelivered(orderId, payload, user?.token);
-        return { status: 'synced', message: 'Delivery updated in Google Sheet.' };
+        const result = await markDelivered(orderId, payload, user?.token);
+        const photoUrl = result.photoUrl || payload.photoUri;
+        if (photoUrl) {
+          const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
+          setOrders(syncedOrders);
+          await saveOrders(syncedOrders);
+        }
+        return { status: 'synced', message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet.', photoUrl: result.photoUrl };
       } catch {
         await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() });
         setPendingSync((count) => count + 1);

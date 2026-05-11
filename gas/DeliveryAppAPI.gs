@@ -1,6 +1,7 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('DB_SHEET_ID');
 const ORDERS_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_ORDERS_SHEET') || 'Sheet1';
 const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PAYMENT_LOG_SHEET') || 'PAYMENT LOG';
+const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
 
 const DEFAULT_COLUMN_ALIASES = {
   ORDER_NO: ['ORDER NO', 'ORDER', 'ORDER_NO', 'ORDER NUMBER'],
@@ -103,13 +104,14 @@ function getOrdersByDistrictAndPartner_(district, partnerName, token) {
 
 function markOrderDelivered_(body, token) {
   assertToken_(token);
+  const photoUrl = body.photoUrl || uploadDeliveryProof_(body);
   updateOrderRow_(body.orderId, {
     DELIVERY_COUNTED: 'DONE',
-    'DELIVERY DATE': Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd-MM-yyyy'),
+    DELIVERY_DATE: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd-MM-yyyy'),
     PROCESSED: 'DONE',
-    DELIVERY_PHOTO: body.photoUri || body.photoUrl || '',
+    DELIVERY_PHOTO: photoUrl || body.photoUri || '',
   });
-  return { updated: true };
+  return { updated: true, photoUrl: photoUrl || '' };
 }
 
 function markOrderFailed_(body, token) {
@@ -146,6 +148,25 @@ function submitCodSettlement_(body, token) {
   return { settlementId: settlementId };
 }
 
+function uploadDeliveryProof_(body) {
+  if (!body.photoBase64) return '';
+  const folder = getProofFolder_();
+  const mimeType = body.photoMimeType || 'image/jpeg';
+  const extension = mimeType.indexOf('png') !== -1 ? 'png' : 'jpg';
+  const safeOrderId = String(body.orderId || 'order').replace(/[^A-Za-z0-9_-]/g, '');
+  const fileName = body.photoFileName || ('delivery-proof-' + safeOrderId + '-' + Date.now() + '.' + extension);
+  const bytes = Utilities.base64Decode(String(body.photoBase64));
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function getProofFolder_() {
+  if (PROOF_FOLDER_ID) return DriveApp.getFolderById(PROOF_FOLDER_ID);
+  return DriveApp.getRootFolder();
+}
+
 function updateOrderRow_(orderId, updates) {
   const sheet = getOrderSheet_();
   const values = sheet.getDataRange().getValues();
@@ -159,13 +180,23 @@ function updateOrderRow_(orderId, updates) {
   for (let r = 2; r <= values.length; r++) {
     if (String(sheet.getRange(r, orderCol).getValue()).replace('#', '') === String(orderId).replace('#', '')) {
       Object.keys(updates).forEach((key) => {
-        const col = headers.indexOf(key) + 1;
+        const resolvedHeader = accessor.resolve(key);
+        let col = headers.indexOf(key) + 1;
+        if (!col && resolvedHeader) col = headers.indexOf(resolvedHeader) + 1;
+        if (!col && key === 'DELIVERY_PHOTO') col = ensureColumn_(sheet, headers, 'DELIVERY_PHOTO');
         if (col) sheet.getRange(r, col).setValue(updates[key]);
       });
       return;
     }
   }
   throw new Error('Order not found: ' + orderId);
+}
+
+function ensureColumn_(sheet, headers, columnName) {
+  const col = headers.length + 1;
+  sheet.getRange(1, col).setValue(columnName);
+  headers.push(columnName);
+  return col;
 }
 
 function rowToOrder_(accessor, row) {
@@ -197,6 +228,7 @@ function rowToOrder_(accessor, row) {
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
     assignedTo: String(accessor.read(row, 'POSTMAN') || '').trim(),
     updatedAt: new Date().toISOString(),
+    photoUrl: String(accessor.read(row, 'DELIVERY_PHOTO') || ''),
     remarks: remarks,
   };
 }

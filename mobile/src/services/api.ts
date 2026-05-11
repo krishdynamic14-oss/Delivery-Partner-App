@@ -35,8 +35,8 @@ export async function fetchOrders(district: string, token?: string, partnerName?
 }
 
 export async function markDelivered(orderId: string, payload: DeliverPayload, token?: string) {
-  if (GAS_URL) return request<{ updated: true }>('orders.deliver', { orderId, ...payload }, token);
-  return { updated: true };
+  if (GAS_URL) return request<{ updated: true; photoUrl?: string }>('orders.deliver', { orderId, ...payload }, token);
+  return { updated: true, photoUrl: payload.photoUri };
 }
 
 export async function markFailed(orderId: string, payload: FailPayload, token?: string) {

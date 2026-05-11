@@ -10,9 +10,11 @@ Set these in Apps Script: Project Settings -> Script Properties.
 DB_SHEET_ID=1ju3wdk_i-n9UHwXOcwJn6_ytw7Qj4_LbY4T0jq5Py2k
 DB_ORDERS_SHEET=Sheet1
 DB_PAYMENT_LOG_SHEET=PAYMENT LOG
+DB_PROOF_FOLDER_ID=<Google Drive folder ID for delivery proof photos>
 ```
 
 If your orders tab is not named `Sheet1`, change `DB_ORDERS_SHEET` to the exact tab name.
+If `DB_PROOF_FOLDER_ID` is not set, proof photos are uploaded to the script owner's Drive root folder. Use a dedicated folder before real partner rollout.
 
 ## Current Header Row
 
@@ -55,3 +57,19 @@ TIMESTAMP, SETTLEMENT ID, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRI
 ```
 
 If old rows already exist without headers, the script inserts the header row above them.
+
+## Delivery Proof Upload
+
+`orders.deliver` accepts proof image fields from the mobile app:
+
+```json
+{
+  "orderId": "DP240",
+  "photoBase64": "<base64 image data>",
+  "photoMimeType": "image/jpeg",
+  "photoFileName": "delivery-proof-DP240.jpg"
+}
+```
+
+The script uploads the image to `DB_PROOF_FOLDER_ID`, makes it viewable by link, and writes the Drive file URL to the configured delivery photo column.
+If the orders sheet does not already have a `DELIVERY_PHOTO` column, the script creates it at the end of the header row on first successful proof upload.

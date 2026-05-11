@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Button, Card, Header, InfoRow, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
@@ -43,10 +43,12 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           <InfoRow icon="credit-card-outline" label="Payment" value={order.paymentType} />
           <InfoRow icon="repeat" label="Attempts" value={String(order.attempts)} />
           <InfoRow icon="clock-outline" label="Last update" value={new Date(order.updatedAt).toLocaleString()} />
+          {order.photoUrl ? <InfoRow icon="image-check-outline" label="Proof photo" value="Uploaded to Drive" /> : null}
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
         <View style={{ gap: 10 }}>
           <Button label="Open Route in Maps" onPress={() => openNavigation(order.address, order.district)} />
+          {order.photoUrl ? <Button label="Open Proof Photo" tone="secondary" onPress={() => Linking.openURL(order.photoUrl || '')} /> : null}
           <Button label="Call Customer (Masked)" tone="secondary" onPress={() => Alert.alert('Masked call', `Bonvoice call request will be sent for ${order.phoneMasked}.`)} />
           <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} />
           <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} />

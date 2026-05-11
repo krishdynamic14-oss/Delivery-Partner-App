@@ -47,6 +47,7 @@ export type QueueAction =
 export type ActionSubmitResult = {
   status: 'synced' | 'queued';
   message: string;
+  photoUrl?: string;
 };
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'warning' | 'error' | 'offline';
@@ -69,6 +70,9 @@ export type SyncQueueResult = {
 export type DeliverPayload = {
   codCollected: number;
   photoUri?: string;
+  photoBase64?: string;
+  photoMimeType?: string;
+  photoFileName?: string;
   otp: string;
   notes?: string;
 };

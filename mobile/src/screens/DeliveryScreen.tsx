@@ -14,7 +14,12 @@ export function DeliveryScreen({ route, navigation }: Props) {
   const { orders, deliverOrder } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
   const [otp, setOtp] = useState('482619');
-  const [photoUri, setPhotoUri] = useState<string | undefined>();
+  const [photo, setPhoto] = useState<{
+    uri: string;
+    base64?: string;
+    mimeType?: string;
+    fileName?: string;
+  }>();
   const [loading, setLoading] = useState(false);
 
   if (!order) return null;
@@ -26,8 +31,16 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Camera permission needed', 'Allow camera access to capture delivery proof.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.6 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.6 }));
-    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.55 }));
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      setPhoto({
+        uri: asset.uri,
+        base64: asset.base64 || undefined,
+        mimeType: asset.mimeType || 'image/jpeg',
+        fileName: asset.fileName ?? `delivery-proof-${currentOrder.id}-${Date.now()}.jpg`,
+      });
+    }
   }
 
   async function submit() {
@@ -35,13 +48,24 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('OTP required', 'Enter the 6-digit customer OTP before confirming delivery.');
       return;
     }
-    if (!photoUri) {
+    if (!photo?.uri) {
       Alert.alert('Photo required', 'Capture open-box proof before confirming delivery.');
+      return;
+    }
+    if (!photo.base64) {
+      Alert.alert('Photo data missing', 'Capture the proof photo again before confirming delivery.');
       return;
     }
     setLoading(true);
     try {
-      const result = await deliverOrder(currentOrder.id, { codCollected: currentOrder.amount, photoUri, otp });
+      const result = await deliverOrder(currentOrder.id, {
+        codCollected: currentOrder.amount,
+        photoUri: photo.uri,
+        photoBase64: photo.base64,
+        photoMimeType: photo.mimeType,
+        photoFileName: photo.fileName,
+        otp,
+      });
       Alert.alert(result.status === 'synced' ? 'Delivery synced' : 'Delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });
     } catch (err) {
@@ -57,8 +81,8 @@ export function DeliveryScreen({ route, navigation }: Props) {
         <Header title="Confirm Delivery" subtitle={`#${order.orderNo} · ${order.customerName}`} />
         <View style={styles.steps}>
           <StepPill index={1} label="Call" done />
-          <StepPill index={2} label="OTP" active={!photoUri} />
-          <StepPill index={3} label="Photo" active={!!photoUri} />
+          <StepPill index={2} label="OTP" active={!photo?.uri} />
+          <StepPill index={3} label="Photo" active={!!photo?.uri} />
           <StepPill index={4} label="COD" />
         </View>
         <Card>
@@ -75,7 +99,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
         <Field value={otp} onChangeText={setOtp} keyboardType="number-pad" placeholder="Customer OTP" maxLength={6} />
         <Card>
           <Text style={styles.label}>Open-box proof</Text>
-          {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} /> : <Text style={styles.meta}>No photo captured yet.</Text>}
+          {photo?.uri ? <Image source={{ uri: photo.uri }} style={styles.photo} /> : <Text style={styles.meta}>No photo captured yet.</Text>}
           <Button label="Capture Photo" tone="secondary" onPress={pickImage} />
         </Card>
         <Button label="Confirm Delivery" loading={loading} onPress={submit} />
