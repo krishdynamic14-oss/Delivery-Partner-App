@@ -16,6 +16,7 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   const [nextAttemptDate, setNextAttemptDate] = useState('');
   const [photo, setPhoto] = useState<{
     uri: string;
+    base64?: string;
     mimeType?: string;
     fileName?: string;
   }>();
@@ -29,11 +30,13 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Camera permission needed', 'Allow camera access to capture house proof.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.55 }));
+    const pickerOptions: ImagePicker.ImagePickerOptions = { quality: 0.35, base64: true };
+    const result = await ImagePicker.launchCameraAsync(pickerOptions).catch(() => ImagePicker.launchImageLibraryAsync(pickerOptions));
     if (!result.canceled) {
       const asset = result.assets[0];
       setPhoto({
         uri: asset.uri,
+        base64: asset.base64 || undefined,
         mimeType: asset.mimeType || 'image/jpeg',
         fileName: asset.fileName ?? `failed-proof-${route.params.orderId}-${Date.now()}.jpg`,
       });
@@ -56,8 +59,10 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
         notes: notes.trim(),
         nextAttemptDate: nextAttemptDate.trim(),
         photoUri: photo?.uri,
+        photoBase64: photo?.base64,
         photoMimeType: photo?.mimeType,
         photoFileName: photo?.fileName,
+        uploadProof: !!photo?.base64,
       });
       Alert.alert(result.status === 'synced' ? 'Failed delivery synced' : 'Failed delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });

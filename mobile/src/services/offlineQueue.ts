@@ -60,7 +60,13 @@ export async function syncQueue(token?: string): Promise<SyncQueueResult> {
 }
 
 function sanitizeQueueAction(action: QueueAction): QueueAction {
-  if (action.type !== 'deliver') return action;
-  const { photoBase64, ...payload } = action.payload;
-  return { ...action, payload };
+  if (action.type === 'deliver') {
+    const { photoBase64, ...payload } = action.payload;
+    return { ...action, payload };
+  }
+  if (action.type === 'fail') {
+    const { photoBase64, ...payload } = action.payload;
+    return { ...action, payload };
+  }
+  return action;
 }

@@ -27,7 +27,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
-| Photo upload to Drive | [ ] | [ ] | Paused for MVP; delivery submit no longer sends base64 or calls Drive by default |
+| Photo upload to Drive | [~] | [ ] | Delivery/failed screens send compressed base64 to GAS; verify Drive URL on Android |
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
 | Admin dashboard shell | [~] | [ ] | Admin role opens hidden admin tabs and all-order monitoring |
@@ -94,7 +94,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Mark delivered in Sheet1
 - [~] Mark failed/RTO in Sheet1
 - [x] Write COD settlement to `PAYMENT LOG`
-- [ ] Upload delivery photo and store photo URL
+- [~] Upload delivery photo and store photo URL
 - [ ] Return consistent API error codes/messages
 
 ## Delivery Workflow
@@ -106,7 +106,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [ ] Real customer masked call through Bonvoice
 - [ ] Real customer delivery OTP validation
 - [ ] Photo compression before upload
-- [ ] Google Drive upload through GAS
+- [~] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
 - [~] Refused/cancelled delivery requires house photo proof

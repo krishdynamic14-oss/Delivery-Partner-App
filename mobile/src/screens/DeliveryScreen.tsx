@@ -16,6 +16,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
   const [otp, setOtp] = useState('482619');
   const [photo, setPhoto] = useState<{
     uri: string;
+    base64?: string;
     mimeType?: string;
     fileName?: string;
   }>();
@@ -30,11 +31,13 @@ export function DeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Camera permission needed', 'Allow camera access to capture delivery proof.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.55 }).catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.55 }));
+    const pickerOptions: ImagePicker.ImagePickerOptions = { quality: 0.35, base64: true };
+    const result = await ImagePicker.launchCameraAsync(pickerOptions).catch(() => ImagePicker.launchImageLibraryAsync(pickerOptions));
     if (!result.canceled) {
       const asset = result.assets[0];
       setPhoto({
         uri: asset.uri,
+        base64: asset.base64 || undefined,
         mimeType: asset.mimeType || 'image/jpeg',
         fileName: asset.fileName ?? `delivery-proof-${currentOrder.id}-${Date.now()}.jpg`,
       });
@@ -55,8 +58,10 @@ export function DeliveryScreen({ route, navigation }: Props) {
       const result = await deliverOrder(currentOrder.id, {
         codCollected: currentOrder.amount,
         photoUri: photo.uri,
+        photoBase64: photo.base64,
         photoMimeType: photo.mimeType,
         photoFileName: photo.fileName,
+        uploadProof: true,
         otp,
         notes: 'Proof photo captured locally.',
       });

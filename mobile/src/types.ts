@@ -102,6 +102,7 @@ export type DeliverPayload = {
   photoBase64?: string;
   photoMimeType?: string;
   photoFileName?: string;
+  uploadProof?: boolean;
   otp: string;
   notes?: string;
 };
@@ -111,8 +112,10 @@ export type FailPayload = {
   notes?: string;
   nextAttemptDate?: string;
   photoUri?: string;
+  photoBase64?: string;
   photoMimeType?: string;
   photoFileName?: string;
+  uploadProof?: boolean;
 };
 
 export type SettlementPayload = {

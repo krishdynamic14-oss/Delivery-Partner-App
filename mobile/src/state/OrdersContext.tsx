@@ -164,8 +164,16 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     await saveOrders(updatedOrders);
     if (state.isConnected) {
       try {
-        await markFailed(orderId, payload, user?.token);
-        return { status: 'synced', message: 'Failed delivery updated in Google Sheet.' };
+        const result = await markFailed(orderId, payload, user?.token);
+        const photoUrl = result.photoUrl || payload.photoUri;
+        const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
+        setOrders(syncedOrders);
+        await saveOrders(syncedOrders);
+        return {
+          status: 'synced',
+          message: result.photoUrl ? 'Failed delivery and house proof synced to Google Sheets.' : 'Failed delivery updated in Google Sheet.',
+          photoUrl: result.photoUrl,
+        };
       } catch (err) {
         const message = getErrorMessage(err);
         await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() });
