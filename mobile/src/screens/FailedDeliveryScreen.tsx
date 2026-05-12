@@ -69,8 +69,8 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   }
 
   return (
-    <Screen>
-      <ScrollView>
+    <Screen bottomPadding={20}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header title="Failed Delivery" subtitle="Record reason for Sheet remarks and admin follow-up" />
         <Card>
           <Text style={styles.label}>Reason</Text>
@@ -97,6 +97,7 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 20 },
   label: { color: colors.muted, textTransform: 'uppercase', fontWeight: '900', marginBottom: 12 },
   reasonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   reasonChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },

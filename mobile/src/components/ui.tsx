@@ -5,13 +5,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
-export function Screen({ children }: PropsWithChildren) {
+export function Screen({ children, bottomPadding = 104 }: PropsWithChildren<{ bottomPadding?: number }>) {
   const insets = useSafeAreaInsets();
   return (
     <LinearGradient
       colors={['#170b08', colors.bg, '#07111d']}
       locations={[0, 0.42, 1]}
-      style={[styles.screen, { paddingTop: Math.max(42, insets.top + 18), paddingBottom: insets.bottom + 104 }]}
+      style={[styles.screen, { paddingTop: Math.max(42, insets.top + 18), paddingBottom: insets.bottom + bottomPadding }]}
     >
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />

@@ -16,7 +16,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
 
   if (!order) {
     return (
-      <Screen>
+      <Screen bottomPadding={20}>
         <Header title="Order not found" />
         <Button label="Back" onPress={() => navigation.goBack()} />
       </Screen>
@@ -28,8 +28,8 @@ export function OrderDetailScreen({ route, navigation }: Props) {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <Screen>
-      <ScrollView>
+    <Screen bottomPadding={20}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${order.phoneMasked}`} />
         <Card>
           <View style={styles.topRow}>
@@ -66,6 +66,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 20 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   badges: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
   product: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },

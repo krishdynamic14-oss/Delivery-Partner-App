@@ -70,8 +70,8 @@ export function DeliveryScreen({ route, navigation }: Props) {
   }
 
   return (
-    <Screen>
-      <ScrollView>
+    <Screen bottomPadding={20}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header title="Confirm Delivery" subtitle={`#${order.orderNo} · ${order.customerName}`} />
         <View style={styles.steps}>
           <StepPill index={1} label="Call" done />
@@ -103,6 +103,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 20 },
   steps: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   priority: { color: colors.amber, fontSize: 12, fontWeight: '900' },
