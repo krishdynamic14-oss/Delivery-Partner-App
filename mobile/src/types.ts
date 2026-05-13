@@ -13,6 +13,15 @@ export type Partner = {
   token: string;
 };
 
+export type DeliveryPartnerSummary = {
+  name: string;
+  phone?: string;
+  numberMasked?: string;
+  district: string;
+  status?: string;
+  orderCount?: number;
+};
+
 export type LoginPayload = {
   phone: string;
   password?: string;
@@ -22,6 +31,7 @@ export type DeliveryOrder = {
   id: string;
   orderNo: string;
   customerName: string;
+  customerPhone?: string;
   phoneMasked: string;
   address: string;
   area: string;
@@ -46,6 +56,40 @@ export type CodSummary = {
   collected: number;
   remaining: number;
   prepaidCount: number;
+};
+
+export type CodSettlementSummary = {
+  assignedCod: number;
+  cashCollected: number;
+  upiCollected: number;
+  commissionEarned: number;
+  payableBeforeSettlement: number;
+  approvedSettled: number;
+  pendingSettlement: number;
+  cashInHand: number;
+  codOrderCount: number;
+  deliveredCodCount: number;
+  pendingCodCount: number;
+};
+
+export type CodSettlement = {
+  settlementId: string;
+  timestamp: string;
+  partnerName: string;
+  partnerPhone: string;
+  district: string;
+  requestedAmount: number;
+  approvedAmount: number;
+  method: 'Cash' | 'UPI' | 'Bank' | '';
+  reference?: string;
+  paymentProofUrl?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  cashInHand: number;
+  commissionEarned?: number;
+  payableBeforeSettlement?: number;
+  approvedBy?: string;
+  approvedAt?: string;
+  adminNotes?: string;
 };
 
 export type StockPartnerBreakdown = {
@@ -75,10 +119,19 @@ export type StockItem = {
   partners: StockPartnerBreakdown[];
 };
 
+export type StockDispatchPayload = {
+  product: string;
+  quantity: number;
+  partnerName?: string;
+  partnerPhone?: string;
+  district?: string;
+  notes?: string;
+};
+
 export type QueueAction =
-  | { id: string; type: 'deliver'; orderId: string; payload: DeliverPayload; createdAt: string }
-  | { id: string; type: 'fail'; orderId: string; payload: FailPayload; createdAt: string }
-  | { id: string; type: 'settle'; orderId: 'cod'; payload: SettlementPayload; createdAt: string };
+  | { id: string; type: 'deliver'; orderId: string; payload: DeliverPayload; createdAt: string; ownerId?: string; ownerRole?: Partner['role'] }
+  | { id: string; type: 'fail'; orderId: string; payload: FailPayload; createdAt: string; ownerId?: string; ownerRole?: Partner['role'] }
+  | { id: string; type: 'settle'; orderId: 'cod'; payload: SettlementPayload; createdAt: string; ownerId?: string; ownerRole?: Partner['role'] };
 
 export type ActionSubmitResult = {
   status: 'synced' | 'queued';
@@ -138,15 +191,22 @@ export type SettlementPayload = {
   amount: number;
   method: 'Cash' | 'UPI' | 'Bank';
   reference?: string;
+  photoUri?: string;
+  photoBase64?: string;
+  photoMimeType?: string;
+  photoFileName?: string;
   partnerName?: string;
   partnerPhone?: string;
   district?: string;
   assignedCod?: number;
   collectedCod?: number;
+  commissionEarned?: number;
+  payableBeforeSettlement?: number;
   remainingCod?: number;
   codOrderCount?: number;
   deliveredCodCount?: number;
   pendingCodCount?: number;
+  cashInHand?: number;
 };
 
 export type TabParamList = {

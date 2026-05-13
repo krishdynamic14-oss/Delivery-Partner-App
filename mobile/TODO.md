@@ -29,9 +29,8 @@ Use this table before marking anything fully complete. `Build` means the feature
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
 | Photo upload to Drive | [~] | [ ] | Delivery/failed screens send compressed base64 to GAS; verify Drive URL on Android |
-| Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
-| Admin dashboard shell | [~] | [ ] | Admin role opens hidden admin tabs and all-order monitoring |
+| Admin dashboard shell | [x] | [ ] | Admin role opens hidden admin tabs, all-order monitoring, settlement approval, stock view/update, and quick assignment |
 | Partner password login | [~] | [ ] | Password login added; real SMS OTP still needs provider if required later |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
@@ -57,8 +56,10 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 
 - [x] Login placeholder screen
 - [~] Hidden role mapping from one login screen
-- [~] Admin dashboard shell
-- [~] Admin all-orders monitoring screen
+- [x] Admin dashboard shell
+- [x] Admin all-orders monitoring screen
+- [x] Admin quick order assignment from active partner list
+- [x] Admin stock dispatch/update form backed by Stock Master
 - [x] Dashboard with COD and order KPIs
 - [x] Orders list with status tabs
 - [x] Search by order number, customer, area, product, or masked phone
@@ -82,6 +83,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Deploy GAS Web App
 - [x] Document script property `DB_SHEET_ID`
 - [x] Verify `meta.columns` resolves Sheet1 headers
+- [x] Add admin partner list endpoint (`admin.partners`)
 - [~] Add safe partner diagnostics endpoint (`meta.partners`)
 - [~] Add script-property based column alias mapping (`DB_COLUMN_ALIASES_JSON`)
 - [~] Add script-property based sheet names (`DB_ORDERS_SHEET`, `DB_PAYMENT_LOG_SHEET`)
@@ -92,6 +94,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [~] Fetch real assigned orders by district
 - [~] Fetch all orders for hidden admin role
 - [ ] Fetch single order detail from GAS
+- [x] Assign order to delivery partner from admin app
 - [x] Mark delivered in Sheet1
 - [~] Mark failed/RTO in Sheet1
 - [x] Write COD settlement to `PAYMENT LOG`
@@ -104,7 +107,6 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Local failed status update
 - [x] Persist local status changes
 - [x] Queue offline delivered/failed/settlement actions
-- [ ] Real customer masked call through Bonvoice
 - [~] Real customer delivery OTP validation
 - [ ] Photo compression before upload
 - [~] Google Drive upload through GAS
@@ -121,9 +123,9 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] COD order-wise breakdown
 - [x] Settlement submission stub
 - [x] Real settlement entry in Google Sheet
-- [~] Delivery payment selector: Cash / UPI QR / Prepaid
-- [~] UPI reference validation during delivery submit
-- [ ] Settlement history
+- [x] Delivery payment selector: Cash / UPI QR / Prepaid
+- [x] UPI reference validation during delivery submit
+- [~] Settlement history through admin pending/recent settlement list
 - [ ] Outstanding COD warning if not settled by day end
 - [x] Add partner, district, and COD breakdown to settlement payload/log
 
@@ -132,7 +134,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Offline queue foundation
 - [x] Queue count visible in profile/dashboard
 - [x] Dedicated sync status component
-- [~] Retry queue with visible per-action failures
+- [x] Retry queue with visible per-action details and local remove/attach-proof controls
 - [ ] Store queued photo files safely until upload
 - [~] Automatic sync on reconnect
 - [x] Manual force sync action with result summary
@@ -153,7 +155,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Add subtle motion for state changes without slowing field work
 - [ ] Ensure every screen works at small Android sizes
 - [x] Replace text-only tab icons with proper icon set
-- [ ] Add polished splash screen and adaptive app icon
+- [~] Add polished splash screen and adaptive app icon
 - [ ] Add Gujarati/Hindi/English language-ready copy structure
 
 ## Android And Deployment
@@ -179,7 +181,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Partner sees only assigned district orders
 - [ ] Search and tabs return expected orders
 - [x] Delivered action updates UI, local cache, and Sheet1
-- [ ] Failed/refused action updates UI, local cache, and Sheet1 with proof rule
+- [~] Failed/refused action updates UI, local cache, and Sheet1 with proof rule
 - [x] COD totals match Sheet data
 - [ ] Offline delivery queues and syncs after reconnect
 - [x] Photo capture works on real Android device

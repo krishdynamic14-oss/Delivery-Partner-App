@@ -2,8 +2,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ActionSubmitResult, DeliveryOrder, FailPayload, DeliverPayload, SyncMeta, SyncQueueResult } from '../types';
 import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp } from '../services/api';
-import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveSyncMeta } from '../services/storage';
-import { enqueueAction, syncQueue } from '../services/offlineQueue';
+import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveQueue, saveSyncMeta } from '../services/storage';
+import { enqueueAction, loadQueueForUser, queueBelongsToUser, syncQueue } from '../services/offlineQueue';
 import { useAuth } from './AuthContext';
 
 type OrdersState = {
@@ -18,6 +18,7 @@ type OrdersState = {
   deliverOrder: (orderId: string, payload: DeliverPayload) => Promise<ActionSubmitResult>;
   failOrder: (orderId: string, payload: FailPayload) => Promise<ActionSubmitResult>;
   syncOfflineQueue: () => Promise<SyncQueueResult>;
+  discardQueuedAction: (actionId: string) => Promise<void>;
   codSummary: ReturnType<typeof getCodSummary>;
 };
 
@@ -71,16 +72,16 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
   }, [refresh]);
 
   useEffect(() => {
-    Promise.all([loadQueue(), loadSyncMeta(), NetInfo.fetch()]).then(([queue, meta, state]) => {
+    Promise.all([loadQueueForUser(user), loadSyncMeta(), NetInfo.fetch()]).then(([queue, meta, state]) => {
       setPendingSync(queue.length);
-      setSyncMeta(meta);
+      setSyncMeta(user?.role === 'admin' && queue.length === 0 ? DEFAULT_SYNC_META : meta);
       setIsOnline(state.isConnected ?? null);
     });
-  }, []);
+  }, [user]);
 
   const syncOfflineQueue = useCallback(async (): Promise<SyncQueueResult> => {
     if (!user?.token) {
-      const queue = await loadQueue();
+      const queue = await loadQueueForUser(user);
       const result: SyncQueueResult = {
         synced: 0,
         remaining: queue.length,
@@ -96,7 +97,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     setSyncing(true);
     setSyncMeta((current) => ({ ...current, status: 'syncing', message: 'Syncing queued actions...' }));
     try {
-      const result = await syncQueue(user?.token);
+      const result = await syncQueue(user?.token, user);
       setPendingSync(result.remaining);
       await persistSyncMeta({
         status: result.status,
@@ -119,7 +120,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     } finally {
       setSyncing(false);
     }
-  }, [pendingSync, persistSyncMeta, refresh, user?.token]);
+  }, [pendingSync, persistSyncMeta, refresh, user]);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -198,17 +199,30 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         };
       } catch (err) {
         const message = getErrorMessage(err);
-        await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() });
+        await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() }, user);
         setPendingSync((count) => count + 1);
         await persistSyncMeta({ status: 'warning', message: 'Failed delivery queued because GAS sync failed.', lastError: message });
         return { status: 'queued', message: `Failed delivery saved locally. GAS error: ${message}` };
       }
     }
 
-    await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() });
+    await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() }, user);
     setPendingSync((count) => count + 1);
     await persistSyncMeta({ status: 'offline', message: 'Failed delivery queued offline.' });
     return { status: 'queued', message: 'Failed delivery saved offline. It will sync when network returns.' };
+  }
+
+  async function discardQueuedAction(actionId: string) {
+    const queue = await loadQueue();
+    const nextQueue = queue.filter((action) => action.id !== actionId || !queueBelongsToUser(action, user));
+    await saveQueue(nextQueue);
+    const userQueue = nextQueue.filter((action) => queueBelongsToUser(action, user));
+    setPendingSync(userQueue.length);
+    await persistSyncMeta({
+      status: userQueue.length ? 'warning' : 'success',
+      message: userQueue.length ? `${userQueue.length} offline action(s) still pending.` : 'Pending offline action removed.',
+      lastSyncAt: new Date().toISOString(),
+    });
   }
 
   const value = useMemo<OrdersState>(() => ({
@@ -223,6 +237,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     deliverOrder,
     failOrder,
     syncOfflineQueue,
+    discardQueuedAction,
     codSummary: getCodSummary(orders),
   }), [orders, loading, syncing, isOnline, pendingSync, syncMeta, refresh, syncOfflineQueue]);
 

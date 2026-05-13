@@ -37,26 +37,37 @@ Admin login now requires password. Use either global `DB_ADMIN_PASSWORD`, or per
 
 ## Stock Master Sheet
 
-The admin Stock tab reads `Stock Master`. This sheet is treated as stock sent to delivery partners.
+The admin Stock tab reads and can append dispatch rows to `Stock Master`. This sheet is treated as stock sent to delivery partners or locations.
 
-Your current supported header names:
+Your existing compact layout is supported and recommended if the sheet already uses dropdowns/formulas in A-D:
 
 ```text
 PRODUCT, QUANTITY, DATE, LOCATION
 ```
 
-Flexible aliases are also supported, for example `PRODUCT NAME`, `ITEM`, `QTY`, `QTY SENT`, `STOCK SENT`, `DISTRICT`, and `AREA`.
+Optional columns can be added after these if you want partner-level dispatch tracking:
+
+```text
+SKU, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, NOTES
+```
+
+Flexible aliases are supported, for example `PRODUCT NAME`, `ITEM`, `QTY`, `QTY SENT`, `STOCK SENT`, `DISTRICT`, and `AREA`.
+
+Admin app action:
+
+- `stock.master` reads current inventory summary.
+- `stock.dispatch` appends a new stock dispatch row using the existing header order. If `Stock Master` is empty, the script creates `PRODUCT, QUANTITY, DATE, LOCATION`; it does not rewrite an existing stock sheet layout.
 
 Stock calculation:
 
-- `sentQty` comes from `Stock Master` quantity.
-- If `Stock Master` has no partner column, stock is matched by `PRODUCT + LOCATION`.
+- `sentQty` comes from the stock quantity column.
+- If `Stock Master` has no partner column, stock is matched by `PRODUCT + LOCATION/DISTRICT`.
 - `deliveredQty`, `pendingQty`, and `failedQty` come from the orders sheet, matched by product + district/location.
 - `remainingQty = sentQty - deliveredQty`.
 
 ## DP MASTER Sheet
 
-Partner login and partner metadata now prefer `DP MASTER`. Only delivery partners listed here should be able to login as partners.
+Partner login, admin partner list, and quick order assignment prefer `DP MASTER`. Only delivery partners listed here should be able to login as partners.
 
 Your current supported header names:
 
@@ -75,6 +86,11 @@ PASSWORD
 Supported aliases include `APP PASSWORD` and `LOGIN PASSWORD`.
 
 If `STATUS` contains `CANCEL`, `INACTIVE`, `REMOVED`, or `NO`, that mobile number is blocked from partner login.
+
+Admin app action:
+
+- `admin.partners` returns active partner names, full phone numbers, districts, status, and current order counts for admin-only assignment/update flows.
+- `orders.assign` writes `DELIVERY PARTNER NAME`, `DELIVERY PARTNER NUMBER`, `DISTRICT` if provided, and `GIVE TO PARTNER=DONE` on the selected order.
 
 ## Password Reset
 
@@ -276,22 +292,27 @@ Diagnostics action:
 `cod.settle` now creates a header row automatically in `PAYMENT LOG`:
 
 ```text
-TIMESTAMP, SETTLEMENT ID, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, SETTLEMENT AMOUNT, METHOD, REFERENCE, ASSIGNED COD, COLLECTED COD, REMAINING COD, COD ORDER COUNT, DELIVERED COD COUNT, PENDING COD COUNT, SOURCE
+TIMESTAMP, SETTLEMENT ID, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DISTRICT, SETTLEMENT AMOUNT, METHOD, REFERENCE, PAYMENT PROOF, ASSIGNED COD, COLLECTED COD, COMMISSION AMOUNT, PAYABLE AMOUNT, REMAINING COD, COD ORDER COUNT, DELIVERED COD COUNT, PENDING COD COUNT, SOURCE, STATUS, REQUESTED AMOUNT, APPROVED AMOUNT, APPROVED BY, APPROVED AT, ADMIN NOTES
 ```
 
 If old rows already exist without headers, the script inserts the header row above them.
 
+Settlement flow:
+
+- Partner opens the UPI app from COD Tracker, completes payment, attaches a payment screenshot, and submits proof.
+- `cod.settle` uploads the payment screenshot to Drive and writes a `PENDING` settlement request.
+- Admin opens the Earnings tab, views the payment screenshot, and approves or rejects through `cod.approveSettlement`.
+- Approved settlements reduce future Pay to Company / cash-in-hand calculations.
+
 ## Delivery Proof Upload
 
-Current MVP behavior:
+Current behavior:
 
-- The app captures proof photo locally.
-- The app does not send `photoBase64`.
-- The delivery submit updates the order in Google Sheets without calling Drive.
+- Delivery and failed-delivery screens capture proof photos.
+- When `uploadProof: true` and `photoBase64` are sent, Apps Script uploads the image to Drive and writes the Drive URL to the configured proof/photo column.
+- COD settlement proof uses the same Drive folder through `cod.settle`.
 
-Optional future Drive upload behavior:
-
-`orders.deliver` can accept proof image fields if the request also sends `uploadProof: true`:
+`orders.deliver`, `orders.fail`, and `cod.settle` can accept proof image fields:
 
 ```json
 {
@@ -303,5 +324,5 @@ Optional future Drive upload behavior:
 }
 ```
 
-In that opt-in path, the script uploads the image to `DB_PROOF_FOLDER_ID`, makes it viewable by link, and writes the Drive file URL to the configured delivery photo column.
+The script uploads the image to `DB_PROOF_FOLDER_ID` if configured, otherwise the script root Drive folder, makes it viewable by link, and writes the Drive file URL to the configured delivery/payment proof column.
 If the orders sheet does not already have a `DELIVERY_PHOTO` column, the script creates it at the end of the header row on first successful proof upload.

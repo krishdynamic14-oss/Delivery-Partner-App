@@ -15,6 +15,14 @@ const AISENSY_API_URL = PropertiesService.getScriptProperties().getProperty('DB_
 const ADMIN_PHONES = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PHONES') || '';
 const ADMIN_CREDENTIALS_JSON = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_CREDENTIALS_JSON') || '';
 const ADMIN_PASSWORD = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PASSWORD') || '';
+const COD_COMMISSION_SLABS_JSON = PropertiesService.getScriptProperties().getProperty('DB_COD_COMMISSION_SLABS_JSON') || '';
+
+const DEFAULT_COD_COMMISSION_SLABS = [
+  { min: 0, max: 1199, commission: 150 },
+  { min: 1200, max: 2000, commission: 200 },
+  { min: 2001, max: 3000, commission: 250 },
+  { min: 3001, max: 10000, commission: 300 },
+];
 
 const DEFAULT_COLUMN_ALIASES = {
   ORDER_NO: ['ORDER NO', 'ORDER', 'ORDER_NO', 'ORDER NUMBER'],
@@ -95,9 +103,15 @@ function doPost(e) {
       'orders.sendDeliveryOtp': () => sendDeliveryOtpByOrderId_(body.orderId, token),
       'orders.deliver': () => markOrderDelivered_(body, token),
       'orders.fail': () => markOrderFailed_(body, token),
+      'cod.summary': () => getCodSettlementSummary_(body, token),
       'cod.settle': () => submitCodSettlement_(body, token),
+      'cod.settlements': () => getCodSettlements_(token),
+      'cod.approveSettlement': () => approveCodSettlement_(body, token),
       'bills.generate': () => generateBillByOrderId_(body.orderId, token),
       'stock.master': () => getStockMaster_(token),
+      'stock.dispatch': () => addStockDispatch_(body, token),
+      'admin.partners': () => getAdminPartners_(token),
+      'orders.assign': () => assignOrderToPartner_(body, token),
       'meta.columns': () => inspectColumns_(),
       'meta.partners': () => inspectPartners_(),
     };
@@ -340,28 +354,164 @@ function markOrderFailed_(body, token) {
 
 function submitCodSettlement_(body, token) {
   assertToken_(token);
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const sheet = ss.getSheetByName(PAYMENT_LOG_SHEET_NAME) || ss.insertSheet(PAYMENT_LOG_SHEET_NAME);
+  const sheet = getPaymentLogSheet_();
   ensurePaymentLogHeader_(sheet);
   const settlementId = 'SET-' + Date.now();
-  sheet.appendRow([
-    new Date(),
-    settlementId,
-    String(body.partnerName || '').trim(),
-    onlyDigits_(body.partnerPhone),
-    String(body.district || '').trim(),
-    Number(body.amount || 0),
-    String(body.method || '').trim(),
-    String(body.reference || '').trim(),
-    Number(body.assignedCod || 0),
-    Number(body.collectedCod || 0),
-    Number(body.remainingCod || 0),
-    Number(body.codOrderCount || 0),
-    Number(body.deliveredCodCount || 0),
-    Number(body.pendingCodCount || 0),
-    'mobile-app',
-  ]);
-  return { settlementId: settlementId };
+  const amount = Number(body.amount || 0);
+  const proofUrl = uploadSettlementProof_(settlementId, body);
+  const summary = calculateCodSettlementSummary_({
+    partnerName: body.partnerName,
+    partnerPhone: body.partnerPhone,
+    district: body.district,
+  });
+  if (!amount || amount <= 0) throw new Error('Settlement amount required');
+  if (amount > summary.cashInHand) {
+    throw new Error('Settlement amount cannot be greater than Payable to Company: ' + summary.cashInHand);
+  }
+
+  appendPaymentLogRow_(sheet, {
+    'TIMESTAMP': new Date(),
+    'SETTLEMENT ID': settlementId,
+    'DELIVERY PARTNER NAME': String(body.partnerName || '').trim(),
+    'DELIVERY PARTNER NUMBER': onlyDigits_(body.partnerPhone),
+    'DISTRICT': String(body.district || '').trim(),
+    'SETTLEMENT AMOUNT': 0,
+    'METHOD': String(body.method || 'Cash').trim(),
+    'REFERENCE': String(body.reference || '').trim(),
+    'PAYMENT PROOF': proofUrl,
+    'ASSIGNED COD': summary.assignedCod,
+    'COLLECTED COD': summary.cashCollected,
+    'COMMISSION AMOUNT': summary.commissionEarned,
+    'PAYABLE AMOUNT': summary.payableBeforeSettlement,
+    'REMAINING COD': summary.cashInHand,
+    'COD ORDER COUNT': summary.codOrderCount,
+    'DELIVERED COD COUNT': summary.deliveredCodCount,
+    'PENDING COD COUNT': summary.pendingCodCount,
+    'SOURCE': 'mobile-app',
+    'STATUS': 'PENDING',
+    'REQUESTED AMOUNT': amount,
+    'APPROVED AMOUNT': 0,
+    'APPROVED BY': '',
+    'APPROVED AT': '',
+    'ADMIN NOTES': String(body.notes || '').trim(),
+  });
+  return { settlementId: settlementId, status: 'PENDING', cashInHand: summary.cashInHand };
+}
+
+function getCodSettlementSummary_(body, token) {
+  assertToken_(token);
+  return calculateCodSettlementSummary_(body || {});
+}
+
+function getCodSettlements_(token) {
+  assertAdminToken_(token);
+  const data = getPaymentLogData_();
+  return data.values
+    .slice(1)
+    .map((row) => paymentLogRowToSettlement_(row, data.indexByHeader))
+    .filter(Boolean)
+    .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+    .slice(0, 100);
+}
+
+function approveCodSettlement_(body, token) {
+  assertAdminToken_(token);
+  const settlementId = String(body.settlementId || '').trim();
+  const decision = normalizeSettlementStatus_(body.status);
+  if (!settlementId) throw new Error('Settlement ID required');
+  if (decision !== 'APPROVED' && decision !== 'REJECTED') throw new Error('Status must be APPROVED or REJECTED');
+
+  const data = getPaymentLogData_();
+  const idCol = data.indexByHeader['SETTLEMENT ID'];
+  const statusCol = data.indexByHeader['STATUS'];
+  if (idCol === undefined) throw new Error('SETTLEMENT ID column missing');
+
+  for (let r = 2; r <= data.values.length; r += 1) {
+    const row = data.values[r - 1];
+    if (String(row[idCol] || '').trim() !== settlementId) continue;
+
+    const currentStatus = normalizeSettlementStatus_(statusCol === undefined ? '' : row[statusCol]);
+    if (currentStatus && currentStatus !== 'PENDING') {
+      throw new Error('Settlement already ' + currentStatus);
+    }
+
+    const requested = Number(readLogValue_(row, data.indexByHeader, 'REQUESTED AMOUNT') || readLogValue_(row, data.indexByHeader, 'SETTLEMENT AMOUNT') || 0);
+    const approvedAmount = decision === 'APPROVED' ? Number(body.approvedAmount || requested || 0) : 0;
+    if (decision === 'APPROVED' && (!approvedAmount || approvedAmount <= 0)) throw new Error('Approved amount required');
+    if (decision === 'APPROVED' && requested && approvedAmount > requested) {
+      throw new Error('Approved amount cannot be greater than requested amount');
+    }
+
+    const updates = {
+      'STATUS': decision,
+      'SETTLEMENT AMOUNT': approvedAmount,
+      'APPROVED AMOUNT': approvedAmount,
+      'METHOD': decision === 'APPROVED' ? String(body.method || 'Cash').trim() : '',
+      'REFERENCE': String(body.reference || '').trim(),
+      'APPROVED BY': getApproverFromToken_(token),
+      'APPROVED AT': new Date(),
+      'ADMIN NOTES': String(body.adminNotes || '').trim(),
+    };
+    Object.keys(updates).forEach((header) => {
+      const col = ensureLogColumn_(data.sheet, data.headers, data.indexByHeader, header);
+      data.sheet.getRange(r, col + 1).setValue(updates[header]);
+    });
+    return { updated: true };
+  }
+  throw new Error('Settlement not found: ' + settlementId);
+}
+
+function getAdminPartners_(token) {
+  assertAdminToken_(token);
+  const fromMaster = getDpMasterPartners_(true);
+  if (fromMaster.length) return fromMaster;
+
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return [];
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  const byPartner = {};
+
+  values.forEach((row) => {
+    const name = String(accessor.read(row, 'POSTMAN') || '').trim();
+    const phone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+    const district = String(accessor.read(row, 'DISTRICT') || '').trim();
+    if (!name && !phone) return;
+
+    const key = [name, phone, district].join('|');
+    if (!byPartner[key]) {
+      byPartner[key] = {
+        name: name,
+        phone: phone,
+        numberMasked: maskPhone_(phone),
+        district: district,
+        status: 'ACTIVE',
+        orderCount: 0,
+      };
+    }
+    byPartner[key].orderCount += 1;
+  });
+
+  return Object.keys(byPartner).map((key) => byPartner[key]);
+}
+
+function assignOrderToPartner_(body, token) {
+  assertAdminToken_(token);
+  const orderId = String(body.orderId || '').replace('#', '').trim();
+  const partnerName = String(body.partnerName || '').trim();
+  const partnerPhone = onlyDigits_(body.partnerPhone).slice(-10);
+  const district = String(body.district || '').trim();
+  if (!orderId) throw new Error('Order ID required');
+  if (!partnerName) throw new Error('Partner name required');
+
+  const updates = {
+    POSTMAN: partnerName,
+    GIVE_TO_PARTNER: 'DONE',
+  };
+  if (partnerPhone) updates.POSTMAN_NUMBER = partnerPhone;
+  if (district) updates.DISTRICT = district;
+  updateOrderRow_(orderId, updates);
+  return { updated: true };
 }
 
 function authorizeRequiredServices() {
@@ -381,6 +531,21 @@ function uploadDeliveryProof_(body) {
   const extension = mimeType.indexOf('png') !== -1 ? 'png' : 'jpg';
   const safeOrderId = String(body.orderId || 'order').replace(/[^A-Za-z0-9_-]/g, '');
   const fileName = body.photoFileName || ('delivery-proof-' + safeOrderId + '-' + Date.now() + '.' + extension);
+  const bytes = Utilities.base64Decode(String(body.photoBase64));
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function uploadSettlementProof_(settlementId, body) {
+  if (body.photoUrl) return String(body.photoUrl || '').trim();
+  if (!body.photoBase64) return '';
+  const folder = getProofFolder_();
+  const mimeType = body.photoMimeType || 'image/jpeg';
+  const extension = mimeType.indexOf('png') !== -1 ? 'png' : 'jpg';
+  const safeSettlementId = String(settlementId || 'settlement').replace(/[^A-Za-z0-9_-]/g, '');
+  const fileName = body.photoFileName || ('payment-proof-' + safeSettlementId + '-' + Date.now() + '.' + extension);
   const bytes = Utilities.base64Decode(String(body.photoBase64));
   const blob = Utilities.newBlob(bytes, mimeType, fileName);
   const file = folder.createFile(blob);
@@ -448,6 +613,7 @@ function rowToOrder_(accessor, row) {
     id: orderNo.replace('#', ''),
     orderNo: orderNo.replace('#', ''),
     customerName: String(accessor.read(row, 'CUSTOMER_NAME') || ''),
+    customerPhone: onlyDigits_(accessor.read(row, 'MOBILE') || accessor.read(row, 'WHATSAPP')).slice(-10),
     phoneMasked: maskPhone_(String(accessor.read(row, 'MOBILE') || '')),
     address: String(address || ''),
     area: area,
@@ -762,7 +928,72 @@ function getStockMaster_(token) {
   }).sort((a, b) => a.daysLeft - b.daysLeft || a.remainingQty - b.remainingQty);
 }
 
-function getDpMasterPartners_() {
+function addStockDispatch_(body, token) {
+  assertAdminToken_(token);
+  const product = String(body.product || '').trim();
+  const qty = Number(body.quantity || body.qty || 0);
+  const partnerName = String(body.partnerName || '').trim();
+  const partnerPhone = onlyDigits_(body.partnerPhone).slice(-10);
+  const district = String(body.district || body.location || '').trim();
+  const notes = String(body.notes || '').trim();
+  if (!product) throw new Error('Product required');
+  if (!qty || qty <= 0) throw new Error('Quantity required');
+  if (!partnerName && !district) throw new Error('Partner or district required');
+
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(STOCK_MASTER_SHEET_NAME) || ss.insertSheet(STOCK_MASTER_SHEET_NAME);
+  ensureStockMasterDispatchColumns_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const stockAccessor = buildAccessorFromAliases_(headers, STOCK_COLUMN_ALIASES);
+  const productHeader = stockAccessor.resolve('PRODUCT') || ensureStockColumn_(sheet, headers, 'PRODUCT');
+  const qtyHeader = stockAccessor.resolve('QTY_SENT') || ensureStockColumn_(sheet, headers, 'QUANTITY');
+  const dateHeader = stockAccessor.resolve('DATE') || ensureStockColumn_(sheet, headers, 'DATE');
+  const locationHeader = stockAccessor.resolve('LOCATION') || stockAccessor.resolve('DISTRICT') || ensureStockColumn_(sheet, headers, 'LOCATION');
+  const skuHeader = stockAccessor.resolve('SKU');
+  const partnerHeader = stockAccessor.resolve('POSTMAN');
+  const partnerPhoneHeader = stockAccessor.resolve('POSTMAN_NUMBER');
+  const districtHeader = stockAccessor.resolve('DISTRICT');
+  const notesHeader = stockAccessor.resolve('NOTES');
+  const rowByHeader = {
+    [String(dateHeader).trim().toUpperCase()]: new Date(),
+    [String(productHeader).trim().toUpperCase()]: product,
+    [String(qtyHeader).trim().toUpperCase()]: qty,
+    [String(locationHeader).trim().toUpperCase()]: district || partnerName,
+  };
+  if (skuHeader) rowByHeader[String(skuHeader).trim().toUpperCase()] = makeSku_(product);
+  if (partnerHeader) rowByHeader[String(partnerHeader).trim().toUpperCase()] = partnerName;
+  if (partnerPhoneHeader) rowByHeader[String(partnerPhoneHeader).trim().toUpperCase()] = partnerPhone;
+  if (districtHeader) rowByHeader[String(districtHeader).trim().toUpperCase()] = district;
+  if (notesHeader) rowByHeader[String(notesHeader).trim().toUpperCase()] = notes;
+  const row = headers.map((header) => {
+    const key = String(header || '').trim().toUpperCase();
+    return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+  });
+  sheet.appendRow(row);
+  return { added: true };
+}
+
+function ensureStockMasterDispatchColumns_(sheet) {
+  if (sheet.getLastRow() === 0 || !String(sheet.getRange(1, 1).getValue() || '').trim()) {
+    sheet.getRange(1, 1, 1, 4).setValues([['PRODUCT', 'QUANTITY', 'DATE', 'LOCATION']]);
+  }
+  const headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const accessor = buildAccessorFromAliases_(headers, STOCK_COLUMN_ALIASES);
+  if (!accessor.resolve('PRODUCT')) ensureStockColumn_(sheet, headers, 'PRODUCT');
+  if (!accessor.resolve('QTY_SENT')) ensureStockColumn_(sheet, headers, 'QUANTITY');
+  if (!accessor.resolve('DATE')) ensureStockColumn_(sheet, headers, 'DATE');
+  if (!accessor.resolve('LOCATION') && !accessor.resolve('DISTRICT')) ensureStockColumn_(sheet, headers, 'LOCATION');
+  sheet.setFrozenRows(1);
+}
+
+function ensureStockColumn_(sheet, headers, columnName) {
+  const col = headers.length + 1;
+  sheet.getRange(1, col).setValue(columnName);
+  headers.push(columnName);
+  return columnName;
+}
+
+function getDpMasterPartners_(includePhone) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
   if (!sheet) return [];
@@ -778,6 +1009,7 @@ function getDpMasterPartners_() {
     if (!name && !phone) return null;
     return {
       name: name,
+      phone: includePhone ? phone.slice(-10) : '',
       numberMasked: maskPhone_(phone),
       district: district,
       status: status,
@@ -796,23 +1028,240 @@ function ensurePaymentLogHeader_(sheet) {
     'SETTLEMENT AMOUNT',
     'METHOD',
     'REFERENCE',
+    'PAYMENT PROOF',
     'ASSIGNED COD',
     'COLLECTED COD',
+    'COMMISSION AMOUNT',
+    'PAYABLE AMOUNT',
     'REMAINING COD',
     'COD ORDER COUNT',
     'DELIVERED COD COUNT',
     'PENDING COD COUNT',
     'SOURCE',
+    'STATUS',
+    'REQUESTED AMOUNT',
+    'APPROVED AMOUNT',
+    'APPROVED BY',
+    'APPROVED AT',
+    'ADMIN NOTES',
   ];
 
   const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
-  if (currentFirstCell === 'TIMESTAMP') return;
-
   if (sheet.getLastRow() > 0 && currentFirstCell) {
-    sheet.insertRowBefore(1);
+    if (currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
   }
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase() !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+    const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        const col = sheet.getLastColumn() + 1;
+        sheet.getRange(1, col).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
   sheet.setFrozenRows(1);
+}
+
+function getPaymentLogSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(PAYMENT_LOG_SHEET_NAME) || ss.insertSheet(PAYMENT_LOG_SHEET_NAME);
+}
+
+function getPaymentLogData_() {
+  const sheet = getPaymentLogSheet_();
+  ensurePaymentLogHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values.length ? values[0] : [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  return { sheet: sheet, headers: headers, values: values, indexByHeader: indexByHeader };
+}
+
+function appendPaymentLogRow_(sheet, rowByHeader) {
+  ensurePaymentLogHeader_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row = headers.map((header) => {
+    const key = String(header || '').trim().toUpperCase();
+    return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+  });
+  sheet.appendRow(row);
+}
+
+function buildHeaderIndex_(headers) {
+  const indexByHeader = {};
+  headers.forEach((header, index) => {
+    indexByHeader[String(header || '').trim().toUpperCase()] = index;
+  });
+  return indexByHeader;
+}
+
+function ensureLogColumn_(sheet, headers, indexByHeader, header) {
+  const key = String(header || '').trim().toUpperCase();
+  if (indexByHeader[key] !== undefined) return indexByHeader[key];
+  const col = headers.length;
+  sheet.getRange(1, col + 1).setValue(key);
+  headers.push(key);
+  indexByHeader[key] = col;
+  return col;
+}
+
+function readLogValue_(row, indexByHeader, header) {
+  const index = indexByHeader[String(header || '').trim().toUpperCase()];
+  return index === undefined ? '' : row[index];
+}
+
+function assertAdminToken_(token) {
+  assertToken_(token);
+  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+}
+
+function getApproverFromToken_(token) {
+  return String(token || '').replace('admin-', '').trim() || 'admin';
+}
+
+function calculateCodSettlementSummary_(filter) {
+  const targetPhone = onlyDigits_(filter && filter.partnerPhone).slice(-10);
+  const targetName = normalizeText_(filter && filter.partnerName);
+  const targetDistrict = normalizeText_(filter && filter.district);
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return emptyCodSettlementSummary_();
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  const summary = emptyCodSettlementSummary_();
+
+  values.forEach((row) => {
+    if (!orderMatchesPartnerFilter_(row, accessor, targetPhone, targetName, targetDistrict)) return;
+    const paymentType = normalizePaymentMode_(accessor.read(row, 'PAYMENT_MODE'), accessor.read(row, 'AMOUNT'));
+    if (paymentType !== 'COD') return;
+
+    const amount = Number(accessor.read(row, 'AMOUNT') || 0);
+    const deliveryStatus = normalizeText_(accessor.read(row, 'DELIVERY_COUNTED'));
+    summary.assignedCod += amount;
+    summary.codOrderCount += 1;
+
+    if (deliveryStatus === 'DONE') {
+      const receivedMode = normalizeText_(accessor.read(row, 'PAYMENT_RECEIVED_MODE'));
+      const receivedAmount = Number(accessor.read(row, 'PAYMENT_RECEIVED_AMOUNT') || accessor.read(row, 'RCVD_AMOUNT') || amount || 0);
+      summary.deliveredCodCount += 1;
+      if (receivedMode.indexOf('UPI') !== -1) {
+        summary.upiCollected += receivedAmount;
+      } else {
+        summary.cashCollected += receivedAmount;
+        summary.commissionEarned += getCodCommission_(amount);
+      }
+    } else {
+      summary.pendingCodCount += 1;
+    }
+  });
+
+  applyPaymentLogTotals_(summary, targetPhone, targetName, targetDistrict);
+  summary.payableBeforeSettlement = Math.max(0, summary.cashCollected - summary.commissionEarned);
+  summary.cashInHand = Math.max(0, summary.payableBeforeSettlement - summary.approvedSettled - summary.pendingSettlement);
+  return summary;
+}
+
+function emptyCodSettlementSummary_() {
+  return {
+    assignedCod: 0,
+    cashCollected: 0,
+    upiCollected: 0,
+    commissionEarned: 0,
+    payableBeforeSettlement: 0,
+    approvedSettled: 0,
+    pendingSettlement: 0,
+    cashInHand: 0,
+    codOrderCount: 0,
+    deliveredCodCount: 0,
+    pendingCodCount: 0,
+  };
+}
+
+function orderMatchesPartnerFilter_(row, accessor, targetPhone, targetName, targetDistrict) {
+  const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+  const partnerName = normalizeText_(accessor.read(row, 'POSTMAN'));
+  const district = normalizeText_(accessor.read(row, 'DISTRICT'));
+  const partnerOk = targetPhone ? partnerPhone === targetPhone : (!targetName || partnerName === targetName);
+  const districtOk = !targetDistrict || district === targetDistrict || targetDistrict === 'ALL';
+  return partnerOk && districtOk;
+}
+
+function applyPaymentLogTotals_(summary, targetPhone, targetName, targetDistrict) {
+  const data = getPaymentLogData_();
+  data.values.slice(1).forEach((row) => {
+    if (!paymentLogMatchesPartnerFilter_(row, data.indexByHeader, targetPhone, targetName, targetDistrict)) return;
+    const status = normalizeSettlementStatus_(readLogValue_(row, data.indexByHeader, 'STATUS'));
+    const requested = Number(readLogValue_(row, data.indexByHeader, 'REQUESTED AMOUNT') || readLogValue_(row, data.indexByHeader, 'SETTLEMENT AMOUNT') || 0);
+    const approved = Number(readLogValue_(row, data.indexByHeader, 'APPROVED AMOUNT') || 0);
+    const legacyAmount = Number(readLogValue_(row, data.indexByHeader, 'SETTLEMENT AMOUNT') || 0);
+
+    if (status === 'PENDING') {
+      summary.pendingSettlement += requested;
+    } else if (status === 'APPROVED') {
+      summary.approvedSettled += approved || legacyAmount;
+    } else if (!status && legacyAmount > 0) {
+      summary.approvedSettled += legacyAmount;
+    }
+  });
+}
+
+function paymentLogMatchesPartnerFilter_(row, indexByHeader, targetPhone, targetName, targetDistrict) {
+  const partnerPhone = onlyDigits_(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NUMBER')).slice(-10);
+  const partnerName = normalizeText_(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NAME'));
+  const district = normalizeText_(readLogValue_(row, indexByHeader, 'DISTRICT'));
+  const partnerOk = targetPhone ? partnerPhone === targetPhone : (!targetName || partnerName === targetName);
+  const districtOk = !targetDistrict || district === targetDistrict || targetDistrict === 'ALL';
+  return partnerOk && districtOk;
+}
+
+function normalizeSettlementStatus_(value) {
+  const status = normalizeText_(value);
+  if (status === 'PENDING' || status === 'APPROVED' || status === 'REJECTED') return status;
+  return '';
+}
+
+function paymentLogRowToSettlement_(row, indexByHeader) {
+  const settlementId = String(readLogValue_(row, indexByHeader, 'SETTLEMENT ID') || '').trim();
+  if (!settlementId) return null;
+  const status = normalizeSettlementStatus_(readLogValue_(row, indexByHeader, 'STATUS')) || 'APPROVED';
+  const partnerName = String(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NAME') || '').trim();
+  const partnerPhone = onlyDigits_(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NUMBER')).slice(-10);
+  const district = String(readLogValue_(row, indexByHeader, 'DISTRICT') || '').trim();
+  const summary = calculateCodSettlementSummary_({
+    partnerName: partnerName,
+    partnerPhone: partnerPhone,
+    district: district,
+  });
+  const rowCashInHand = Number(readLogValue_(row, indexByHeader, 'REMAINING COD') || 0);
+  const rowCommission = Number(readLogValue_(row, indexByHeader, 'COMMISSION AMOUNT') || 0);
+  const rowPayable = Number(readLogValue_(row, indexByHeader, 'PAYABLE AMOUNT') || 0);
+  return {
+    settlementId: settlementId,
+    timestamp: formatLogDate_(readLogValue_(row, indexByHeader, 'TIMESTAMP')),
+    partnerName: partnerName,
+    partnerPhone: partnerPhone,
+    district: district,
+    requestedAmount: Number(readLogValue_(row, indexByHeader, 'REQUESTED AMOUNT') || readLogValue_(row, indexByHeader, 'SETTLEMENT AMOUNT') || 0),
+    approvedAmount: Number(readLogValue_(row, indexByHeader, 'APPROVED AMOUNT') || readLogValue_(row, indexByHeader, 'SETTLEMENT AMOUNT') || 0),
+    method: String(readLogValue_(row, indexByHeader, 'METHOD') || '').trim(),
+    reference: String(readLogValue_(row, indexByHeader, 'REFERENCE') || '').trim(),
+    paymentProofUrl: String(readLogValue_(row, indexByHeader, 'PAYMENT PROOF') || '').trim(),
+    status: status,
+    cashInHand: rowCashInHand || summary.cashInHand,
+    commissionEarned: rowCommission || summary.commissionEarned,
+    payableBeforeSettlement: rowPayable || summary.payableBeforeSettlement,
+    approvedBy: String(readLogValue_(row, indexByHeader, 'APPROVED BY') || '').trim(),
+    approvedAt: formatLogDate_(readLogValue_(row, indexByHeader, 'APPROVED AT')),
+    adminNotes: String(readLogValue_(row, indexByHeader, 'ADMIN NOTES') || '').trim(),
+  };
+}
+
+function formatLogDate_(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString();
+  return String(value || '').trim();
 }
 
 function logDeliveredOrder_(orderId, body, updates, photoUrl, billResult) {
@@ -1260,6 +1709,35 @@ function formatBillDate_(value) {
 function truncate_(value, maxLength) {
   const text = String(value || '');
   return text.length > maxLength ? text.slice(0, maxLength) : text;
+}
+
+function getCodCommissionSlabs_() {
+  if (COD_COMMISSION_SLABS_JSON) {
+    try {
+      const slabs = JSON.parse(COD_COMMISSION_SLABS_JSON);
+      if (Array.isArray(slabs) && slabs.length) {
+        return slabs.map((slab) => ({
+          min: Number(slab.min || 0),
+          max: Number(slab.max || 0),
+          commission: Number(slab.commission || 0),
+        })).filter((slab) => slab.max >= slab.min && slab.commission >= 0);
+      }
+    } catch (err) {
+      throw new Error('Invalid DB_COD_COMMISSION_SLABS_JSON: ' + err.message);
+    }
+  }
+  return DEFAULT_COD_COMMISSION_SLABS;
+}
+
+function getCodCommission_(amount) {
+  const orderAmount = Number(amount || 0);
+  if (!orderAmount || orderAmount <= 0) return 0;
+  const slabs = getCodCommissionSlabs_().slice().sort((a, b) => a.min - b.min);
+  for (let i = 0; i < slabs.length; i += 1) {
+    if (orderAmount >= slabs[i].min && orderAmount <= slabs[i].max) return Number(slabs[i].commission || 0);
+  }
+  const last = slabs[slabs.length - 1];
+  return last && orderAmount > last.max ? Number(last.commission || 0) : 0;
 }
 
 function generateDeliveryOtp_() {

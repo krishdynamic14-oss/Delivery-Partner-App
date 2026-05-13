@@ -1,17 +1,28 @@
 import NetInfo from '@react-native-community/netinfo';
 import { loadQueue, saveQueue } from './storage';
 import { markDelivered, markFailed, submitSettlement } from './api';
-import type { QueueAction, SyncQueueResult } from '../types';
+import type { Partner, QueueAction, SyncQueueResult } from '../types';
 
-export async function enqueueAction(action: QueueAction) {
+export async function enqueueAction(action: QueueAction, owner?: Partner | null) {
   const queue = await loadQueue();
-  await saveQueue([...queue, sanitizeQueueAction(action)]);
+  await saveQueue([...queue, sanitizeQueueAction(withQueueOwner(action, owner))]);
 }
 
-export async function syncQueue(token?: string): Promise<SyncQueueResult> {
+export async function loadQueueForUser(user?: Partner | null): Promise<QueueAction[]> {
+  const queue = await loadQueue();
+  return queue.filter((action) => queueBelongsToUser(action, user));
+}
+
+export function queueBelongsToUser(action: QueueAction, user?: Partner | null) {
+  if (!user) return false;
+  if (action.ownerId) return action.ownerId === user.id;
+  return user.role !== 'admin';
+}
+
+export async function syncQueue(token?: string, user?: Partner | null): Promise<SyncQueueResult> {
   const state = await NetInfo.fetch();
   if (!state.isConnected) {
-    const remaining = (await loadQueue()).length;
+    const remaining = (await loadQueueForUser(user)).length;
     return {
       synced: 0,
       remaining,
@@ -21,7 +32,8 @@ export async function syncQueue(token?: string): Promise<SyncQueueResult> {
     };
   }
 
-  const queue = await loadQueue();
+  const allQueue = await loadQueue();
+  const queue = allQueue.filter((action) => queueBelongsToUser(action, user));
   if (!queue.length) {
     return {
       synced: 0,
@@ -46,7 +58,10 @@ export async function syncQueue(token?: string): Promise<SyncQueueResult> {
     }
   }
 
-  await saveQueue(remaining);
+  await saveQueue([
+    ...allQueue.filter((action) => !queueBelongsToUser(action, user)),
+    ...remaining,
+  ]);
   const failed = remaining.length;
   return {
     synced,
@@ -56,6 +71,15 @@ export async function syncQueue(token?: string): Promise<SyncQueueResult> {
     message: failed
       ? `${synced} synced. ${failed} action(s) still need retry.`
       : `${synced} queued action(s) synced successfully.`,
+  };
+}
+
+function withQueueOwner(action: QueueAction, owner?: Partner | null): QueueAction {
+  if (!owner) return action;
+  return {
+    ...action,
+    ownerId: owner.id,
+    ownerRole: owner.role,
   };
 }
 

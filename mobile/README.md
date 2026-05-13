@@ -38,10 +38,12 @@ If the URL is not set, the app runs in demo mode with mock orders.
 - Orders list with pending, delivered, failed, and all tabs.
 - Order search by order number, customer, area, product, or masked phone.
 - Order detail screen.
-- Masked-call placeholder action for Bonvoice integration.
 - Delivery confirmation with customer OTP field and camera proof capture.
 - Failed delivery/RTO reason submission.
-- COD tracker and settlement submission.
+- COD tracker, UPI handover, payment screenshot proof, and settlement submission.
+- Admin settlement approval/rejection with payment proof viewing.
+- Admin quick order assignment to active delivery partners.
+- Admin stock dispatch/update into Stock Master.
 - Persisted local status changes plus offline queue for delivery, failed, and settlement actions.
 - GAS-ready API client using a single Web App endpoint.
 
@@ -61,12 +63,23 @@ Deploy it as a Web App and set `DB_SHEET_ID` in Script Properties. The mobile cl
 - `orders.deliver`
 - `orders.fail`
 - `cod.settle`
+- `cod.summary`
+- `cod.settlements`
+- `cod.approveSettlement`
+- `admin.partners`
+- `orders.assign`
+- `stock.master`
+- `stock.dispatch`
 
 Recommended GAS Script Properties:
 
 - `DB_SHEET_ID`: Google Sheet ID
 - `DB_ORDERS_SHEET`: orders sheet name (default `Sheet1`)
 - `DB_PAYMENT_LOG_SHEET`: settlement sheet name (default `PAYMENT LOG`)
+- `DB_DELIVERY_LOG_SHEET`: delivered-order audit sheet name (default `DELIVERY LOG`)
+- `DB_STOCK_MASTER_SHEET`: stock dispatch sheet name (default `Stock Master`)
+- `DB_DP_MASTER_SHEET`: delivery partner master sheet name (default `DP MASTER`)
+- `DB_PROOF_FOLDER_ID`: Drive folder ID for delivery/payment proof uploads
 - `DB_COLUMN_ALIASES_JSON`: optional JSON override for logical column aliases
 
 Current project setup values are documented in `../gas/SETUP.md`.

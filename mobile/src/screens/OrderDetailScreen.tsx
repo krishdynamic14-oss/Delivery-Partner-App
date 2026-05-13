@@ -26,11 +26,19 @@ export function OrderDetailScreen({ route, navigation }: Props) {
   const proofUrl = order.photoUrl || '';
   const hasRemoteProof = proofUrl.startsWith('http');
   const isAdmin = user?.role === 'admin';
+  const customerPhone = String(order.customerPhone || '').replace(/\D/g, '');
+  const callCustomer = () => {
+    if (!customerPhone) {
+      Alert.alert('Customer number missing', 'Refresh orders after deploying the latest Apps Script. Full customer number is required for direct calling.');
+      return;
+    }
+    Linking.openURL(`tel:${customerPhone}`);
+  };
 
   return (
     <Screen bottomPadding={20}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${order.phoneMasked}`} />
+        <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${customerPhone || order.phoneMasked}`} />
         <Card>
           <View style={styles.topRow}>
             <View style={styles.badges}>
@@ -40,7 +48,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
             <Money value={order.amount} />
           </View>
           <Text style={styles.product}>{order.product} × {order.quantity}</Text>
-          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
+          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${customerPhone || order.phoneMasked}`} />
           <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
           <InfoRow icon="map-outline" label="Area" value={`${order.area}, ${order.district}`} />
           <InfoRow icon="account-hard-hat-outline" label="Delivery partner" value={order.assignedTo || 'Not assigned'} />
@@ -54,8 +62,8 @@ export function OrderDetailScreen({ route, navigation }: Props) {
         </Card>
         <View style={{ gap: 10 }}>
           <Button label="Open Route in Maps" onPress={() => openNavigation(order.address, order.district)} />
+          {!isAdmin ? <Button label="Call Customer" tone="secondary" onPress={callCustomer} /> : null}
           {hasRemoteProof ? <Button label="Open Proof Photo" tone="secondary" onPress={() => Linking.openURL(proofUrl)} /> : null}
-          <Button label="Call Customer (Masked)" tone="secondary" onPress={() => Alert.alert('Masked call', `Bonvoice call request will be sent for ${order.phoneMasked}.`)} />
           {!isAdmin ? <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} /> : null}
           {!isAdmin ? <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} /> : null}
           <Button label="Back to Orders" tone="secondary" onPress={() => navigation.goBack()} />

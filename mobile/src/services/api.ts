@@ -1,4 +1,18 @@
-import type { CodSummary, DeliverPayload, DeliveryOrder, FailPayload, LoginPayload, Partner, SendDeliveryOtpResult, SettlementPayload, StockItem } from '../types';
+import type {
+  CodSettlement,
+  CodSettlementSummary,
+  CodSummary,
+  DeliverPayload,
+  DeliveryOrder,
+  DeliveryPartnerSummary,
+  FailPayload,
+  LoginPayload,
+  Partner,
+  SendDeliveryOtpResult,
+  SettlementPayload,
+  StockDispatchPayload,
+  StockItem,
+} from '../types';
 import { mockOrders } from '../data/mockOrders';
 
 const GAS_URL = process.env.EXPO_PUBLIC_GAS_API_URL;
@@ -60,9 +74,65 @@ export async function submitSettlement(payload: SettlementPayload, token?: strin
   return { settlementId: `SET-${Date.now()}` };
 }
 
+export async function fetchCodSettlementSummary(payload: { partnerName?: string; partnerPhone?: string; district?: string }, token?: string): Promise<CodSettlementSummary> {
+  if (GAS_URL) return request<CodSettlementSummary>('cod.summary', payload, token);
+  return {
+    assignedCod: 0,
+    cashCollected: 0,
+    upiCollected: 0,
+    commissionEarned: 0,
+    payableBeforeSettlement: 0,
+    approvedSettled: 0,
+    pendingSettlement: 0,
+    cashInHand: 0,
+    codOrderCount: 0,
+    deliveredCodCount: 0,
+    pendingCodCount: 0,
+  };
+}
+
+export async function fetchCodSettlements(token?: string): Promise<CodSettlement[]> {
+  if (GAS_URL) return request<CodSettlement[]>('cod.settlements', {}, token);
+  return [];
+}
+
+export async function approveCodSettlement(payload: {
+  settlementId: string;
+  status: 'APPROVED' | 'REJECTED';
+  approvedAmount?: number;
+  method?: 'Cash' | 'UPI' | 'Bank';
+  reference?: string;
+  adminNotes?: string;
+}, token?: string): Promise<{ updated: true }> {
+  if (GAS_URL) return request<{ updated: true }>('cod.approveSettlement', payload, token);
+  return { updated: true };
+}
+
 export async function fetchStockMaster(token?: string): Promise<StockItem[]> {
   if (GAS_URL) return request<StockItem[]>('stock.master', {}, token);
   return [];
+}
+
+export async function fetchDeliveryPartners(token?: string): Promise<DeliveryPartnerSummary[]> {
+  if (GAS_URL) return request<DeliveryPartnerSummary[]>('admin.partners', {}, token);
+  return [];
+}
+
+export async function assignOrder(orderId: string, partner: DeliveryPartnerSummary, token?: string): Promise<{ updated: true }> {
+  if (GAS_URL) {
+    return request<{ updated: true }>('orders.assign', {
+      orderId,
+      partnerName: partner.name,
+      partnerPhone: partner.phone,
+      district: partner.district,
+    }, token);
+  }
+  return { updated: true };
+}
+
+export async function addStockDispatch(payload: StockDispatchPayload, token?: string): Promise<{ added: true }> {
+  if (GAS_URL) return request<{ added: true }>('stock.dispatch', payload, token);
+  return { added: true };
 }
 
 export function getCodSummary(orders: DeliveryOrder[]): CodSummary {

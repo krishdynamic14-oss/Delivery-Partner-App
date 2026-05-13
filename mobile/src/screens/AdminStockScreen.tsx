@@ -2,17 +2,26 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 import { useCallback, useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Badge, Card, Screen } from '../components/ui';
+import { Badge, Button, Card, Field, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
-import { fetchStockMaster } from '../services/api';
-import type { StockItem, StockPartnerBreakdown } from '../types';
+import { addStockDispatch, fetchDeliveryPartners, fetchStockMaster } from '../services/api';
+import type { DeliveryPartnerSummary, StockItem, StockPartnerBreakdown } from '../types';
 
 export function AdminStockScreen() {
   const { user } = useAuth();
   const { loading: ordersLoading, refresh: refreshOrders } = useOrders();
   const [products, setProducts] = useState<StockItem[]>([]);
+  const [partners, setPartners] = useState<DeliveryPartnerSummary[]>([]);
+  const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [stockProduct, setStockProduct] = useState('');
+  const [stockQty, setStockQty] = useState('');
+  const [stockDistrict, setStockDistrict] = useState('');
+  const [stockPartnerName, setStockPartnerName] = useState('');
+  const [stockPartnerPhone, setStockPartnerPhone] = useState('');
+  const [stockNotes, setStockNotes] = useState('');
+  const [savingStock, setSavingStock] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -32,6 +41,13 @@ export function AdminStockScreen() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    fetchDeliveryPartners(user.token)
+      .then(setPartners)
+      .catch(() => setPartners([]));
+  }, [user?.token]);
 
   const critical = products.filter((product) => product.status === 'critical');
   const low = products.filter((product) => product.status === 'low');
@@ -56,9 +72,75 @@ export function AdminStockScreen() {
         </View>
 
         <View style={styles.actionGrid}>
-          <ActionButton icon="note-edit-outline" label="Update Stock" color={colors.orange} onPress={() => Alert.alert('Update Stock', 'Manual stock editing screen will be connected after stock sheet fields are finalized.')} />
+          <ActionButton icon="note-edit-outline" label="Update Stock" color={colors.orange} onPress={() => setShowUpdateForm((visible) => !visible)} />
           <ActionButton icon="cloud-sync-outline" label="Sync Sheets" color={colors.green} onPress={() => { void refreshOrders(); void refresh(); }} />
         </View>
+
+        {showUpdateForm ? (
+          <Card>
+            <Text style={styles.sectionTitle}>Add Stock Dispatch</Text>
+            <Text style={styles.meta}>Stock Master me new sent-stock row add hoga.</Text>
+            <Field value={stockProduct} onChangeText={setStockProduct} placeholder="Product name" />
+            <Field value={stockQty} onChangeText={setStockQty} keyboardType="number-pad" placeholder="Quantity sent" />
+            <Field value={stockDistrict} onChangeText={setStockDistrict} placeholder="District / location" autoCapitalize="characters" />
+            <Field value={stockPartnerName} onChangeText={setStockPartnerName} placeholder="Partner name optional" />
+            <Field value={stockPartnerPhone} onChangeText={setStockPartnerPhone} keyboardType="phone-pad" placeholder="Partner mobile optional" />
+            {partners.length ? (
+              <View style={styles.partnerChips}>
+                {partners.slice(0, 8).map((partner) => (
+                  <Pressable
+                    key={`${partner.name}-${partner.phone || partner.numberMasked || partner.district}`}
+                    onPress={() => {
+                      setStockPartnerName(partner.name);
+                      setStockPartnerPhone(partner.phone || '');
+                      setStockDistrict(partner.district || stockDistrict);
+                    }}
+                    style={({ pressed }) => [styles.partnerChip, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.partnerChipText}>{partner.name}</Text>
+                    <Text style={styles.partnerChipMeta}>{partner.district || partner.numberMasked || '-'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <Field value={stockNotes} onChangeText={setStockNotes} placeholder="Notes optional" />
+            <Button label="Save Stock Dispatch" loading={savingStock} onPress={async () => {
+              const quantity = Number(stockQty || 0);
+              if (!stockProduct.trim()) {
+                Alert.alert('Product required', 'Product name enter karo.');
+                return;
+              }
+              if (!quantity || quantity <= 0) {
+                Alert.alert('Quantity required', 'Quantity sent enter karo.');
+                return;
+              }
+              if (!stockDistrict.trim() && !stockPartnerName.trim()) {
+                Alert.alert('Location required', 'District ya partner select karo.');
+                return;
+              }
+              setSavingStock(true);
+              try {
+                await addStockDispatch({
+                  product: stockProduct.trim(),
+                  quantity,
+                  district: stockDistrict.trim(),
+                  partnerName: stockPartnerName.trim(),
+                  partnerPhone: stockPartnerPhone.trim(),
+                  notes: stockNotes.trim(),
+                }, user?.token);
+                Alert.alert('Stock updated', 'Stock Master me dispatch row add ho gaya.');
+                setStockProduct('');
+                setStockQty('');
+                setStockNotes('');
+                await refresh();
+              } catch (err) {
+                Alert.alert('Stock update failed', err instanceof Error ? err.message : 'Could not update stock.');
+              } finally {
+                setSavingStock(false);
+              }
+            }} />
+          </Card>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -288,6 +370,10 @@ const styles = StyleSheet.create({
   alertCount: { color: colors.text, backgroundColor: colors.red, borderRadius: 999, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, fontSize: 10, fontWeight: '900' },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(255,75,110,0.22)', backgroundColor: 'rgba(255,75,110,0.08)', marginBottom: 12 },
   errorText: { color: colors.red, flex: 1, fontSize: 12, fontWeight: '800' },
+  partnerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  partnerChip: { borderWidth: 1, borderColor: 'rgba(255,179,71,0.28)', backgroundColor: 'rgba(255,179,71,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+  partnerChipText: { color: colors.text, fontSize: 11, fontWeight: '900' },
+  partnerChipMeta: { color: colors.muted, fontSize: 9, marginTop: 2 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 4 },
   miniStat: { width: '48%', borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.glass, padding: 12, marginBottom: 10 },
   miniLabel: { color: colors.muted, fontSize: 10, textTransform: 'uppercase', fontWeight: '900', marginBottom: 5 },

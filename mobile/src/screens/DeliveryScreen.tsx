@@ -113,7 +113,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header title="Confirm Delivery" subtitle={`#${order.orderNo} · ${order.customerName}`} />
         <View style={styles.steps}>
-          <StepPill index={1} label="Call" done />
+          <StepPill index={1} label="Route" done />
           <StepPill index={2} label="OTP" active={!photo?.uri} />
           <StepPill index={3} label="Photo" active={!!photo?.uri} />
           <StepPill index={4} label="COD" />

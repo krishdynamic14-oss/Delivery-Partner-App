@@ -1,11 +1,13 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useState } from 'react';
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Badge, Card, Money, Screen } from '../components/ui';
+import { Badge, Button, Card, Field, Money, Screen } from '../components/ui';
 import { colors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
-import type { DeliveryOrder } from '../types';
+import { useAuth } from '../state/AuthContext';
+import { approveCodSettlement, fetchCodSettlements } from '../services/api';
+import type { CodSettlement, DeliveryOrder } from '../types';
 
 const RANGE_OPTIONS = [
   { label: 'Today', days: 1 },
@@ -16,8 +18,12 @@ const RANGE_OPTIONS = [
 ];
 
 export function AdminEarningsScreen() {
+  const { user } = useAuth();
   const [rangeDays, setRangeDays] = useState(7);
   const [showSettlementReport, setShowSettlementReport] = useState(false);
+  const [settlements, setSettlements] = useState<CodSettlement[]>([]);
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const [settlementInputs, setSettlementInputs] = useState<Record<string, SettlementInput>>({});
   const { orders, loading, refresh } = useOrders();
   const codOrders = orders.filter((order) => order.paymentType === 'COD');
   const deliveredCod = codOrders.filter((order) => order.status === 'delivered');
@@ -35,10 +41,91 @@ export function AdminEarningsScreen() {
   const partnerToday = getPartnerDailyReport(orders);
   const buckets = getCollectionBuckets(deliveredCod, rangeDays);
   const peak = Math.max(...buckets.map((bucket) => bucket.amount), 1);
+  const pendingSettlements = settlements.filter((settlement) => settlement.status === 'PENDING');
+
+  async function loadSettlements() {
+    if (!user?.token) return;
+    setSettlementLoading(true);
+    try {
+      const next = await fetchCodSettlements(user.token);
+      setSettlements(next);
+      setSettlementInputs((current) => {
+        const merged = { ...current };
+        next.forEach((settlement) => {
+          if (!merged[settlement.settlementId]) {
+            merged[settlement.settlementId] = {
+              approvedAmount: String(settlement.requestedAmount || ''),
+              method: 'UPI',
+              reference: '',
+              adminNotes: '',
+            };
+          }
+        });
+        return merged;
+      });
+    } catch {
+      setSettlements([]);
+    } finally {
+      setSettlementLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadSettlements();
+  }, [user?.token]);
+
+  async function refreshAll() {
+    await Promise.all([refresh(), loadSettlements()]);
+  }
+
+  function updateSettlementInput(settlementId: string, patch: Partial<SettlementInput>) {
+    setSettlementInputs((current) => ({
+      ...current,
+      [settlementId]: {
+        approvedAmount: current[settlementId]?.approvedAmount || '',
+        method: current[settlementId]?.method || 'UPI',
+        reference: current[settlementId]?.reference || '',
+        adminNotes: current[settlementId]?.adminNotes || '',
+        ...patch,
+      },
+    }));
+  }
+
+  async function handleSettlementDecision(settlement: CodSettlement, status: 'APPROVED' | 'REJECTED') {
+    const input = settlementInputs[settlement.settlementId] || {
+      approvedAmount: String(settlement.requestedAmount || ''),
+      method: 'UPI' as const,
+      reference: '',
+      adminNotes: '',
+    };
+    const approvedAmount = status === 'APPROVED' ? Number(input.approvedAmount || 0) : 0;
+    if (status === 'APPROVED' && (!approvedAmount || approvedAmount <= 0)) {
+      Alert.alert('Amount required', 'Approved amount enter karo.');
+      return;
+    }
+    if (status === 'APPROVED' && approvedAmount > settlement.requestedAmount) {
+      Alert.alert('Amount too high', 'Approved amount requested amount se zyada nahi ho sakta.');
+      return;
+    }
+    try {
+      await approveCodSettlement({
+        settlementId: settlement.settlementId,
+        status,
+        approvedAmount,
+        method: input.method,
+        reference: input.reference,
+        adminNotes: input.adminNotes,
+      }, user?.token);
+      Alert.alert(status === 'APPROVED' ? 'Settlement approved' : 'Settlement rejected', `Request ${settlement.settlementId} updated.`);
+      await refreshAll();
+    } catch (err) {
+      Alert.alert('Update failed', String(err instanceof Error ? err.message : err));
+    }
+  }
 
   return (
     <Screen>
-      <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
+      <ScrollView refreshControl={<RefreshControl refreshing={loading || settlementLoading} onRefresh={refreshAll} tintColor={colors.orange} />}>
         <LinearGradient colors={['rgba(255,107,0,0.22)', 'rgba(255,179,71,0.08)', 'transparent']} style={styles.hero}>
           <View style={styles.headerRow}>
             <View>
@@ -80,6 +167,57 @@ export function AdminEarningsScreen() {
             <Text style={styles.meta}>Use this report for end-of-day handover. It is calculated from delivered COD orders with today's delivery date.</Text>
           </Card>
         ) : null}
+
+        <Text style={styles.sectionTitleOutside}>Pending Settlements</Text>
+        {pendingSettlements.length ? pendingSettlements.map((settlement) => {
+          const input = settlementInputs[settlement.settlementId] || {
+            approvedAmount: String(settlement.requestedAmount || ''),
+            method: 'UPI' as const,
+            reference: '',
+            adminNotes: '',
+          };
+          return (
+            <Card key={settlement.settlementId}>
+              <View style={styles.settlementTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pmName}>{settlement.partnerName || 'Delivery Partner'}</Text>
+                  <Text style={styles.meta}>{settlement.district || '-'} · {settlement.partnerPhone || '-'}</Text>
+                  <Text style={styles.meta}>{formatDateTime(settlement.timestamp)}</Text>
+                </View>
+                <View style={styles.orderRight}>
+                  <Text style={styles.kpiLabel}>Requested</Text>
+                  <Money value={settlement.requestedAmount} size={18} />
+                </View>
+              </View>
+              <View style={styles.settlementGrid}>
+                <Kpi label="Payable" value={`₹${settlement.cashInHand.toLocaleString('en-IN')}`} color={colors.amber} />
+                <Kpi label="Commission" value={`₹${Number(settlement.commissionEarned || 0).toLocaleString('en-IN')}`} color={colors.green} />
+                <Kpi label="Status" value={settlement.status} color={colors.blue} />
+              </View>
+              <Field value={input.approvedAmount} onChangeText={(value) => updateSettlementInput(settlement.settlementId, { approvedAmount: value })} keyboardType="number-pad" placeholder="Approved amount" />
+              <View style={styles.methodRow}>
+                {(['Cash', 'UPI', 'Bank'] as const).map((method) => (
+                  <Pressable key={method} onPress={() => updateSettlementInput(settlement.settlementId, { method })} style={[styles.methodChip, input.method === method && styles.methodChipActive]}>
+                    <Text style={[styles.methodChipText, input.method === method && styles.methodChipTextActive]}>{method}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Field value={input.reference} onChangeText={(value) => updateSettlementInput(settlement.settlementId, { reference: value })} placeholder="Reference / UTR optional" />
+              {settlement.paymentProofUrl ? <Button label="Open Payment Screenshot" tone="secondary" onPress={() => Linking.openURL(settlement.paymentProofUrl || '')} /> : null}
+              <Field value={input.adminNotes} onChangeText={(value) => updateSettlementInput(settlement.settlementId, { adminNotes: value })} placeholder="Admin notes optional" />
+              <View style={styles.actionRow}>
+                <Pressable onPress={() => handleSettlementDecision(settlement, 'REJECTED')} style={({ pressed }) => [styles.rejectButton, pressed && styles.pressed]}>
+                  <Text style={styles.rejectText}>Reject</Text>
+                </Pressable>
+                <Pressable onPress={() => handleSettlementDecision(settlement, 'APPROVED')} style={({ pressed }) => [styles.approveButton, pressed && styles.pressed]}>
+                  <Text style={styles.approveText}>Approve</Text>
+                </Pressable>
+              </View>
+            </Card>
+          );
+        }) : (
+          <Card><Text style={styles.meta}>{settlementLoading ? 'Loading settlements...' : 'No pending settlement requests.'}</Text></Card>
+        )}
 
         <Card>
           <View style={styles.targetTop}>
@@ -215,6 +353,13 @@ type PartnerDailyReport = {
   color: string;
 };
 
+type SettlementInput = {
+  approvedAmount: string;
+  method: 'Cash' | 'UPI' | 'Bank';
+  reference: string;
+  adminNotes: string;
+};
+
 function getTopPostmen(orders: DeliveryOrder[]) {
   const palette = [colors.orange, colors.blue, colors.green, colors.red, '#8b5cf6'];
   const byPostman = new Map<string, PostmanEarning>();
@@ -303,6 +448,13 @@ function shortMoney(value: number) {
   return String(value);
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'NA';
 }
@@ -323,6 +475,18 @@ const styles = StyleSheet.create({
   ctaIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   ctaTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
   ctaSub: { color: colors.muted, marginTop: 3, fontSize: 11 },
+  settlementTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  settlementGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 8 },
+  methodRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 10 },
+  methodChip: { flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  methodChipActive: { borderColor: colors.orange, backgroundColor: 'rgba(255,107,0,0.16)' },
+  methodChipText: { color: colors.muted, fontWeight: '900', fontSize: 12 },
+  methodChipTextActive: { color: colors.orange },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  rejectButton: { flex: 1, borderWidth: 1, borderColor: 'rgba(255,75,92,0.45)', backgroundColor: 'rgba(255,75,92,0.12)', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  rejectText: { color: colors.red, fontWeight: '900' },
+  approveButton: { flex: 1, borderWidth: 1, borderColor: 'rgba(0,200,150,0.45)', backgroundColor: 'rgba(0,200,150,0.14)', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  approveText: { color: colors.green, fontWeight: '900' },
   targetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
   sectionTitleOutside: { color: colors.text, fontSize: 15, fontWeight: '900', marginBottom: 10, marginTop: 4 },
