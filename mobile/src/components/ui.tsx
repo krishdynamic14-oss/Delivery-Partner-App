@@ -47,8 +47,8 @@ export function Button({ label, onPress, tone = 'primary', loading = false }: { 
   );
 }
 
-export function Field(props: TextInputProps) {
-  return <TextInput placeholderTextColor={colors.muted} style={styles.field} {...props} />;
+export function Field({ style, ...props }: TextInputProps) {
+  return <TextInput placeholderTextColor={colors.muted} style={[styles.field, style]} {...props} />;
 }
 
 export function Badge({ label, tone }: { label: string; tone: 'pending' | 'delivered' | 'failed' | 'info' }) {

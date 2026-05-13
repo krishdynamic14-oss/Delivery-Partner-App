@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field } from '../components/ui';
 import { colors } from '../theme';
 import { useAuth } from '../state/AuthContext';
+import { requestPasswordReset } from '../services/api';
 
 export function LoginScreen() {
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { login } = useAuth();
 
   async function submit() {
@@ -15,13 +20,36 @@ export function LoginScreen() {
       Alert.alert('Mobile number required', 'Enter the registered 10-digit mobile number.');
       return;
     }
+    if (password.trim().length < 4) {
+      Alert.alert('Password required', 'Enter your login password.');
+      return;
+    }
     setLoading(true);
     try {
-      await login(phone);
+      await login({
+        phone,
+        password: password.trim(),
+      });
     } catch (err) {
       Alert.alert('Login failed', err instanceof Error ? err.message : 'Could not sign in.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resetPassword() {
+    if (phone.replace(/\D/g, '').length !== 10) {
+      Alert.alert('Mobile number required', 'Enter your registered 10-digit mobile number first.');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      const result = await requestPasswordReset(phone);
+      Alert.alert('Reset requested', result.message || 'Your password reset request has been sent to admin.');
+    } catch (err) {
+      Alert.alert('Reset failed', err instanceof Error ? err.message : 'Could not request password reset.');
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -37,9 +65,33 @@ export function LoginScreen() {
       <Card>
         <Text style={styles.fieldLabel}>Registered mobile number</Text>
         <Field keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} placeholder="10-digit mobile number" />
+        <Text style={styles.fieldLabel}>Password</Text>
+        <View style={styles.passwordWrap}>
+          <Field
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry={!passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter password"
+            style={styles.passwordField}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+            hitSlop={12}
+            onPress={() => setPasswordVisible((visible) => !visible)}
+            style={styles.eyeButton}
+          >
+            <MaterialCommunityIcons name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.muted} />
+          </Pressable>
+        </View>
         <Button label="Continue" loading={loading} onPress={submit} />
+        <Pressable disabled={resetLoading} onPress={resetPassword} style={styles.resetButton}>
+          <Text style={styles.resetText}>{resetLoading ? 'Sending request...' : 'Forgot password?'}</Text>
+        </Pressable>
       </Card>
-      <Text style={styles.note}>Your access is assigned automatically from your registered mobile number.</Text>
+      <Text style={styles.note}>Your role is assigned from your registered mobile number after password verification.</Text>
     </KeyboardAvoidingView>
   );
 }
@@ -53,5 +105,10 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 32, fontWeight: '900', marginBottom: 10, letterSpacing: 0 },
   subtitle: { color: colors.muted, marginBottom: 28, fontSize: 15, lineHeight: 22 },
   fieldLabel: { color: colors.text, fontWeight: '800', marginBottom: 10 },
+  passwordWrap: { position: 'relative' },
+  passwordField: { paddingRight: 52 },
+  eyeButton: { position: 'absolute', right: 14, top: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  resetButton: { alignItems: 'center', paddingTop: 14, paddingBottom: 2 },
+  resetText: { color: colors.amber, fontSize: 13, fontWeight: '900' },
   note: { color: colors.muted, fontSize: 12, marginTop: 18, lineHeight: 18 },
 });

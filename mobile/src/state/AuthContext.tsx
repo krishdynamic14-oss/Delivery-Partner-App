@@ -1,12 +1,12 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
-import type { Partner } from '../types';
+import type { LoginPayload, Partner } from '../types';
 import { clearPartner, loadPartner, savePartner } from '../services/storage';
 import { loginWithPhone } from '../services/api';
 
 type AuthState = {
   user: Partner | null;
   loading: boolean;
-  login: (phone: string) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -23,8 +23,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthState>(() => ({
     user,
     loading,
-    async login(phone: string) {
-      const partner = await loginWithPhone(phone);
+    async login(payload: LoginPayload) {
+      const partner = await loginWithPhone(payload);
       await savePartner(partner);
       setUser(partner);
     },

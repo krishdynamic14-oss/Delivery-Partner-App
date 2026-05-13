@@ -1,7 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ActionSubmitResult, DeliveryOrder, FailPayload, DeliverPayload, SyncMeta, SyncQueueResult } from '../types';
-import { fetchOrders, getCodSummary, markDelivered, markFailed } from '../services/api';
+import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp } from '../services/api';
 import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveSyncMeta } from '../services/storage';
 import { enqueueAction, syncQueue } from '../services/offlineQueue';
 import { useAuth } from './AuthContext';
@@ -14,6 +14,7 @@ type OrdersState = {
   pendingSync: number;
   syncMeta: SyncMeta;
   refresh: () => Promise<void>;
+  sendOrderOtp: (orderId: string) => Promise<ActionSubmitResult>;
   deliverOrder: (orderId: string, payload: DeliverPayload) => Promise<ActionSubmitResult>;
   failOrder: (orderId: string, payload: FailPayload) => Promise<ActionSubmitResult>;
   syncOfflineQueue: () => Promise<SyncQueueResult>;
@@ -154,6 +155,27 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     throw new Error('Delivery submit needs network. Reconnect and try again.');
   }
 
+  async function sendOrderOtp(orderId: string): Promise<ActionSubmitResult> {
+    const state = await NetInfo.fetch();
+    if (!state.isConnected) {
+      await persistSyncMeta({ status: 'offline', message: 'OTP send needs network. Reconnect and try again.' });
+      throw new Error('OTP send needs network. Reconnect and try again.');
+    }
+
+    try {
+      await sendDeliveryOtp(orderId, user?.token);
+      const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, deliveryOtpSentStatus: 'SENT', updatedAt: new Date().toISOString() } : order);
+      setOrders(updatedOrders);
+      await saveOrders(updatedOrders);
+      await persistSyncMeta({ status: 'success', message: 'Delivery OTP sent to customer.', lastSyncAt: new Date().toISOString() });
+      return { status: 'synced', message: 'Delivery OTP sent to customer.' };
+    } catch (err) {
+      const message = getErrorMessage(err);
+      await persistSyncMeta({ status: 'error', message: 'Delivery OTP send failed.', lastError: message });
+      throw new Error(message);
+    }
+  }
+
   async function failOrder(orderId: string, payload: FailPayload): Promise<ActionSubmitResult> {
     const state = await NetInfo.fetch();
     const proofDetail = payload.photoUri ? 'House proof captured locally' : '';
@@ -197,6 +219,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     pendingSync,
     syncMeta,
     refresh,
+    sendOrderOtp,
     deliverOrder,
     failOrder,
     syncOfflineQueue,

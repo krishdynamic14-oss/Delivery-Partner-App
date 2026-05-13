@@ -10,16 +10,30 @@ Set these in Apps Script: Project Settings -> Script Properties.
 DB_SHEET_ID=1ju3wdk_i-n9UHwXOcwJn6_ytw7Qj4_LbY4T0jq5Py2k
 DB_ORDERS_SHEET=Sheet1
 DB_PAYMENT_LOG_SHEET=PAYMENT LOG
+DB_DELIVERY_LOG_SHEET=DELIVERY LOG
 DB_STOCK_MASTER_SHEET=Stock Master
 DB_DP_MASTER_SHEET=DP MASTER
+DB_PASSWORD_RESET_SHEET=PASSWORD RESET
 DB_PROOF_FOLDER_ID=<optional Google Drive folder ID for delivery proof photos>
+DB_BILL_TEMPLATE_ID=<Google Slides bill template ID>
+DB_BILL_FOLDER_ID=<Google Drive folder ID for bill PDFs>
+DB_AISENSY_API_KEY=<AiSensy API key>
+DB_AISENSY_CAMPAIGN_NAME=BILL2
+DB_AISENSY_DELIVERY_OTP_CAMPAIGN_NAME=OTP
+DB_AISENSY_API_URL=https://backend.aisensy.com/campaign/t1/api/v2
 DB_ADMIN_PHONES=9876543210,9123456780
+DB_ADMIN_PASSWORD=<fallback admin password>
+DB_ADMIN_CREDENTIALS_JSON=[{"phone":"9876543210","password":"secret"}]
 ```
 
 If your orders tab is not named `Sheet1`, change `DB_ORDERS_SHEET` to the exact tab name.
 If your stock or delivery partner tabs use different names, change `DB_STOCK_MASTER_SHEET` and `DB_DP_MASTER_SHEET`.
-`DB_PROOF_FOLDER_ID` is only needed when Drive proof upload is enabled. The current mobile MVP keeps proof photos on the phone and does not upload them to Drive during delivery submit.
+`DB_PROOF_FOLDER_ID` is needed for Drive proof upload. Delivery and failed-delivery photo proofs are uploaded to this folder.
+`DB_BILL_TEMPLATE_ID` is the Google Slides bill template. `DB_BILL_FOLDER_ID` is where generated bill PDFs are saved.
+`DB_AISENSY_API_KEY` enables bill WhatsApp sending. `DB_AISENSY_CAMPAIGN_NAME` should be `BILL2` for the current template.
+`DB_AISENSY_DELIVERY_OTP_CAMPAIGN_NAME` should be `OTP` for the customer delivery confirmation message.
 `DB_ADMIN_PHONES` is a comma-separated hidden admin allowlist. The mobile app does not show an admin login option; admin role is returned only when the entered mobile number matches this list.
+Admin login now requires password. Use either global `DB_ADMIN_PASSWORD`, or per-admin `DB_ADMIN_CREDENTIALS_JSON`.
 
 ## Stock Master Sheet
 
@@ -52,13 +66,150 @@ DISTRICT, PARTNER NAME, MOBILE NUMBER, STATUS
 
 Flexible aliases are also supported, for example `DELIVERY PARTNER NAME`, `POSTMAN`, `DP NAME`, `PHONE`, and `ASSIGNED DISTRICT`.
 
+Add this login credential column:
+
+```text
+PASSWORD
+```
+
+Supported aliases include `APP PASSWORD` and `LOGIN PASSWORD`.
+
 If `STATUS` contains `CANCEL`, `INACTIVE`, `REMOVED`, or `NO`, that mobile number is blocked from partner login.
 
-## Optional Drive Authorization
+## Password Reset
 
-Drive upload is paused for the current MVP because Apps Script Drive permissions were blocking real delivery testing. Normal `orders.deliver` requests do not call `DriveApp`.
+The login screen has **Forgot password?**. This does not reset automatically. It writes a row to `PASSWORD RESET` with:
 
-Only do this section later if we re-enable Drive upload by sending `uploadProof: true` from the app:
+```text
+TIMESTAMP, PHONE, NAME, STATUS, ROLE, DISTRICT, NOTES
+```
+
+Admin should update the partner's `PASSWORD` in `DP MASTER`, then mark the request row `DONE`.
+
+## Bill Generator
+
+Bills are generated from a Google Slides template and saved as PDFs in Drive.
+
+Required template placeholders:
+
+```text
+{{BILL NUMBER}}, {{DATE}}, {{NAME}}, {{P. MODE}}, {{ITEM}}, {{QTY}}, {{AMT1}}
+```
+
+Auto trigger behavior:
+
+- When the app marks delivery `DONE`, the backend generates the bill automatically.
+- If editing the sheet manually, fill `DELIVERY DATE` or set `DELIVERY_COUNTED` to `DONE`.
+- Script creates bill PDF.
+- PDF link is written to `BILL LINK`.
+- If `DB_AISENSY_API_KEY` is configured, the bill PDF is sent to the customer on WhatsApp through AiSensy campaign `BILL2`.
+- AiSensy template variable `{{1}}` receives the order `PRODUCT`.
+- WhatsApp send status is written to `BILL WHATSAPP STATUS` and response/error to `BILL WHATSAPP RESPONSE`.
+- Existing Drive bill links are not overwritten.
+- Existing `BILL WHATSAPP STATUS=SENT` rows are not sent again.
+
+Setup:
+
+1. Set `DB_BILL_TEMPLATE_ID`.
+2. Set `DB_BILL_FOLDER_ID`.
+3. Set `DB_AISENSY_API_KEY`.
+4. Confirm OAuth scopes include `spreadsheets`, `drive`, `presentations`, `script.scriptapp`, and `script.external_request`.
+5. Run `setupBillTrigger` once from Apps Script editor.
+6. Approve permissions.
+7. Deploy a new Web App version.
+
+## Delivery OTP
+
+Delivery confirmation OTP is order-level and does not expire. The same OTP is reused if the customer message is resent.
+
+AiSensy campaign:
+
+```text
+OTP
+```
+
+Template variable mapping:
+
+```text
+{{1}} = DELIVERY PARTNER NAME
+{{2}} = DELIVERY PARTNER NUMBER
+{{3}} = PRODUCT
+{{4}} = AMOUNT
+{{5}} = DELIVERY OTP
+```
+
+Columns are created automatically when needed:
+
+```text
+DELIVERY OTP
+DELIVERY OTP SENT STATUS
+DELIVERY OTP SENT RESPONSE
+DELIVERY OTP VERIFIED
+```
+
+Flow:
+
+- Partner taps **Send OTP to Customer** in the delivery screen.
+- Script generates a 6-digit OTP if the order does not already have one.
+- Script sends campaign `OTP` through AiSensy.
+- Partner enters the OTP given by customer.
+- `orders.deliver` verifies OTP before marking delivery `DONE`.
+
+## Doorstep Payment QR
+
+The mobile app can show a dynamic UPI QR on the delivery screen. Configure these in `mobile/.env`:
+
+```text
+EXPO_PUBLIC_UPI_ID=yourupi@bank
+EXPO_PUBLIC_UPI_NAME=Dynamic Bazar
+```
+
+Delivery partner can choose:
+
+```text
+Cash
+UPI QR
+Prepaid
+```
+
+For `UPI QR`, the app shows a QR with the order amount and requires a UPI reference/UTR before delivery submit.
+
+The backend writes these columns automatically when delivery is confirmed:
+
+```text
+PAYMENT RECEIVED MODE
+PAYMENT RECEIVED REF
+PAYMENT RECEIVED AMOUNT
+PAYMENT RECEIVED AT
+```
+
+It also fills existing `RCVD AMOUNT` if available.
+
+## Delivery Log Sheet
+
+After successful delivery, the script appends a final snapshot row to:
+
+```text
+DELIVERY LOG
+```
+
+Override name if needed:
+
+```text
+DB_DELIVERY_LOG_SHEET=DELIVERY LOG
+```
+
+Columns are created automatically:
+
+```text
+TIMESTAMP, ORDER NO, CUSTOMER NAME, MOBILE NUMBER, WHATSAPP NUMBER, ADDRESS, PIN CODE, DISTRICT, PRODUCT, QUANTITY, ORDER AMOUNT, ORDER PAYMENT MODE, PAYMENT RECEIVED MODE, PAYMENT RECEIVED AMOUNT, PAYMENT RECEIVED REF, DELIVERY DATE, DELIVERY PARTNER NAME, DELIVERY PARTNER NUMBER, DELIVERY STATUS, DELIVERY OTP, DELIVERY OTP VERIFIED, DELIVERY PHOTO, BILL LINK, BILL WHATSAPP STATUS, REMARKS, SOURCE
+```
+
+The log is append-only and skips duplicate delivered log rows for the same order number.
+
+## Drive Authorization
+
+Drive is required for proof photos and bill PDFs.
 
 1. Open the Apps Script editor.
 2. Click Project Settings and enable **Show "appsscript.json" manifest file in editor**.
@@ -68,7 +219,10 @@ Only do this section later if we re-enable Drive upload by sending `uploadProof:
 ```json
 "oauthScopes": [
   "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/drive"
+  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/presentations",
+  "https://www.googleapis.com/auth/script.scriptapp",
+  "https://www.googleapis.com/auth/script.external_request"
 ]
 ```
 

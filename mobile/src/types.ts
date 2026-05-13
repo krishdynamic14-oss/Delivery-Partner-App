@@ -2,6 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type OrderStatus = 'pending' | 'delivered' | 'failed';
 export type PaymentType = 'COD' | 'Prepaid';
+export type PaymentReceivedMode = 'Cash' | 'UPI QR' | 'Prepaid';
 
 export type Partner = {
   id: string;
@@ -10,6 +11,11 @@ export type Partner = {
   district: string;
   role: 'partner' | 'admin' | 'viewer';
   token: string;
+};
+
+export type LoginPayload = {
+  phone: string;
+  password?: string;
 };
 
 export type DeliveryOrder = {
@@ -31,6 +37,7 @@ export type DeliveryOrder = {
   deliveryDate?: string;
   updatedAt: string;
   photoUrl?: string;
+  deliveryOtpSentStatus?: string;
   remarks?: string;
 };
 
@@ -79,6 +86,12 @@ export type ActionSubmitResult = {
   photoUrl?: string;
 };
 
+export type SendDeliveryOtpResult = {
+  sent: boolean;
+  orderId?: string;
+  statusCode?: number;
+};
+
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'warning' | 'error' | 'offline';
 
 export type SyncMeta = {
@@ -98,6 +111,9 @@ export type SyncQueueResult = {
 
 export type DeliverPayload = {
   codCollected: number;
+  paymentReceivedMode?: PaymentReceivedMode;
+  paymentReference?: string;
+  paymentReceivedAmount?: number;
   photoUri?: string;
   photoBase64?: string;
   photoMimeType?: string;

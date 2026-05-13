@@ -24,6 +24,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Delivery confirmation UI | [x] | [x] | Real phone test confirmed delivery sync after Drive upload pause |
 | Failed delivery UI | [x] | [~] | Reason validation, house proof required for refused/cancel, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
+| Doorstep UPI QR payment | [~] | [ ] | Configure `EXPO_PUBLIC_UPI_ID`, scan generated QR, verify Sheet payment columns |
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
@@ -31,7 +32,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Bonvoice masked call | [ ] | [ ] | Initiate real masked call through GAS |
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
 | Admin dashboard shell | [~] | [ ] | Admin role opens hidden admin tabs and all-order monitoring |
-| Partner OTP/PIN login | [ ] | [ ] | OTP/PIN login on Android device |
+| Partner password login | [~] | [ ] | Password login added; real SMS OTP still needs provider if required later |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
 | Core glass-style UI polish | [x] | [x] | Visual direction approved in preview; continue screen-by-screen polish |
@@ -67,7 +68,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] COD tracker and settlement screen
 - [x] Profile and sync status screen
 - [~] Splash/session check screen with branded loading state
-- [ ] PIN login screen
+- [~] Password login screen
 - [ ] OTP verification screen for partner login
 - [ ] Notifications screen
 - [ ] Daily report screen
@@ -86,7 +87,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [~] Add script-property based sheet names (`DB_ORDERS_SHEET`, `DB_PAYMENT_LOG_SHEET`)
 - [ ] Configure `EXPO_PUBLIC_GAS_API_URL` in `mobile/.env`
 - [~] Replace demo login with real partner lookup
-- [ ] Add token/session validation in GAS
+- [~] Add token/session validation in GAS
 - [ ] Enforce district-level access in GAS
 - [~] Fetch real assigned orders by district
 - [~] Fetch all orders for hidden admin role
@@ -104,7 +105,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Persist local status changes
 - [x] Queue offline delivered/failed/settlement actions
 - [ ] Real customer masked call through Bonvoice
-- [ ] Real customer delivery OTP validation
+- [~] Real customer delivery OTP validation
 - [ ] Photo compression before upload
 - [~] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
@@ -120,8 +121,8 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] COD order-wise breakdown
 - [x] Settlement submission stub
 - [x] Real settlement entry in Google Sheet
-- [ ] Settlement method selector: Cash / UPI / Bank
-- [ ] UPI/bank reference validation
+- [~] Delivery payment selector: Cash / UPI QR / Prepaid
+- [~] UPI reference validation during delivery submit
 - [ ] Settlement history
 - [ ] Outstanding COD warning if not settled by day end
 - [x] Add partner, district, and COD breakdown to settlement payload/log
@@ -195,7 +196,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 4. Replace demo data with real order sync.
 5. Complete delivery/photo/COD write flows.
 6. Harden offline queue and visible sync state.
-7. Add PIN/OTP login.
+7. Add password login now; add real OTP after SMS provider selection.
 8. Test on real Android phone and emulator.
 9. Build preview APK.
 10. Prepare Play internal testing release.

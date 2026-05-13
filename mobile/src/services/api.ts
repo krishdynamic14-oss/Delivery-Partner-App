@@ -1,4 +1,4 @@
-import type { CodSummary, DeliverPayload, DeliveryOrder, FailPayload, Partner, SettlementPayload, StockItem } from '../types';
+import type { CodSummary, DeliverPayload, DeliveryOrder, FailPayload, LoginPayload, Partner, SendDeliveryOtpResult, SettlementPayload, StockItem } from '../types';
 import { mockOrders } from '../data/mockOrders';
 
 const GAS_URL = process.env.EXPO_PUBLIC_GAS_API_URL;
@@ -17,16 +17,21 @@ async function request<T>(action: string, body?: unknown, token?: string): Promi
   return json.data;
 }
 
-export async function loginWithPhone(phone: string): Promise<Partner> {
-  if (GAS_URL) return request<Partner>('auth.demoLogin', { phone });
+export async function loginWithPhone(payload: LoginPayload): Promise<Partner> {
+  if (GAS_URL) return request<Partner>('auth.login', payload);
   return {
     id: 'partner_ahmedabad',
     name: 'SURESHBHAI',
-    phone,
+    phone: payload.phone,
     district: 'AHMEDABAD',
     role: 'partner',
     token: 'demo-token',
   };
+}
+
+export async function requestPasswordReset(phone: string): Promise<{ requested: boolean; message: string }> {
+  if (GAS_URL) return request<{ requested: boolean; message: string }>('auth.passwordResetRequest', { phone });
+  return { requested: true, message: 'Password reset request saved' };
 }
 
 export async function fetchOrders(district: string, token?: string, partnerName?: string): Promise<DeliveryOrder[]> {
@@ -38,6 +43,11 @@ export async function fetchOrders(district: string, token?: string, partnerName?
 export async function markDelivered(orderId: string, payload: DeliverPayload, token?: string) {
   if (GAS_URL) return request<{ updated: true; photoUrl?: string }>('orders.deliver', { orderId, ...payload }, token);
   return { updated: true, photoUrl: payload.photoUri };
+}
+
+export async function sendDeliveryOtp(orderId: string, token?: string): Promise<SendDeliveryOtpResult> {
+  if (GAS_URL) return request<SendDeliveryOtpResult>('orders.sendDeliveryOtp', { orderId }, token);
+  return { sent: true, orderId, statusCode: 200 };
 }
 
 export async function markFailed(orderId: string, payload: FailPayload, token?: string) {

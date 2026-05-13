@@ -1,10 +1,20 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('DB_SHEET_ID');
 const ORDERS_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_ORDERS_SHEET') || 'Sheet1';
 const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PAYMENT_LOG_SHEET') || 'PAYMENT LOG';
+const DELIVERY_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DELIVERY_LOG_SHEET') || 'DELIVERY LOG';
 const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_MASTER_SHEET') || 'Stock Master';
 const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
+const PASSWORD_RESET_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PASSWORD_RESET_SHEET') || 'PASSWORD RESET';
 const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
+const BILL_TEMPLATE_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_TEMPLATE_ID') || '';
+const BILL_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_FOLDER_ID') || '';
+const AISENSY_API_KEY = PropertiesService.getScriptProperties().getProperty('DB_AISENSY_API_KEY') || '';
+const AISENSY_CAMPAIGN_NAME = PropertiesService.getScriptProperties().getProperty('DB_AISENSY_CAMPAIGN_NAME') || 'BILL2';
+const AISENSY_DELIVERY_OTP_CAMPAIGN_NAME = PropertiesService.getScriptProperties().getProperty('DB_AISENSY_DELIVERY_OTP_CAMPAIGN_NAME') || 'OTP';
+const AISENSY_API_URL = PropertiesService.getScriptProperties().getProperty('DB_AISENSY_API_URL') || 'https://backend.aisensy.com/campaign/t1/api/v2';
 const ADMIN_PHONES = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PHONES') || '';
+const ADMIN_CREDENTIALS_JSON = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_CREDENTIALS_JSON') || '';
+const ADMIN_PASSWORD = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PASSWORD') || '';
 
 const DEFAULT_COLUMN_ALIASES = {
   ORDER_NO: ['ORDER NO', 'ORDER', 'ORDER_NO', 'ORDER NUMBER'],
@@ -33,6 +43,16 @@ const DEFAULT_COLUMN_ALIASES = {
   DELIVERY_DATE: ['DELIVERY DATE', 'DELIVERY_DATE'],
   PROCESSED: ['PROCESSED'],
   BILL_LINK: ['BILL LINK'],
+  BILL_WHATSAPP_STATUS: ['BILL WHATSAPP STATUS', 'BILL WA STATUS'],
+  BILL_WHATSAPP_RESPONSE: ['BILL WHATSAPP RESPONSE', 'BILL WA RESPONSE'],
+  DELIVERY_OTP: ['DELIVERY OTP', 'DELIVERY_OTP', 'CUSTOMER OTP', 'OTP'],
+  DELIVERY_OTP_SENT_STATUS: ['DELIVERY OTP SENT STATUS', 'OTP SENT STATUS'],
+  DELIVERY_OTP_SENT_RESPONSE: ['DELIVERY OTP SENT RESPONSE', 'OTP SENT RESPONSE'],
+  DELIVERY_OTP_VERIFIED: ['DELIVERY OTP VERIFIED', 'OTP VERIFIED'],
+  PAYMENT_RECEIVED_MODE: ['PAYMENT RECEIVED MODE', 'RCVD PAYMENT MODE', 'RECEIVED PAYMENT MODE'],
+  PAYMENT_RECEIVED_REF: ['PAYMENT RECEIVED REF', 'PAYMENT REF', 'UPI REF', 'UTR'],
+  PAYMENT_RECEIVED_AMOUNT: ['PAYMENT RECEIVED AMOUNT', 'RCVD AMOUNT', 'RECEIVED AMOUNT'],
+  PAYMENT_RECEIVED_AT: ['PAYMENT RECEIVED AT', 'PAYMENT RCVD AT'],
   PAYMENT_DATE: ['PAYMENT DATE'],
   RCVD_AMOUNT: ['RCVD AMOUNT', 'RECEIVED AMOUNT'],
   DELIVERY_PHOTO: ['DELIVERY_PHOTO', 'DELIVERY PHOTO', 'PHOTO URL'],
@@ -55,6 +75,7 @@ const DP_COLUMN_ALIASES = {
   POSTMAN_NUMBER: ['DELIVERY PARTNER NUMBER', 'PARTNER NUMBER', 'POSTMAN NUMBER', 'DP NUMBER', 'MOBILE NUMBER', 'MOBILE', 'PHONE'],
   DISTRICT: ['DISTRICT', 'ASSIGNED DISTRICT', 'AREA', 'CITY'],
   STATUS: ['STATUS', 'ACTIVE', 'IS ACTIVE'],
+  PASSWORD: ['PASSWORD', 'APP PASSWORD', 'LOGIN PASSWORD'],
 };
 
 function doPost(e) {
@@ -65,13 +86,17 @@ function doPost(e) {
     const token = getToken_(e, input);
 
     const routes = {
+      'auth.login': () => demoLogin_(body),
       'auth.demoLogin': () => demoLogin_(body),
+      'auth.passwordResetRequest': () => requestPasswordReset_(body),
       'orders.all': () => getAllOrders_(token),
       'orders.byDistrict': () => getOrdersByDistrict_(body.district, token),
       'orders.byDistrictAndPartner': () => getOrdersByDistrictAndPartner_(body.district, body.partnerName, token),
+      'orders.sendDeliveryOtp': () => sendDeliveryOtpByOrderId_(body.orderId, token),
       'orders.deliver': () => markOrderDelivered_(body, token),
       'orders.fail': () => markOrderFailed_(body, token),
       'cod.settle': () => submitCodSettlement_(body, token),
+      'bills.generate': () => generateBillByOrderId_(body.orderId, token),
       'stock.master': () => getStockMaster_(token),
       'meta.columns': () => inspectColumns_(),
       'meta.partners': () => inspectPartners_(),
@@ -85,11 +110,12 @@ function doPost(e) {
 }
 
 function demoLogin_(body) {
-  const admin = findAdminByPhone_(body.phone);
+  const admin = findAdminByPhone_(body.phone, body);
   if (admin) return admin;
-  const partner = findPartnerByPhone_(body.phone);
+  const partner = findPartnerByPhone_(body.phone, body);
   if (partner) return partner;
   if (SHEET_ID) throw new Error('Partner not found for this mobile number');
+  verifyLoginCredential_(body, 'demo123');
   return {
     id: 'partner_ahmedabad',
     name: 'SURESHBHAI',
@@ -100,7 +126,7 @@ function demoLogin_(body) {
   };
 }
 
-function findAdminByPhone_(phone) {
+function findAdminByPhone_(phone, body) {
   const normalizedPhone = onlyDigits_(phone).slice(-10);
   if (!normalizedPhone || !ADMIN_PHONES) return null;
   const adminPhones = ADMIN_PHONES
@@ -108,6 +134,8 @@ function findAdminByPhone_(phone) {
     .map((value) => onlyDigits_(value).slice(-10))
     .filter(Boolean);
   if (adminPhones.indexOf(normalizedPhone) === -1) return null;
+  const credential = getAdminCredential_(normalizedPhone);
+  verifyLoginCredential_(body || {}, credential.password);
   return {
     id: 'admin_' + normalizedPhone,
     name: 'Dynamic Bazar Admin',
@@ -116,6 +144,112 @@ function findAdminByPhone_(phone) {
     role: 'admin',
     token: 'admin-' + normalizedPhone,
   };
+}
+
+function getAdminCredential_(phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (ADMIN_CREDENTIALS_JSON) {
+    try {
+      const credentials = JSON.parse(ADMIN_CREDENTIALS_JSON);
+      if (Array.isArray(credentials)) {
+        const matched = credentials.find((entry) => onlyDigits_(entry.phone).slice(-10) === normalizedPhone);
+        if (matched) {
+          return {
+            password: String(matched.password || ''),
+          };
+        }
+      }
+    } catch (err) {
+      throw new Error('Invalid DB_ADMIN_CREDENTIALS_JSON: ' + err.message);
+    }
+  }
+  return {
+    password: ADMIN_PASSWORD,
+  };
+}
+
+function verifyLoginCredential_(body, storedPassword) {
+  const inputPassword = String(body.password || '').trim();
+  const password = String(storedPassword || '').trim();
+
+  if (!password) throw new Error('Password is not configured for this login');
+  if (!inputPassword) throw new Error('Password required');
+  if (inputPassword !== password) throw new Error('Invalid password');
+}
+
+function requestPasswordReset_(body) {
+  const phone = onlyDigits_(body.phone).slice(-10);
+  if (!phone || phone.length !== 10) throw new Error('Registered mobile number required');
+
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(PASSWORD_RESET_SHEET_NAME) || ss.insertSheet(PASSWORD_RESET_SHEET_NAME);
+  ensurePasswordResetHeader_(sheet);
+
+  const existingValues = sheet.getDataRange().getValues();
+  for (let r = existingValues.length; r >= 2; r -= 1) {
+    const row = existingValues[r - 1];
+    const existingPhone = onlyDigits_(row[1]).slice(-10);
+    const status = normalizeText_(row[3]);
+    if (existingPhone === phone && status === 'PENDING') {
+      sheet.getRange(r, 1).setValue(new Date());
+      return { requested: true, message: 'Password reset request already pending' };
+    }
+  }
+
+  const partner = lookupPartnerSummaryByPhone_(phone);
+  sheet.appendRow([
+    new Date(),
+    phone,
+    partner.name || '',
+    'PENDING',
+    partner.role || '',
+    partner.district || '',
+    '',
+  ]);
+  return { requested: true, message: 'Password reset request saved' };
+}
+
+function ensurePasswordResetHeader_(sheet) {
+  const headers = ['TIMESTAMP', 'PHONE', 'NAME', 'STATUS', 'ROLE', 'DISTRICT', 'NOTES'];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (currentFirstCell === 'TIMESTAMP') return;
+  if (sheet.getLastRow() > 0 && currentFirstCell) sheet.insertRowBefore(1);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
+}
+
+function lookupPartnerSummaryByPhone_(phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (ADMIN_PHONES) {
+    const isAdmin = ADMIN_PHONES
+      .split(/[,\n]/)
+      .map((value) => onlyDigits_(value).slice(-10))
+      .filter(Boolean)
+      .indexOf(normalizedPhone) !== -1;
+    if (isAdmin) return { name: 'Dynamic Bazar Admin', role: 'admin', district: 'ALL' };
+  }
+
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
+  if (sheet) {
+    const values = sheet.getDataRange().getValues();
+    if (values.length) {
+      const headers = values.shift();
+      const accessor = buildAccessorFromAliases_(headers, DP_COLUMN_ALIASES);
+      for (let i = 0; i < values.length; i += 1) {
+        const row = values[i];
+        const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+        if (partnerPhone === normalizedPhone) {
+          return {
+            name: String(accessor.read(row, 'POSTMAN') || '').trim(),
+            role: 'partner',
+            district: String(accessor.read(row, 'DISTRICT') || '').trim(),
+          };
+        }
+      }
+    }
+  }
+  return { name: '', role: '', district: '' };
 }
 
 function getOrdersByDistrict_(district, token) {
@@ -158,15 +292,30 @@ function getOrdersByDistrictAndPartner_(district, partnerName, token) {
 
 function markOrderDelivered_(body, token) {
   assertToken_(token);
+  verifyDeliveryOtpByOrderId_(body.orderId, body.otp);
   const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
   const updates = {
     DELIVERY_COUNTED: 'DONE',
     DELIVERY_DATE: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd-MM-yyyy'),
     PROCESSED: 'DONE',
+    DELIVERY_OTP_VERIFIED: 'DONE',
+    PAYMENT_RECEIVED_MODE: normalizeReceivedPaymentMode_(body.paymentReceivedMode, body.codCollected),
+    PAYMENT_RECEIVED_AMOUNT: Number(body.paymentReceivedAmount || body.codCollected || 0),
+    PAYMENT_RECEIVED_AT: new Date(),
   };
+  if (body.paymentReference) updates.PAYMENT_RECEIVED_REF = String(body.paymentReference).trim();
+  if (updates.PAYMENT_RECEIVED_AMOUNT) updates.RCVD_AMOUNT = updates.PAYMENT_RECEIVED_AMOUNT;
   if (photoUrl) updates.DELIVERY_PHOTO = photoUrl;
   updateOrderRow_(body.orderId, updates);
-  return { updated: true, photoUrl: photoUrl || '' };
+  const billResult = tryGenerateBillByOrderId_(body.orderId);
+  logDeliveredOrder_(body.orderId, body, updates, photoUrl, billResult);
+  return {
+    updated: true,
+    photoUrl: photoUrl || '',
+    billUrl: billResult.billUrl || '',
+    billError: billResult.error || '',
+    billWhatsApp: billResult.whatsApp || null,
+  };
 }
 
 function markOrderFailed_(body, token) {
@@ -261,6 +410,11 @@ function updateOrderRow_(orderId, updates) {
         let col = headers.indexOf(key) + 1;
         if (!col && resolvedHeader) col = headers.indexOf(resolvedHeader) + 1;
         if (!col && key === 'DELIVERY_PHOTO') col = ensureColumn_(sheet, headers, 'DELIVERY_PHOTO');
+        if (!col && key === 'DELIVERY_OTP_VERIFIED') col = ensureColumn_(sheet, headers, 'DELIVERY OTP VERIFIED');
+        if (!col && key === 'PAYMENT_RECEIVED_MODE') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED MODE');
+        if (!col && key === 'PAYMENT_RECEIVED_REF') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED REF');
+        if (!col && key === 'PAYMENT_RECEIVED_AMOUNT') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED AMOUNT');
+        if (!col && key === 'PAYMENT_RECEIVED_AT') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED AT');
         if (col) sheet.getRange(r, col).setValue(updates[key]);
       });
       return;
@@ -309,6 +463,7 @@ function rowToOrder_(accessor, row) {
     deliveryDate: String(accessor.read(row, 'DELIVERY_DATE') || ''),
     updatedAt: new Date().toISOString(),
     photoUrl: String(accessor.read(row, 'DELIVERY_PHOTO') || ''),
+    deliveryOtpSentStatus: String(accessor.read(row, 'DELIVERY_OTP_SENT_STATUS') || ''),
     remarks: remarks,
   };
 }
@@ -335,6 +490,14 @@ function normalizePaymentMode_(paymentMode, amount) {
   return Number(amount || 0) > 0 ? 'COD' : 'Prepaid';
 }
 
+function normalizeReceivedPaymentMode_(mode, amount) {
+  const normalized = normalizeText_(mode);
+  if (normalized.indexOf('UPI') !== -1) return 'UPI QR';
+  if (normalized.indexOf('PREPAID') !== -1 || normalized.indexOf('PAID') !== -1) return 'Prepaid';
+  if (normalized.indexOf('CASH') !== -1) return 'Cash';
+  return Number(amount || 0) > 0 ? 'Cash' : 'Prepaid';
+}
+
 function json_(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -343,6 +506,32 @@ function getOrderSheet_() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(ORDERS_SHEET_NAME);
   if (!sheet) throw new Error('Orders sheet not found: ' + ORDERS_SHEET_NAME);
   return sheet;
+}
+
+function getOrderRowContextById_(orderId) {
+  const sheet = getOrderSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('Orders sheet is empty');
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+  const orderHeader = accessor.resolve('ORDER_NO');
+  const orderCol = orderHeader ? headers.indexOf(orderHeader) : -1;
+  if (orderCol === -1) throw new Error('ORDER NO column missing');
+
+  const targetOrder = String(orderId || '').replace('#', '').trim();
+  for (let i = 1; i < values.length; i += 1) {
+    const rowOrder = String(values[i][orderCol] || '').replace('#', '').trim();
+    if (rowOrder === targetOrder) {
+      return {
+        sheet: sheet,
+        headers: headers,
+        accessor: accessor,
+        row: values[i],
+        rowNumber: i + 1,
+      };
+    }
+  }
+  throw new Error('Order not found: ' + orderId);
 }
 
 function getColumnOverrides_() {
@@ -626,10 +815,462 @@ function ensurePaymentLogHeader_(sheet) {
   sheet.setFrozenRows(1);
 }
 
-function findPartnerByPhone_(phone) {
+function logDeliveredOrder_(orderId, body, updates, photoUrl, billResult) {
+  try {
+    const rowContext = getOrderRowContextById_(orderId);
+    const order = rowContext.row;
+    const accessor = rowContext.accessor;
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const logSheet = ss.getSheetByName(DELIVERY_LOG_SHEET_NAME) || ss.insertSheet(DELIVERY_LOG_SHEET_NAME);
+    ensureDeliveryLogHeader_(logSheet);
+
+    const existing = logSheet.getDataRange().getValues();
+    for (let i = 1; i < existing.length; i += 1) {
+      const loggedOrder = String(existing[i][1] || '').replace('#', '').trim();
+      if (loggedOrder === String(orderId || '').replace('#', '').trim()) return;
+    }
+
+    logSheet.appendRow([
+      new Date(),
+      String(accessor.read(order, 'ORDER_NO') || '').replace('#', '').trim(),
+      String(accessor.read(order, 'CUSTOMER_NAME') || '').trim(),
+      onlyDigits_(accessor.read(order, 'MOBILE')).slice(-10),
+      onlyDigits_(accessor.read(order, 'WHATSAPP')).slice(-10),
+      String(accessor.read(order, 'ADDRESS') || '').trim(),
+      String(accessor.read(order, 'PIN_CODE') || '').trim(),
+      String(accessor.read(order, 'DISTRICT') || '').trim(),
+      String(accessor.read(order, 'PRODUCT') || '').trim(),
+      Number(accessor.read(order, 'QTY') || 1),
+      Number(accessor.read(order, 'AMOUNT') || 0),
+      String(accessor.read(order, 'PAYMENT_MODE') || '').trim(),
+      updates.PAYMENT_RECEIVED_MODE || '',
+      updates.PAYMENT_RECEIVED_AMOUNT || 0,
+      body.paymentReference || '',
+      updates.DELIVERY_DATE || '',
+      String(accessor.read(order, 'POSTMAN') || '').trim(),
+      onlyDigits_(accessor.read(order, 'POSTMAN_NUMBER')).slice(-10),
+      'DONE',
+      String(accessor.read(order, 'DELIVERY_OTP') || '').trim(),
+      updates.DELIVERY_OTP_VERIFIED || '',
+      photoUrl || String(accessor.read(order, 'DELIVERY_PHOTO') || ''),
+      billResult && billResult.billUrl ? billResult.billUrl : String(accessor.read(order, 'BILL_LINK') || ''),
+      billResult && billResult.whatsApp && billResult.whatsApp.sent ? 'SENT' : '',
+      String(accessor.read(order, 'REMARKS') || '').trim(),
+      'mobile-app',
+    ]);
+  } catch (err) {
+    Logger.log('Delivery log skipped/failed for order ' + orderId + ': ' + String(err && err.message ? err.message : err));
+  }
+}
+
+function ensureDeliveryLogHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'ORDER NO',
+    'CUSTOMER NAME',
+    'MOBILE NUMBER',
+    'WHATSAPP NUMBER',
+    'ADDRESS',
+    'PIN CODE',
+    'DISTRICT',
+    'PRODUCT',
+    'QUANTITY',
+    'ORDER AMOUNT',
+    'ORDER PAYMENT MODE',
+    'PAYMENT RECEIVED MODE',
+    'PAYMENT RECEIVED AMOUNT',
+    'PAYMENT RECEIVED REF',
+    'DELIVERY DATE',
+    'DELIVERY PARTNER NAME',
+    'DELIVERY PARTNER NUMBER',
+    'DELIVERY STATUS',
+    'DELIVERY OTP',
+    'DELIVERY OTP VERIFIED',
+    'DELIVERY PHOTO',
+    'BILL LINK',
+    'BILL WHATSAPP STATUS',
+    'REMARKS',
+    'SOURCE',
+  ];
+
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (currentFirstCell === 'TIMESTAMP') return;
+  if (sheet.getLastRow() > 0 && currentFirstCell) sheet.insertRowBefore(1);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
+}
+
+function setupBillTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === 'generateBillOnEdit')
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+
+  ScriptApp.newTrigger('generateBillOnEdit')
+    .forSpreadsheet(SpreadsheetApp.openById(SHEET_ID))
+    .onEdit()
+    .create();
+
+  return { installed: true, handler: 'generateBillOnEdit' };
+}
+
+function sendDeliveryOtpByOrderId_(orderId, token) {
+  assertToken_(token);
+  const sheet = getOrderSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('Orders sheet is empty');
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+  const orderHeader = accessor.resolve('ORDER_NO');
+  const orderCol = orderHeader ? headers.indexOf(orderHeader) : -1;
+  if (orderCol === -1) throw new Error('ORDER NO column missing');
+
+  const targetOrder = String(orderId || '').replace('#', '').trim();
+  for (let i = 1; i < values.length; i += 1) {
+    const rowOrder = String(values[i][orderCol] || '').replace('#', '').trim();
+    if (rowOrder === targetOrder) {
+      return sendDeliveryOtpForRow_(sheet, i + 1, accessor);
+    }
+  }
+  throw new Error('Order not found: ' + orderId);
+}
+
+function sendDeliveryOtpForRow_(sheet, rowNumber, accessor) {
+  if (!AISENSY_API_KEY) throw new Error('DB_AISENSY_API_KEY missing');
+  const headers = accessor.headers;
+  const otpCol = ensureResolvedColumn_(sheet, headers, accessor, 'DELIVERY_OTP', 'DELIVERY OTP');
+  const statusCol = ensureResolvedColumn_(sheet, headers, accessor, 'DELIVERY_OTP_SENT_STATUS', 'DELIVERY OTP SENT STATUS');
+  const responseCol = ensureResolvedColumn_(sheet, headers, accessor, 'DELIVERY_OTP_SENT_RESPONSE', 'DELIVERY OTP SENT RESPONSE');
+
+  const row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const customerName = String(accessor.read(row, 'CUSTOMER_NAME') || '').trim() || 'Customer';
+  const partnerName = String(accessor.read(row, 'POSTMAN') || '').trim() || 'Delivery Partner';
+  const partnerNumber = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+  const product = String(accessor.read(row, 'PRODUCT') || '').trim();
+  const amount = String(accessor.read(row, 'AMOUNT') || '').trim();
+  const orderNo = String(accessor.read(row, 'ORDER_NO') || '').replace('#', '').trim();
+  const phone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
+  if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
+
+  let otp = onlyDigits_(sheet.getRange(rowNumber, otpCol).getValue()).slice(-6);
+  if (!otp || otp.length !== 6) {
+    otp = generateDeliveryOtp_();
+    sheet.getRange(rowNumber, otpCol).setValue(otp);
+  }
+
+  const payload = {
+    apiKey: AISENSY_API_KEY,
+    campaignName: AISENSY_DELIVERY_OTP_CAMPAIGN_NAME,
+    destination: '+91' + phone,
+    userName: customerName,
+    source: 'dynamic-bazar-app',
+    templateParams: [partnerName, partnerNumber, product, amount, otp],
+    tags: ['delivery-otp'],
+    attributes: {
+      order_no: orderNo,
+      delivery_partner: partnerName,
+      partner_number: partnerNumber,
+      product: product,
+      amount: amount,
+    },
+  };
+
+  const response = UrlFetchApp.fetch(AISENSY_API_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  if (code < 200 || code >= 300) {
+    sheet.getRange(rowNumber, statusCol).setValue('ERROR');
+    sheet.getRange(rowNumber, responseCol).setValue(truncate_('AiSensy HTTP ' + code + ': ' + text, 450));
+    throw new Error('AiSensy HTTP ' + code + ': ' + text);
+  }
+
+  sheet.getRange(rowNumber, statusCol).setValue('SENT');
+  sheet.getRange(rowNumber, responseCol).setValue(truncate_(text, 450));
+  return { sent: true, orderId: orderNo, statusCode: code };
+}
+
+function verifyDeliveryOtpByOrderId_(orderId, inputOtp) {
+  const sheet = getOrderSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('Orders sheet is empty');
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+  const orderHeader = accessor.resolve('ORDER_NO');
+  const orderCol = orderHeader ? headers.indexOf(orderHeader) : -1;
+  const otpHeader = accessor.resolve('DELIVERY_OTP');
+  const otpCol = otpHeader ? headers.indexOf(otpHeader) : -1;
+  if (orderCol === -1) throw new Error('ORDER NO column missing');
+  if (otpCol === -1) throw new Error('Delivery OTP not generated for this order');
+
+  const targetOrder = String(orderId || '').replace('#', '').trim();
+  const otp = onlyDigits_(inputOtp).slice(-6);
+  if (!otp || otp.length !== 6) throw new Error('Valid 6-digit delivery OTP required');
+
+  for (let i = 1; i < values.length; i += 1) {
+    const rowOrder = String(values[i][orderCol] || '').replace('#', '').trim();
+    if (rowOrder === targetOrder) {
+      const storedOtp = onlyDigits_(values[i][otpCol]).slice(-6);
+      if (!storedOtp) throw new Error('Delivery OTP not generated for this order');
+      if (storedOtp !== otp) throw new Error('Invalid delivery OTP');
+      return true;
+    }
+  }
+  throw new Error('Order not found: ' + orderId);
+}
+
+function generateBillOnEdit(e) {
+  try {
+    const sheet = e.range.getSheet();
+    if (sheet.getName() !== ORDERS_SHEET_NAME) return;
+    if (e.range.getRow() <= 1) return;
+
+    const values = sheet.getDataRange().getValues();
+    if (!values.length) return;
+    const headers = values[0];
+    const accessor = buildAccessor_(headers);
+    const editedCol = e.range.getColumn();
+    const deliveryDateCol = getResolvedColumnNumber_(headers, accessor, 'DELIVERY_DATE');
+    const deliveryStatusCol = getResolvedColumnNumber_(headers, accessor, 'DELIVERY_COUNTED');
+    const editedDeliveryDate = deliveryDateCol && editedCol === deliveryDateCol;
+    const editedDeliveryStatus = deliveryStatusCol && editedCol === deliveryStatusCol;
+    if (!editedDeliveryDate && !editedDeliveryStatus) return;
+
+    const value = String(e.value || '').trim();
+    if (!value) return;
+    if (editedDeliveryStatus && normalizeText_(value) !== 'DONE') return;
+
+    generateBillAndNotifyForRow_(sheet, e.range.getRow(), accessor);
+  } catch (err) {
+    Logger.log('generateBillOnEdit ERROR: ' + String(err && err.message ? err.message : err));
+  }
+}
+
+function tryGenerateBillByOrderId_(orderId) {
+  try {
+    const result = generateBillByOrderIdInternal_(orderId);
+    return { billUrl: result.billUrl || '', whatsApp: result.whatsApp || null };
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err);
+    Logger.log('Bill auto-generation skipped/failed for order ' + orderId + ': ' + message);
+    return { error: message };
+  }
+}
+
+function generateBillByOrderId_(orderId, token) {
+  assertToken_(token);
+  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  return generateBillByOrderIdInternal_(orderId);
+}
+
+function generateBillByOrderIdInternal_(orderId) {
+  const sheet = getOrderSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('Orders sheet is empty');
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+  const orderHeader = accessor.resolve('ORDER_NO');
+  const orderCol = orderHeader ? headers.indexOf(orderHeader) : -1;
+  if (orderCol === -1) throw new Error('ORDER NO column missing');
+
+  const targetOrder = String(orderId || '').replace('#', '').trim();
+  for (let i = 1; i < values.length; i += 1) {
+    const rowOrder = String(values[i][orderCol] || '').replace('#', '').trim();
+    if (rowOrder === targetOrder) {
+      return generateBillAndNotifyForRow_(sheet, i + 1, accessor);
+    }
+  }
+  throw new Error('Order not found: ' + orderId);
+}
+
+function generateBillAndNotifyForRow_(sheet, rowNumber, accessor) {
+  const bill = generateBillForRow_(sheet, rowNumber, accessor);
+  const whatsApp = trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, bill.billUrl);
+  bill.whatsApp = whatsApp;
+  return bill;
+}
+
+function generateBillForRow_(sheet, rowNumber, accessor) {
+  if (!BILL_TEMPLATE_ID) throw new Error('DB_BILL_TEMPLATE_ID missing');
+  if (!BILL_FOLDER_ID) throw new Error('DB_BILL_FOLDER_ID missing');
+
+  const headers = accessor.headers;
+  let billLinkCol = getResolvedColumnNumber_(headers, accessor, 'BILL_LINK');
+  if (!billLinkCol) billLinkCol = ensureColumn_(sheet, headers, 'BILL LINK');
+
+  const existing = String(sheet.getRange(rowNumber, billLinkCol).getValue() || '');
+  if (existing.indexOf('drive.google.com') !== -1) {
+    return { generated: false, billUrl: existing, message: 'Bill already exists' };
+  }
+
+  const row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const orderNo = String(accessor.read(row, 'ORDER_NO') || '').replace('#', '').trim();
+  const customerName = String(accessor.read(row, 'CUSTOMER_NAME') || '').trim();
+  if (!orderNo || !customerName) throw new Error('ORDER NO or customer name missing');
+
+  const orderDate = accessor.read(row, 'ORDER_DATE');
+  const dateText = formatBillDate_(orderDate);
+  const product = String(accessor.read(row, 'PRODUCT') || '').trim();
+  const quantity = String(accessor.read(row, 'QTY') || 1);
+  const amount = String(accessor.read(row, 'AMOUNT') || 0);
+  const paymentMode = String(accessor.read(row, 'PAYMENT_MODE') || '').trim();
+
+  const replacements = {
+    '{{BILL NUMBER}}': orderNo,
+    '{{DATE}}': dateText,
+    '{{NAME}}': customerName,
+    '{{P. MODE}}': paymentMode,
+    '{{ITEM}}': product,
+    '{{QTY}}': quantity,
+    '{{AMT1}}': amount,
+  };
+
+  const folder = DriveApp.getFolderById(BILL_FOLDER_ID);
+  const safeName = customerName.replace(/[^A-Za-z0-9]/g, '_');
+  const copyName = 'BILL_' + orderNo + '_' + safeName;
+  const slideCopy = DriveApp.getFileById(BILL_TEMPLATE_ID).makeCopy(copyName, folder);
+  const slideId = slideCopy.getId();
+
+  const presentation = SlidesApp.openById(slideId);
+  presentation.getSlides().forEach((slide) => {
+    Object.keys(replacements).forEach((placeholder) => {
+      slide.replaceAllText(placeholder, String(replacements[placeholder]));
+    });
+  });
+  presentation.saveAndClose();
+  Utilities.sleep(800);
+
+  const pdfBlob = DriveApp.getFileById(slideId)
+    .getAs('application/pdf')
+    .setName('Bill_' + orderNo + '_' + customerName.split(' ')[0] + '.pdf');
+  const pdfFile = folder.createFile(pdfBlob);
+  pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const pdfUrl = pdfFile.getUrl();
+
+  DriveApp.getFileById(slideId).setTrashed(true);
+  sheet.getRange(rowNumber, billLinkCol)
+    .setValue(pdfUrl)
+    .setFontColor('#1565C0')
+    .setFontStyle('normal')
+    .setNote('Bill: ' + orderNo + ' | ' + customerName);
+
+  return { generated: true, billUrl: pdfUrl };
+}
+
+function trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
+  try {
+    return sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl);
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err);
+    Logger.log('Bill WhatsApp skipped/failed for row ' + rowNumber + ': ' + message);
+    writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'ERROR', message);
+    return { sent: false, error: message };
+  }
+}
+
+function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
+  if (!AISENSY_API_KEY) return { sent: false, skipped: true, message: 'DB_AISENSY_API_KEY missing' };
+  if (!billUrl) throw new Error('Bill PDF link missing');
+
+  const headers = accessor.headers;
+  const statusCol = ensureResolvedColumn_(sheet, headers, accessor, 'BILL_WHATSAPP_STATUS', 'BILL WHATSAPP STATUS');
+  const existingStatus = normalizeText_(sheet.getRange(rowNumber, statusCol).getValue());
+  if (existingStatus === 'SENT') return { sent: false, skipped: true, message: 'Bill WhatsApp already sent' };
+
+  const row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const customerName = String(accessor.read(row, 'CUSTOMER_NAME') || '').trim() || 'Customer';
+  const product = String(accessor.read(row, 'PRODUCT') || '').trim();
+  const orderNo = String(accessor.read(row, 'ORDER_NO') || '').replace('#', '').trim();
+  const phone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
+  if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
+
+  const destination = '+91' + phone;
+  const payload = {
+    apiKey: AISENSY_API_KEY,
+    campaignName: AISENSY_CAMPAIGN_NAME,
+    destination: destination,
+    userName: customerName,
+    source: 'dynamic-bazar-app',
+    media: {
+      url: billUrl,
+      filename: 'Bill_' + (orderNo || rowNumber) + '.pdf',
+    },
+    templateParams: [product],
+    tags: ['bill-sent'],
+    attributes: {
+      order_no: orderNo,
+      product: product,
+      bill_url: billUrl,
+    },
+  };
+
+  const response = UrlFetchApp.fetch(AISENSY_API_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('AiSensy HTTP ' + code + ': ' + text);
+  }
+
+  writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT', truncate_(text, 450));
+  return { sent: true, statusCode: code, response: text };
+}
+
+function writeBillWhatsAppStatus_(sheet, accessor, rowNumber, status, responseText) {
+  const headers = accessor.headers;
+  const statusCol = ensureResolvedColumn_(sheet, headers, accessor, 'BILL_WHATSAPP_STATUS', 'BILL WHATSAPP STATUS');
+  const responseCol = ensureResolvedColumn_(sheet, headers, accessor, 'BILL_WHATSAPP_RESPONSE', 'BILL WHATSAPP RESPONSE');
+  sheet.getRange(rowNumber, statusCol).setValue(status);
+  sheet.getRange(rowNumber, responseCol).setValue(responseText || '');
+}
+
+function ensureResolvedColumn_(sheet, headers, accessor, logical, columnName) {
+  const existing = getResolvedColumnNumber_(headers, accessor, logical);
+  if (existing) return existing;
+  const direct = headers
+    .map((header) => String(header).trim().toUpperCase())
+    .indexOf(String(columnName).trim().toUpperCase());
+  if (direct !== -1) return direct + 1;
+  return ensureColumn_(sheet, headers, columnName);
+}
+
+function getResolvedColumnNumber_(headers, accessor, logical) {
+  const resolved = accessor.resolve(logical);
+  return resolved ? headers.indexOf(resolved) + 1 : 0;
+}
+
+function formatBillDate_(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'dd-MM-yyyy');
+  }
+  if (typeof value === 'number' && value > 40000) {
+    const date = new Date(Date.UTC(1899, 11, 30) + value * 86400000);
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd-MM-yyyy');
+  }
+  return String(value || '').trim();
+}
+
+function truncate_(value, maxLength) {
+  const text = String(value || '');
+  return text.length > maxLength ? text.slice(0, maxLength) : text;
+}
+
+function generateDeliveryOtp_() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function findPartnerByPhone_(phone, body) {
   if (!phone) return null;
-  const fromMaster = findPartnerByPhoneInMaster_(phone);
+  const fromMaster = findPartnerByPhoneInMaster_(phone, body);
   if (fromMaster) return fromMaster;
+  if (body && body.password) return null;
 
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return null;
@@ -656,7 +1297,7 @@ function findPartnerByPhone_(phone) {
   return null;
 }
 
-function findPartnerByPhoneInMaster_(phone) {
+function findPartnerByPhoneInMaster_(phone, body) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
   if (!sheet) return null;
@@ -672,6 +1313,7 @@ function findPartnerByPhoneInMaster_(phone) {
     if (partnerPhone && partnerPhone.slice(-10) === normalizedPhone.slice(-10)) {
       const status = String(accessor.read(row, 'STATUS') || 'ACTIVE').trim();
       if (isCancelledStatus_(status)) return null;
+      verifyLoginCredential_(body || {}, accessor.read(row, 'PASSWORD'));
       const name = String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim();
       const district = String(accessor.read(row, 'DISTRICT') || '').trim();
       return {
