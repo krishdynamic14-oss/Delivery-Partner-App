@@ -133,6 +133,8 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
   async function deliverOrder(orderId: string, payload: DeliverPayload): Promise<ActionSubmitResult> {
     const state = await NetInfo.fetch();
     const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'delivered' as const, photoUrl: payload.photoUri, updatedAt: new Date().toISOString() } : order);
+    setOrders(updatedOrders);
+    await saveOrders(updatedOrders);
     if (state.isConnected) {
       try {
         const result = await markDelivered(orderId, payload, user?.token);
@@ -147,13 +149,17 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         };
       } catch (err) {
         const message = getErrorMessage(err);
-        await persistSyncMeta({ status: 'error', message: 'Delivery sync failed. Please retry online.', lastError: message });
-        throw new Error(message);
+        await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() }, user);
+        setPendingSync((count) => count + 1);
+        await persistSyncMeta({ status: 'warning', message: 'Delivery queued because sync failed.', lastError: message });
+        return { status: 'queued', message: `Delivery saved locally. Sync error: ${message}` };
       }
     }
 
-    await persistSyncMeta({ status: 'offline', message: 'Delivery submit needs network. Reconnect and try again.' });
-    throw new Error('Delivery submit needs network. Reconnect and try again.');
+    await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() }, user);
+    setPendingSync((count) => count + 1);
+    await persistSyncMeta({ status: 'offline', message: 'Delivery queued offline.' });
+    return { status: 'queued', message: 'Delivery saved offline. It will sync when network returns.' };
   }
 
   async function sendOrderOtp(orderId: string): Promise<ActionSubmitResult> {

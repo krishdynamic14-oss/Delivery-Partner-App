@@ -38,11 +38,21 @@ export async function pickProofImage(options: ProofImageOptions): Promise<ProofI
   return imageResultToProof(result, options.fileName);
 }
 
+export async function prepareProofImageFromUri(uri: string, fileName: string): Promise<ProofImage> {
+  const proof = await uriToProof(uri, fileName);
+  if (!proof) throw new Error('Proof image is no longer available on this device. Attach it again before syncing.');
+  return proof;
+}
+
 async function imageResultToProof(result: ImagePicker.ImagePickerResult, fileName: string): Promise<ProofImage | null> {
   if (result.canceled) return null;
   const asset = result.assets[0];
+  return uriToProof(asset.uri, fileName);
+}
+
+async function uriToProof(uri: string, fileName: string): Promise<ProofImage | null> {
   const manipulated = await ImageManipulator.manipulateAsync(
-    asset.uri,
+    uri,
     [{ resize: { width: MAX_PROOF_IMAGE_WIDTH } }],
     {
       compress: PROOF_IMAGE_COMPRESS,

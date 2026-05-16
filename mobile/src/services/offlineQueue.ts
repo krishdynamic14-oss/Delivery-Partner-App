@@ -1,7 +1,11 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import NetInfo from '@react-native-community/netinfo';
 import { loadQueue, saveQueue } from './storage';
 import { markDelivered, markFailed, submitSettlement } from './api';
-import type { Partner, QueueAction, SyncQueueResult } from '../types';
+import { prepareProofImageFromUri } from './proofImages';
+import type { DeliverPayload, FailPayload, Partner, QueueAction, SettlementPayload, SyncQueueResult } from '../types';
+
+const MAX_CALL_RECORDING_BYTES = 12 * 1024 * 1024;
 
 export async function enqueueAction(action: QueueAction, owner?: Partner | null) {
   const queue = await loadQueue();
@@ -49,9 +53,9 @@ export async function syncQueue(token?: string, user?: Partner | null): Promise<
 
   for (const action of queue) {
     try {
-      if (action.type === 'deliver') await markDelivered(action.orderId, action.payload, token);
-      if (action.type === 'fail') await markFailed(action.orderId, action.payload, token);
-      if (action.type === 'settle') await submitSettlement(action.payload, token);
+      if (action.type === 'deliver') await markDelivered(action.orderId, await hydrateDeliverPayload(action.payload), token);
+      if (action.type === 'fail') await markFailed(action.orderId, await hydrateFailPayload(action.payload), token);
+      if (action.type === 'settle') await submitSettlement(await hydrateSettlementPayload(action.payload), token);
       synced += 1;
     } catch {
       remaining.push(action);
@@ -93,4 +97,67 @@ function sanitizeQueueAction(action: QueueAction): QueueAction {
     return { ...action, payload };
   }
   return action;
+}
+
+async function hydrateDeliverPayload(payload: DeliverPayload): Promise<DeliverPayload> {
+  if (!payload.photoBase64 && payload.photoUri) {
+    const proof = await prepareProofImageFromUri(payload.photoUri, payload.photoFileName || `delivery-proof-${Date.now()}.jpg`);
+    return {
+      ...payload,
+      photoUri: proof.uri,
+      photoBase64: proof.base64,
+      photoMimeType: proof.mimeType,
+      photoFileName: proof.fileName,
+      uploadProof: true,
+    };
+  }
+  return payload;
+}
+
+async function hydrateFailPayload(payload: FailPayload): Promise<FailPayload> {
+  let nextPayload = payload;
+  if (!nextPayload.photoBase64 && nextPayload.photoUri) {
+    const proof = await prepareProofImageFromUri(nextPayload.photoUri, nextPayload.photoFileName || `failed-proof-${Date.now()}.jpg`);
+    nextPayload = {
+      ...nextPayload,
+      photoUri: proof.uri,
+      photoBase64: proof.base64,
+      photoMimeType: proof.mimeType,
+      photoFileName: proof.fileName,
+      uploadProof: true,
+    };
+  }
+  if (!nextPayload.callRecordingBase64 && nextPayload.callRecordingUri) {
+    const recordingBase64 = await FileSystem.readAsStringAsync(nextPayload.callRecordingUri, { encoding: FileSystem.EncodingType.Base64 });
+    if (estimateBase64Bytes(recordingBase64) > MAX_CALL_RECORDING_BYTES) {
+      throw new Error('Call recording is too large. Attach a recording smaller than 12 MB before syncing.');
+    }
+    nextPayload = {
+      ...nextPayload,
+      callRecordingBase64: recordingBase64,
+      callRecordingMimeType: nextPayload.callRecordingMimeType || 'audio/mpeg',
+      callRecordingFileName: nextPayload.callRecordingFileName || `call-recording-${Date.now()}.mp3`,
+      uploadCallRecording: true,
+    };
+  }
+  return nextPayload;
+}
+
+async function hydrateSettlementPayload(payload: SettlementPayload): Promise<SettlementPayload> {
+  if (!payload.photoBase64 && payload.photoUri) {
+    const proof = await prepareProofImageFromUri(payload.photoUri, payload.photoFileName || `payment-proof-${Date.now()}.jpg`);
+    return {
+      ...payload,
+      photoUri: proof.uri,
+      photoBase64: proof.base64,
+      photoMimeType: proof.mimeType,
+      photoFileName: proof.fileName,
+    };
+  }
+  return payload;
+}
+
+function estimateBase64Bytes(value: string) {
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
+  return Math.ceil((value.length * 3) / 4) - padding;
 }
