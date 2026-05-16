@@ -1,3 +1,5 @@
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
@@ -10,6 +12,7 @@ import { useTheme } from '../state/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FailedDelivery'>;
 
+const MAX_CALL_RECORDING_BYTES = 12 * 1024 * 1024;
 
 let colors: AppColors = defaultColors;
 let styles = createStyles(colors);
@@ -31,9 +34,17 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
     mimeType?: string;
     fileName?: string;
   }>();
+  const [callRecording, setCallRecording] = useState<{
+    uri: string;
+    base64?: string;
+    mimeType?: string;
+    fileName?: string;
+    size?: number;
+  }>();
   const [loading, setLoading] = useState(false);
   const reasons = ['Customer not available', 'Phone not answered', 'Refused delivery', 'Cancelled by customer', 'Wrong address', 'Item damaged'];
   const requiresHouseProof = /refused|cancel/i.test(reason);
+  const requiresCallRecording = /cancel/i.test(reason);
 
   async function pickImage() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -54,6 +65,28 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
     }
   }
 
+  async function pickCallRecording() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['audio/*', 'video/3gpp', 'application/octet-stream'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (asset.size && asset.size > MAX_CALL_RECORDING_BYTES) {
+      Alert.alert('Recording too large', 'Attach a call recording smaller than 12 MB.');
+      return;
+    }
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    setCallRecording({
+      uri: asset.uri,
+      base64,
+      mimeType: asset.mimeType || 'audio/mpeg',
+      fileName: asset.name || `cancel-call-${route.params.orderId}-${Date.now()}.mp3`,
+      size: asset.size,
+    });
+  }
+
   async function submit() {
     if (!reason.trim()) {
       Alert.alert('Reason required', 'Select or enter a failed delivery reason.');
@@ -61,6 +94,10 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
     }
     if (requiresHouseProof && !photo?.uri) {
       Alert.alert('House photo required', 'Capture the customer house proof before marking this order refused or cancelled.');
+      return;
+    }
+    if (requiresCallRecording && !callRecording?.base64) {
+      Alert.alert('Call recording required', 'Attach the customer call recording before marking this parcel cancelled.');
       return;
     }
     setLoading(true);
@@ -74,6 +111,11 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
         photoMimeType: photo?.mimeType,
         photoFileName: photo?.fileName,
         uploadProof: !!photo?.base64,
+        callRecordingUri: callRecording?.uri,
+        callRecordingBase64: callRecording?.base64,
+        callRecordingMimeType: callRecording?.mimeType,
+        callRecordingFileName: callRecording?.fileName,
+        uploadCallRecording: !!callRecording?.base64,
       });
       Alert.alert(result.status === 'synced' ? 'Failed delivery synced' : 'Failed delivery queued', result.message);
       navigation.navigate('Tabs', { screen: 'Orders' });
@@ -105,6 +147,13 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
           <Text style={styles.label}>{requiresHouseProof ? 'House proof required' : 'House proof optional'}</Text>
           {photo?.uri ? <Image source={{ uri: photo.uri }} style={styles.photo} /> : <Text style={styles.meta}>Capture the customer house or delivery location when the customer refuses or cancels.</Text>}
           <Button label="Capture House Photo" tone="secondary" onPress={pickImage} />
+        </Card>
+        <Card>
+          <Text style={styles.label}>{requiresCallRecording ? 'Call recording required for cancelled parcel' : 'Call recording optional'}</Text>
+          <Text style={styles.meta}>
+            {callRecording?.fileName ? `${callRecording.fileName}${callRecording.size ? ` · ${Math.ceil(callRecording.size / 1024)} KB` : ''}` : 'Attach the customer call recording when the parcel is cancelled.'}
+          </Text>
+          <Button label="Attach Call Recording" tone="secondary" onPress={pickCallRecording} />
         </Card>
         <Button label="Submit Failed Delivery" tone="danger" loading={loading} onPress={submit} />
       </ScrollView>

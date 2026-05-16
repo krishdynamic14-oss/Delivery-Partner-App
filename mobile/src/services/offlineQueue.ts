@@ -89,7 +89,7 @@ function sanitizeQueueAction(action: QueueAction): QueueAction {
     return { ...action, payload };
   }
   if (action.type === 'fail') {
-    const { photoBase64, ...payload } = action.payload;
+    const { photoBase64, callRecordingBase64, ...payload } = action.payload;
     return { ...action, payload };
   }
   return action;

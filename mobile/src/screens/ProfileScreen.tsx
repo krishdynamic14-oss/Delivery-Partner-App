@@ -190,7 +190,8 @@ function getQueueActionMeta(action: QueueAction) {
   }
   if (action.type === 'fail') {
     const proof = action.payload.photoUri ? ' · house proof attached' : '';
-    return `${action.payload.reason || 'Failed delivery'}${proof}`;
+    const recording = action.payload.callRecordingUri ? ' · call recording attached' : '';
+    return `${action.payload.reason || 'Failed delivery'}${proof}${recording}`;
   }
   const amount = Number(action.payload.amount || 0);
   const ref = action.payload.reference ? ` · Ref ${action.payload.reference}` : '';

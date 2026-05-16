@@ -65,6 +65,7 @@ const DEFAULT_COLUMN_ALIASES = {
   PAYMENT_DATE: ['PAYMENT DATE'],
   RCVD_AMOUNT: ['RCVD AMOUNT', 'RECEIVED AMOUNT'],
   DELIVERY_PHOTO: ['DELIVERY_PHOTO', 'DELIVERY PHOTO', 'PHOTO URL'],
+  CALL_RECORDING: ['CALL RECORDING', 'CALL RECORDING LINK', 'CANCEL CALL RECORDING', 'CALL_RECORDING'],
 };
 
 const STOCK_COLUMN_ALIASES = {
@@ -342,10 +343,12 @@ function markOrderFailed_(body, token) {
   assertToken_(token);
   const reason = String(body.reason || 'Failed delivery').trim();
   const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
+  const callRecordingUrl = body.uploadCallRecording === true ? (body.callRecordingUrl || uploadCallRecording_(body)) : (body.callRecordingUrl || '');
   const detail = [];
   if (body.notes) detail.push('Notes: ' + String(body.notes).trim());
   if (body.nextAttemptDate) detail.push('Next attempt: ' + String(body.nextAttemptDate).trim());
   if (body.photoUri || photoUrl) detail.push('House proof captured');
+  if (body.callRecordingUri || callRecordingUrl) detail.push('Call recording: ' + callRecordingUrl);
 
   const updates = {
     REMARKS: 'FAILED: ' + reason,
@@ -353,13 +356,14 @@ function markOrderFailed_(body, token) {
     PROCESSED: 'FAILED',
   };
   if (photoUrl) updates.DELIVERY_PHOTO = photoUrl;
+  if (callRecordingUrl) updates.CALL_RECORDING = callRecordingUrl;
   if (detail.length) updates.REMARK2 = detail.join(' | ');
   updateOrderRow_(body.orderId, updates);
   notifyAdmins_('Delivery failed', 'Order #' + String(body.orderId || '').replace('#', '') + ' failed: ' + reason, {
     type: 'delivery_failed',
     orderId: String(body.orderId || '').replace('#', ''),
   });
-  return { updated: true, photoUrl: photoUrl || '' };
+  return { updated: true, photoUrl: photoUrl || '', callRecordingUrl: callRecordingUrl || '' };
 }
 
 function submitCodSettlement_(body, token) {
@@ -572,6 +576,34 @@ function uploadSettlementProof_(settlementId, body) {
   return file.getUrl();
 }
 
+function uploadCallRecording_(body) {
+  if (!body.callRecordingBase64) return '';
+  const folder = getProofFolder_();
+  const mimeType = body.callRecordingMimeType || 'audio/mpeg';
+  const extension = getFileExtensionFromMime_(mimeType, body.callRecordingFileName, 'mp3');
+  const safeOrderId = String(body.orderId || 'order').replace(/[^A-Za-z0-9_-]/g, '');
+  const fileName = body.callRecordingFileName || ('call-recording-' + safeOrderId + '-' + Date.now() + '.' + extension);
+  const bytes = Utilities.base64Decode(String(body.callRecordingBase64));
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function getFileExtensionFromMime_(mimeType, fileName, fallback) {
+  const name = String(fileName || '').trim();
+  const matched = name.match(/\.([A-Za-z0-9]{2,5})$/);
+  if (matched) return matched[1].toLowerCase();
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime.indexOf('mpeg') !== -1 || mime.indexOf('mp3') !== -1) return 'mp3';
+  if (mime.indexOf('mp4') !== -1 || mime.indexOf('m4a') !== -1) return 'm4a';
+  if (mime.indexOf('aac') !== -1) return 'aac';
+  if (mime.indexOf('amr') !== -1) return 'amr';
+  if (mime.indexOf('3gpp') !== -1) return '3gp';
+  if (mime.indexOf('wav') !== -1) return 'wav';
+  return fallback || 'bin';
+}
+
 function getProofFolder_() {
   if (PROOF_FOLDER_ID) return DriveApp.getFolderById(PROOF_FOLDER_ID);
   return DriveApp.getRootFolder();
@@ -594,6 +626,7 @@ function updateOrderRow_(orderId, updates) {
         let col = headers.indexOf(key) + 1;
         if (!col && resolvedHeader) col = headers.indexOf(resolvedHeader) + 1;
         if (!col && key === 'DELIVERY_PHOTO') col = ensureColumn_(sheet, headers, 'DELIVERY_PHOTO');
+        if (!col && key === 'CALL_RECORDING') col = ensureColumn_(sheet, headers, 'CALL RECORDING');
         if (!col && key === 'DELIVERY_OTP_VERIFIED') col = ensureColumn_(sheet, headers, 'DELIVERY OTP VERIFIED');
         if (!col && key === 'PAYMENT_RECEIVED_MODE') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED MODE');
         if (!col && key === 'PAYMENT_RECEIVED_REF') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED REF');

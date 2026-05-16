@@ -39,6 +39,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Push notification foundation | [~] | [x] | Expo/Firebase token registration and GAS push test working; production cleanup pending |
 | Maps route handoff | [~] | [ ] | Android Google Maps/geo/browser fallback added; verify on delivery partner phones |
 | Multi-UPI routing | [~] | [ ] | Comma-separated `EXPO_PUBLIC_UPI_IDS` supported; verify QR payments across all UPI IDs |
+| Cancel call recording proof | [~] | [ ] | Cancelled parcel now requires attached call recording; verify upload link in Sheet/Drive |
 
 ## Product Goal
 
@@ -117,6 +118,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
 - [~] Refused/cancelled delivery requires house photo proof
+- [~] Cancelled delivery requires customer call recording attachment
 - [ ] Next-attempt date picker
 - [x] Prevent duplicate submission during sync
 - [~] Show sync conflict/error state per order
@@ -196,6 +198,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Offline delivery queues and syncs after reconnect
 - [x] Photo capture works on real Android device
 - [ ] Remote photo URL is stored against correct order
+- [ ] Cancelled parcel call recording URL is stored against correct order
 - [ ] App handles bad network without crashing
 - [ ] App handles GAS API errors clearly
 - [ ] App works on Android 8, 11, 13+, and one low-end device

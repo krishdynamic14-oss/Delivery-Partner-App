@@ -208,6 +208,11 @@ export type FailPayload = {
   photoMimeType?: string;
   photoFileName?: string;
   uploadProof?: boolean;
+  callRecordingUri?: string;
+  callRecordingBase64?: string;
+  callRecordingMimeType?: string;
+  callRecordingFileName?: string;
+  uploadCallRecording?: boolean;
 };
 
 export type SettlementPayload = {

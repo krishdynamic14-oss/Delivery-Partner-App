@@ -66,7 +66,7 @@ export async function sendDeliveryOtp(orderId: string, token?: string): Promise<
 }
 
 export async function markFailed(orderId: string, payload: FailPayload, token?: string) {
-  if (GAS_URL) return request<{ updated: true; photoUrl?: string }>('orders.fail', { orderId, ...payload }, token);
+  if (GAS_URL) return request<{ updated: true; photoUrl?: string; callRecordingUrl?: string }>('orders.fail', { orderId, ...payload }, token);
   return { updated: true, photoUrl: payload.photoUri };
 }
 
