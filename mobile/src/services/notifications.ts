@@ -9,17 +9,17 @@ const CHANNEL_ID = 'dynamic-bazar-delivery';
 
 export async function setupPushNotifications(user: Partner): Promise<string | null> {
   if (!Device.isDevice) {
-    await savePushStatus('skipped', 'Push skipped: Android/iPhone real device required.');
+    await savePushStatus('skipped', 'Push notifications work on the installed Android app.');
     return null;
   }
   if (isExpoGo()) {
-    await savePushStatus('skipped', 'Push skipped: Expo Go remote notifications support nahi karta. APK/dev build use karo.');
+    await savePushStatus('skipped', 'Push notifications work in the installed APK, not Expo Go.');
     return null;
   }
 
   const Notifications = await loadNotifications();
   if (!Notifications) {
-    await savePushStatus('error', 'expo-notifications module load nahi hua. Latest APK install karo.');
+    await savePushStatus('error', 'Push notifications are not available in this app build. Install the latest APK.');
     return null;
   }
 
@@ -35,13 +35,13 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
 
   const permission = await ensureNotificationPermission(Notifications);
   if (!permission) {
-    await savePushStatus('skipped', 'Push skipped: notification permission denied. Android App Info > Notifications me allow karo.');
+    await savePushStatus('skipped', 'Notification permission is off. Enable notifications from Android App Info.');
     return null;
   }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
   if (!projectId) {
-    await savePushStatus('error', 'EAS projectId missing. app.json extra.eas.projectId check karo.');
+    await savePushStatus('error', 'Push notifications are not configured in this app build.');
     return null;
   }
 
@@ -58,10 +58,10 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
       deviceName: Device.deviceName || '',
       appVersion: Constants.expoConfig?.version || '',
     }, user.token);
-    await savePushStatus('registered', 'Push token registered. PUSH TOKENS sheet me ACTIVE row aani chahiye.', token);
+    await savePushStatus('registered', 'Notifications are active for this device.', token);
     return token;
   } catch (err) {
-    await savePushStatus('error', `Push registration failed: ${err instanceof Error ? err.message : String(err)}`);
+    await savePushStatus('error', getUserSafePushError(err));
     return null;
   }
 }
@@ -109,4 +109,12 @@ async function savePushStatus(status: 'registered' | 'skipped' | 'error', messag
     message,
     tokenPreview: token ? `${token.slice(0, 22)}...` : undefined,
   });
+}
+
+function getUserSafePushError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err || '');
+  if (/permission|denied/i.test(message)) return 'Notification permission is off. Enable notifications from Android App Info.';
+  if (/firebase|fcm|credential|project|server key|Default FirebaseApp/i.test(message)) return 'Push notifications are not configured in this app build. Install the latest APK.';
+  if (/network|fetch|internet|timeout/i.test(message)) return 'Could not register notifications. Check internet and try again.';
+  return 'Could not register notifications on this device. Try again later.';
 }

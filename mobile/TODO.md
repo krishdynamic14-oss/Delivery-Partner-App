@@ -212,10 +212,10 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 
 ## Production Launch Cleanup
 
-- [ ] Hide partner-facing `Register Push Token` button
-- [ ] Remove token preview and raw Firebase/Expo error text from partner Profile
-- [ ] Keep push retry tools admin-only or debug-build-only
-- [ ] Replace technical notification errors with simple user-safe copy
+- [x] Hide partner-facing `Register Push Token` button
+- [x] Remove token preview and raw Firebase/Expo error text from partner Profile
+- [x] Keep push retry tools admin-only or debug-build-only
+- [x] Replace technical notification errors with simple user-safe copy
 - [ ] Confirm push registration runs automatically after login
 - [ ] Remove any temporary debug/testing functions from production GAS if not needed
 - [ ] Re-check `.gitignore` before pushing secrets/build files

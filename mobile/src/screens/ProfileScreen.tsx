@@ -21,6 +21,7 @@ export function ProfileScreen() {
   const [queuedActions, setQueuedActions] = useState<QueueAction[]>([]);
   const [pushStatus, setPushStatus] = useState<PushRegistrationStatus>();
   const [pushRetrying, setPushRetrying] = useState(false);
+  const showPushDebugTools = user?.role === 'admin' || __DEV__;
 
   async function refreshQueueDetails() {
     const queue = await loadQueueForUser(user);
@@ -73,7 +74,7 @@ export function ProfileScreen() {
       await setupPushNotifications(user);
       const nextStatus = await loadPushRegistrationStatus();
       setPushStatus(nextStatus);
-      Alert.alert(nextStatus.status === 'registered' ? 'Push registered' : 'Push not registered', nextStatus.message);
+      Alert.alert(nextStatus.status === 'registered' ? 'Notifications active' : 'Notifications not active', nextStatus.message);
     } finally {
       setPushRetrying(false);
     }
@@ -141,13 +142,15 @@ export function ProfileScreen() {
             })}
           </View>
         </Card>
+        {showPushDebugTools ? (
         <Card>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Push Notifications</Text>
           <Text style={[styles.helperText, { color: theme.colors.muted }]}>{pushStatus?.message || 'Push notification registration not checked yet.'}</Text>
           {pushStatus?.tokenPreview ? <Text style={styles.queueTime}>Token {pushStatus.tokenPreview}</Text> : null}
           {pushStatus?.updatedAt ? <Text style={styles.queueTime}>Checked {formatQueueDate(pushStatus.updatedAt).replace('Saved ', '')}</Text> : null}
-          <Button label="Register Push Token" tone="secondary" loading={pushRetrying} onPress={retryPushRegistration} />
+          <Button label="Retry Notifications" tone="secondary" loading={pushRetrying} onPress={retryPushRegistration} />
         </Card>
+        ) : null}
         {queuedActions.length ? (
           <Card>
             <Text style={styles.sectionTitle}>Pending Action Details</Text>
