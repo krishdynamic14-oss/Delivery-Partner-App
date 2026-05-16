@@ -17,7 +17,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Expo app scaffold | [x] | [x] | `npm run typecheck`, Expo config validation |
 | GitHub feature branch | [x] | [x] | Branch pushed to origin |
 | Expo web preview | [x] | [x] | `http://localhost:8083` returns app UI |
-| Secure role-based session | [~] | [ ] | Login maps hidden admin/partner role from backend; restart app and confirm session persists |
+| Secure role-based session | [~] | [ ] | GAS validates admin/partner token shape and partner scope; restart app and real-device regression still needed |
 | Dashboard KPIs | [x] | [ ] | Verify totals against mock and real data |
 | Orders list tabs/search | [x] | [ ] | Search order/customer/area/product/phone |
 | Order detail screen | [x] | [ ] | Open every order status without crash |
@@ -95,7 +95,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [ ] Configure `EXPO_PUBLIC_GAS_API_URL` in `mobile/.env`
 - [~] Replace demo login with real partner lookup
 - [~] Add token/session validation in GAS
-- [ ] Enforce district-level access in GAS
+- [~] Enforce district-level access in GAS
 - [~] Fetch real assigned orders by district
 - [~] Fetch all orders for hidden admin role
 - [ ] Fetch single order detail from GAS

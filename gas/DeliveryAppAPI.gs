@@ -274,19 +274,20 @@ function lookupPartnerSummaryByPhone_(phone) {
 }
 
 function getOrdersByDistrict_(district, token) {
-  assertToken_(token);
+  const auth = assertToken_(token);
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return [];
   const headers = values.shift();
   const accessor = buildAccessor_(headers);
+  const effectiveDistrict = auth.role === 'admin' ? district : auth.district;
   return values
     .map((row) => rowToOrder_(accessor, row))
-    .filter((order) => String(order.district).toUpperCase() === String(district).toUpperCase());
+    .filter((order) => String(order.district).toUpperCase() === String(effectiveDistrict).toUpperCase())
+    .filter((order) => auth.role === 'admin' || normalizeText_(order.assignedTo) === normalizeText_(auth.name));
 }
 
 function getAllOrders_(token) {
-  assertToken_(token);
-  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  assertAdminToken_(token);
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return [];
   const headers = values.shift();
@@ -295,13 +296,13 @@ function getAllOrders_(token) {
 }
 
 function getOrdersByDistrictAndPartner_(district, partnerName, token) {
-  assertToken_(token);
+  const auth = assertToken_(token);
   const values = getOrderSheet_().getDataRange().getValues();
   if (!values.length) return [];
   const headers = values.shift();
   const accessor = buildAccessor_(headers);
-  const districtUpper = String(district || '').toUpperCase();
-  const partnerUpper = normalizeText_(partnerName);
+  const districtUpper = auth.role === 'admin' ? String(district || '').toUpperCase() : String(auth.district || '').toUpperCase();
+  const partnerUpper = auth.role === 'admin' ? normalizeText_(partnerName) : normalizeText_(auth.name);
   return values
     .map((row) => rowToOrder_(accessor, row))
     .filter((order) => {
@@ -313,6 +314,7 @@ function getOrdersByDistrictAndPartner_(district, partnerName, token) {
 
 function markOrderDelivered_(body, token) {
   assertToken_(token);
+  assertOrderAccess_(body.orderId, token);
   verifyDeliveryOtpByOrderId_(body.orderId, body.otp);
   const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
   const updates = {
@@ -341,6 +343,7 @@ function markOrderDelivered_(body, token) {
 
 function markOrderFailed_(body, token) {
   assertToken_(token);
+  assertOrderAccess_(body.orderId, token);
   const reason = String(body.reason || 'Failed delivery').trim();
   const photoUrl = body.uploadProof === true ? (body.photoUrl || uploadDeliveryProof_(body)) : (body.photoUrl || '');
   const callRecordingUrl = body.uploadCallRecording === true ? (body.callRecordingUrl || uploadCallRecording_(body)) : (body.callRecordingUrl || '');
@@ -367,16 +370,22 @@ function markOrderFailed_(body, token) {
 }
 
 function submitCodSettlement_(body, token) {
-  assertToken_(token);
+  const auth = assertToken_(token);
   const sheet = getPaymentLogSheet_();
   ensurePaymentLogHeader_(sheet);
   const settlementId = 'SET-' + Date.now();
   const amount = Number(body.amount || 0);
   const proofUrl = uploadSettlementProof_(settlementId, body);
+  const effectiveBody = auth.role === 'admin' ? body : {
+    ...body,
+    partnerName: auth.name,
+    partnerPhone: auth.phone,
+    district: auth.district,
+  };
   const summary = calculateCodSettlementSummary_({
-    partnerName: body.partnerName,
-    partnerPhone: body.partnerPhone,
-    district: body.district,
+    partnerName: effectiveBody.partnerName,
+    partnerPhone: effectiveBody.partnerPhone,
+    district: effectiveBody.district,
   });
   if (!amount || amount <= 0) throw new Error('Settlement amount required');
   if (amount > summary.cashInHand) {
@@ -386,9 +395,9 @@ function submitCodSettlement_(body, token) {
   appendPaymentLogRow_(sheet, {
     'TIMESTAMP': new Date(),
     'SETTLEMENT ID': settlementId,
-    'DELIVERY PARTNER NAME': String(body.partnerName || '').trim(),
-    'DELIVERY PARTNER NUMBER': onlyDigits_(body.partnerPhone),
-    'DISTRICT': String(body.district || '').trim(),
+    'DELIVERY PARTNER NAME': String(effectiveBody.partnerName || '').trim(),
+    'DELIVERY PARTNER NUMBER': onlyDigits_(effectiveBody.partnerPhone),
+    'DISTRICT': String(effectiveBody.district || '').trim(),
     'SETTLEMENT AMOUNT': 0,
     'METHOD': String(body.method || 'Cash').trim(),
     'REFERENCE': String(body.reference || '').trim(),
@@ -409,17 +418,22 @@ function submitCodSettlement_(body, token) {
     'APPROVED AT': '',
     'ADMIN NOTES': String(body.notes || '').trim(),
   });
-  notifyAdmins_('COD settlement pending', String(body.partnerName || 'Partner').trim() + ' submitted Rs. ' + amount + ' COD settlement.', {
+  notifyAdmins_('COD settlement pending', String(effectiveBody.partnerName || 'Partner').trim() + ' submitted Rs. ' + amount + ' COD settlement.', {
     type: 'cod_settlement_pending',
     settlementId: settlementId,
-    partnerPhone: onlyDigits_(body.partnerPhone).slice(-10),
+    partnerPhone: onlyDigits_(effectiveBody.partnerPhone).slice(-10),
   });
   return { settlementId: settlementId, status: 'PENDING', cashInHand: summary.cashInHand };
 }
 
 function getCodSettlementSummary_(body, token) {
-  assertToken_(token);
-  return calculateCodSettlementSummary_(body || {});
+  const auth = assertToken_(token);
+  if (auth.role === 'admin') return calculateCodSettlementSummary_(body || {});
+  return calculateCodSettlementSummary_({
+    partnerName: auth.name,
+    partnerPhone: auth.phone,
+    district: auth.district,
+  });
 }
 
 function getCodSettlements_(token) {
@@ -738,14 +752,49 @@ function startOfLocalDay_(date) {
 }
 
 function assertToken_(token) {
-  if (!token) throw new Error('Missing token');
+  return getAuthContext_(token);
 }
 
 function getToken_(e, input) {
   const fromBody = (input && input.__token) || (input && input.body && input.body.__token) || '';
   const fromParam = (e.parameter && (e.parameter.token || e.parameter.authorization)) || '';
   const merged = String(fromBody || fromParam || '').replace('Bearer ', '').trim();
-  return merged || 'demo-token';
+  return merged;
+}
+
+function getAuthContext_(token) {
+  const raw = String(token || '').trim();
+  if (!raw) throw new Error('Missing token');
+  if (raw === 'demo-token' && !SHEET_ID) {
+    return { role: 'partner', phone: '', name: 'SURESHBHAI', district: 'AHMEDABAD', token: raw };
+  }
+
+  if (raw.indexOf('admin-') === 0) {
+    const phone = onlyDigits_(raw.replace('admin-', '')).slice(-10);
+    if (isAdminPhone_(phone)) {
+      return { role: 'admin', phone: phone, name: 'Dynamic Bazar Admin', district: 'ALL', token: raw };
+    }
+    throw new Error('Invalid admin token');
+  }
+
+  if (raw.indexOf('partner-') === 0) {
+    const phone = onlyDigits_(raw.replace('partner-', '')).slice(-10);
+    const partner = getPartnerAuthByPhone_(phone);
+    if (partner) return { role: 'partner', phone: phone, name: partner.name, district: partner.district, token: raw };
+    throw new Error('Invalid partner token');
+  }
+
+  throw new Error('Invalid token');
+}
+
+function isAdminPhone_(phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (!normalizedPhone || !ADMIN_PHONES) return false;
+  return ADMIN_PHONES
+    .split(/[,\n]/)
+    .map((value) => onlyDigits_(value).slice(-10))
+    .filter(Boolean)
+    .indexOf(normalizedPhone) !== -1;
 }
 
 function maskPhone_(phone) {
@@ -801,6 +850,20 @@ function getOrderRowContextById_(orderId) {
     }
   }
   throw new Error('Order not found: ' + orderId);
+}
+
+function assertOrderAccess_(orderId, token) {
+  const auth = assertToken_(token);
+  if (auth.role === 'admin') return true;
+  const context = getOrderRowContextById_(orderId);
+  const partnerPhone = onlyDigits_(context.accessor.read(context.row, 'POSTMAN_NUMBER')).slice(-10);
+  const partnerName = normalizeText_(context.accessor.read(context.row, 'POSTMAN'));
+  const district = normalizeText_(context.accessor.read(context.row, 'DISTRICT'));
+  const phoneOk = partnerPhone && partnerPhone === auth.phone;
+  const nameOk = partnerName && partnerName === normalizeText_(auth.name);
+  const districtOk = !auth.district || district === normalizeText_(auth.district);
+  if ((phoneOk || nameOk) && districtOk) return true;
+  throw new Error('Order access denied');
 }
 
 function getColumnOverrides_() {
@@ -900,8 +963,7 @@ function inspectPartners_() {
 }
 
 function getStockMaster_(token) {
-  assertToken_(token);
-  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  assertAdminToken_(token);
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const stockSheet = ss.getSheetByName(STOCK_MASTER_SHEET_NAME);
   if (!stockSheet) throw new Error('Stock Master sheet not found: ' + STOCK_MASTER_SHEET_NAME);
@@ -1129,7 +1191,7 @@ function getDpMasterPartners_(includePhone) {
 }
 
 function registerPushToken_(body, token) {
-  assertToken_(token);
+  const auth = assertToken_(token);
   const expoPushToken = String(body.expoPushToken || '').trim();
   if (!expoPushToken) throw new Error('Expo push token required');
 
@@ -1141,11 +1203,11 @@ function registerPushToken_(body, token) {
   const tokenCol = indexByHeader['EXPO PUSH TOKEN'];
   const rowData = {
     'TIMESTAMP': new Date(),
-    'USER ID': String(body.userId || '').trim(),
-    'ROLE': String(body.role || '').trim(),
-    'PHONE': onlyDigits_(body.phone).slice(-10),
-    'PARTNER NAME': String(body.partnerName || '').trim(),
-    'DISTRICT': String(body.district || '').trim(),
+    'USER ID': auth.role + '_' + auth.phone,
+    'ROLE': auth.role,
+    'PHONE': onlyDigits_(auth.phone).slice(-10),
+    'PARTNER NAME': String(auth.name || '').trim(),
+    'DISTRICT': String(auth.district || '').trim(),
     'EXPO PUSH TOKEN': expoPushToken,
     'PLATFORM': String(body.platform || '').trim(),
     'DEVICE NAME': String(body.deviceName || '').trim(),
@@ -1174,7 +1236,7 @@ function registerPushToken_(body, token) {
 }
 
 function deactivatePushToken_(body, token) {
-  assertToken_(token);
+  const auth = assertToken_(token);
   const expoPushToken = String(body.expoPushToken || '').trim();
   if (!expoPushToken) throw new Error('Expo push token required');
 
@@ -1190,6 +1252,9 @@ function deactivatePushToken_(body, token) {
 
   for (let r = 2; r <= values.length; r += 1) {
     if (String(values[r - 1][tokenCol] || '').trim() !== expoPushToken) continue;
+    const rowPhone = onlyDigits_(readLogValue_(values[r - 1], indexByHeader, 'PHONE')).slice(-10);
+    const rowRole = normalizeText_(readLogValue_(values[r - 1], indexByHeader, 'ROLE')).toLowerCase();
+    if (auth.role !== 'admin' && (rowPhone !== auth.phone || rowRole !== auth.role)) throw new Error('Push token access denied');
     sheet.getRange(r, statusCol + 1).setValue('INACTIVE');
     sheet.getRange(r, lastSeenCol + 1).setValue(new Date());
     return { deactivated: true };
@@ -1604,12 +1669,14 @@ function readLogValue_(row, indexByHeader, header) {
 }
 
 function assertAdminToken_(token) {
-  assertToken_(token);
-  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  const auth = assertToken_(token);
+  if (auth.role !== 'admin') throw new Error('Admin access required');
+  return auth;
 }
 
 function getApproverFromToken_(token) {
-  return String(token || '').replace('admin-', '').trim() || 'admin';
+  const auth = assertAdminToken_(token);
+  return auth.phone || 'admin';
 }
 
 function calculateCodSettlementSummary_(filter) {
@@ -1854,6 +1921,7 @@ function setupBillTrigger() {
 
 function sendDeliveryOtpByOrderId_(orderId, token) {
   assertToken_(token);
+  assertOrderAccess_(orderId, token);
   const sheet = getOrderSheet_();
   const values = sheet.getDataRange().getValues();
   if (!values.length) throw new Error('Orders sheet is empty');
@@ -2000,8 +2068,7 @@ function tryGenerateBillByOrderId_(orderId) {
 }
 
 function generateBillByOrderId_(orderId, token) {
-  assertToken_(token);
-  if (String(token).indexOf('admin-') !== 0) throw new Error('Admin access required');
+  assertAdminToken_(token);
   return generateBillByOrderIdInternal_(orderId);
 }
 
@@ -2259,6 +2326,48 @@ function findPartnerByPhone_(phone, body) {
         district: district,
         role: 'partner',
         token: 'partner-' + normalizedPhone.slice(-10),
+      };
+    }
+  }
+  return null;
+}
+
+function getPartnerAuthByPhone_(phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (!normalizedPhone) return null;
+
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const masterSheet = ss.getSheetByName(DP_MASTER_SHEET_NAME);
+  if (masterSheet) {
+    const values = masterSheet.getDataRange().getValues();
+    if (values.length) {
+      const headers = values.shift();
+      const accessor = buildAccessorFromAliases_(headers, DP_COLUMN_ALIASES);
+      for (let i = 0; i < values.length; i += 1) {
+        const row = values[i];
+        const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+        if (partnerPhone !== normalizedPhone) continue;
+        const status = String(accessor.read(row, 'STATUS') || 'ACTIVE').trim();
+        if (isCancelledStatus_(status)) return null;
+        return {
+          name: String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim(),
+          district: String(accessor.read(row, 'DISTRICT') || '').trim(),
+        };
+      }
+    }
+  }
+
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return null;
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  for (let i = 0; i < values.length; i += 1) {
+    const row = values[i];
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+    if (partnerPhone === normalizedPhone) {
+      return {
+        name: String(accessor.read(row, 'POSTMAN') || 'Delivery Partner').trim(),
+        district: String(accessor.read(row, 'DISTRICT') || '').trim(),
       };
     }
   }
