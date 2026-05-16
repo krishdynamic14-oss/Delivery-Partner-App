@@ -9,6 +9,7 @@ import type { RootStackParamList } from '../types';
 import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
 import { captureProofImage, type ProofImage } from '../services/proofImages';
+import { persistProofFile } from '../services/proofFiles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FailedDelivery'>;
 
@@ -65,12 +66,14 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
       Alert.alert('Recording too large', 'Attach a call recording smaller than 12 MB.');
       return;
     }
-    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    const fileName = asset.name || `cancel-call-${route.params.orderId}-${Date.now()}.mp3`;
+    const uri = await persistProofFile(asset.uri, fileName);
+    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
     setCallRecording({
-      uri: asset.uri,
+      uri,
       base64,
       mimeType: asset.mimeType || 'audio/mpeg',
-      fileName: asset.name || `cancel-call-${route.params.orderId}-${Date.now()}.mp3`,
+      fileName,
       size: asset.size,
     });
   }

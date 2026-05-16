@@ -4,6 +4,7 @@ import type { ActionSubmitResult, DeliveryOrder, FailPayload, DeliverPayload, Sy
 import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp } from '../services/api';
 import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveQueue, saveSyncMeta } from '../services/storage';
 import { enqueueAction, loadQueueForUser, queueBelongsToUser, syncQueue } from '../services/offlineQueue';
+import { deleteActionProofFiles, deletePayloadProofFiles } from '../services/proofFiles';
 import { useAuth } from './AuthContext';
 
 type OrdersState = {
@@ -142,6 +143,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
         setOrders(syncedOrders);
         await saveOrders(syncedOrders);
+        await deletePayloadProofFiles(payload);
         return {
           status: 'synced',
           message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet. Proof photo stays on this device for now.',
@@ -199,6 +201,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
         setOrders(syncedOrders);
         await saveOrders(syncedOrders);
+        await deletePayloadProofFiles(payload);
         return {
           status: 'synced',
           message: result.photoUrl ? 'Failed delivery proof synced to Google Sheets.' : 'Failed delivery updated in Google Sheet.',
@@ -221,7 +224,9 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
 
   async function discardQueuedAction(actionId: string) {
     const queue = await loadQueue();
+    const removed = queue.filter((action) => action.id === actionId && queueBelongsToUser(action, user));
     const nextQueue = queue.filter((action) => action.id !== actionId || !queueBelongsToUser(action, user));
+    await Promise.all(removed.map(deleteActionProofFiles));
     await saveQueue(nextQueue);
     const userQueue = nextQueue.filter((action) => queueBelongsToUser(action, user));
     setPendingSync(userQueue.length);

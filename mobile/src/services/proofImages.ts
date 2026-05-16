@@ -1,5 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { persistProofFile } from './proofFiles';
 
 const MAX_PROOF_IMAGE_BYTES = 1.8 * 1024 * 1024;
 const MAX_PROOF_IMAGE_WIDTH = 1280;
@@ -66,8 +67,9 @@ async function uriToProof(uri: string, fileName: string): Promise<ProofImage | n
   if (bytes > MAX_PROOF_IMAGE_BYTES) {
     throw new Error('Proof image is still too large. Please retake a clear close photo and try again.');
   }
+  const persistedUri = await persistProofFile(manipulated.uri, fileName);
   return {
-    uri: manipulated.uri,
+    uri: persistedUri,
     base64,
     mimeType: 'image/jpeg',
     fileName,

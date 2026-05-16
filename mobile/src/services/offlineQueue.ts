@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { loadQueue, saveQueue } from './storage';
 import { markDelivered, markFailed, submitSettlement } from './api';
 import { prepareProofImageFromUri } from './proofImages';
+import { deleteActionProofFiles } from './proofFiles';
 import type { DeliverPayload, FailPayload, Partner, QueueAction, SettlementPayload, SyncQueueResult } from '../types';
 
 const MAX_CALL_RECORDING_BYTES = 12 * 1024 * 1024;
@@ -56,6 +57,7 @@ export async function syncQueue(token?: string, user?: Partner | null): Promise<
       if (action.type === 'deliver') await markDelivered(action.orderId, await hydrateDeliverPayload(action.payload), token);
       if (action.type === 'fail') await markFailed(action.orderId, await hydrateFailPayload(action.payload), token);
       if (action.type === 'settle') await submitSettlement(await hydrateSettlementPayload(action.payload), token);
+      await deleteActionProofFiles(action);
       synced += 1;
     } catch {
       remaining.push(action);

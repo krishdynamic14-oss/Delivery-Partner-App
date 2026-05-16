@@ -25,7 +25,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Failed delivery UI | [x] | [~] | Reason validation, house proof required for refused/cancel, notes submit, failed state, sync/queued alert added |
 | COD tracker UI | [x] | [x] | Summary and order-wise amounts match real MEHSANA orders |
 | Doorstep UPI QR payment | [~] | [ ] | Configure `EXPO_PUBLIC_UPI_ID`, scan generated QR, verify Sheet payment columns |
-| Offline queue foundation | [x] | [~] | Delivery/failed/settlement queues keep URIs and rebuild proof payloads on retry; reconnect sync still needs full device test |
+| Offline queue foundation | [x] | [~] | Proof files are copied to app storage for queued retry and cleaned after sync/remove; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
 | Photo upload to Drive | [~] | [ ] | Shared proof-image compression and size guard added; verify Drive URL on Android |
@@ -141,8 +141,9 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Queue count visible in profile/dashboard
 - [x] Dedicated sync status component
 - [x] Retry queue with visible per-action details and local remove/attach-proof controls
-- [~] Store queued photo files safely until upload
+- [~] Store queued photo/call recording files safely until upload
 - [~] Rebuild queued photo/call recording payloads from local URI on sync retry
+- [~] Clean persisted proof files after successful sync or pending-action removal
 - [~] Automatic sync on reconnect
 - [x] Manual force sync action with result summary
 - [x] Last sync timestamp
