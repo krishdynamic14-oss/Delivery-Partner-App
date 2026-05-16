@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Header, InfoRow, Screen } from '../components/ui';
@@ -12,6 +11,7 @@ import { loadPushRegistrationStatus } from '../services/storage';
 import { setupPushNotifications } from '../services/notifications';
 import type { PushRegistrationStatus, QueueAction } from '../types';
 import { useTheme } from '../state/ThemeContext';
+import { pickProofImage } from '../services/proofImages';
 
 export function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -34,19 +34,14 @@ export function ProfileScreen() {
   }, [pendingSync, user?.id]);
 
   async function attachScreenshot(actionId: string) {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.45,
-      base64: true,
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    });
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    const base64 = asset.base64 || undefined;
-    if (!base64) {
-      Alert.alert('Screenshot not attached', 'Please select screenshot again.');
+    let proof;
+    try {
+      proof = await pickProofImage({ fileName: `payment-proof-${Date.now()}.jpg` });
+    } catch (err) {
+      Alert.alert('Screenshot not attached', err instanceof Error ? err.message : 'Please select screenshot again.');
       return;
     }
+    if (!proof) return;
 
     const queue = await loadQueue();
     const nextQueue = queue.map((action) => {
@@ -55,10 +50,10 @@ export function ProfileScreen() {
         ...action,
         payload: {
           ...action.payload,
-          photoUri: asset.uri,
-          photoBase64: base64,
-          photoMimeType: asset.mimeType || 'image/jpeg',
-          photoFileName: asset.fileName ?? `payment-proof-${Date.now()}.jpg`,
+          photoUri: proof.uri,
+          photoBase64: proof.base64,
+          photoMimeType: proof.mimeType,
+          photoFileName: proof.fileName,
         },
       };
     });

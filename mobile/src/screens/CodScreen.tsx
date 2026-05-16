@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, StyleSheet, Text } from 'react-native';
 import { Badge, Button, Card, Field, Header, Money, Screen } from '../components/ui';
@@ -10,6 +9,7 @@ import { enqueueAction } from '../services/offlineQueue';
 import { useAuth } from '../state/AuthContext';
 import type { CodSettlementSummary } from '../types';
 import { buildUpiPaymentUrl, pickUpiId, UPI_NAME } from '../services/upi';
+import { pickProofImage, type ProofImage } from '../services/proofImages';
 
 const todayKey = new Date().toISOString().slice(0, 10);
 
@@ -28,12 +28,7 @@ export function CodScreen() {
   const { orders, codSummary } = useOrders();
   const [amount, setAmount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
-  const [paymentProof, setPaymentProof] = useState<{
-    uri: string;
-    base64?: string;
-    mimeType?: string;
-    fileName?: string;
-  }>();
+  const [paymentProof, setPaymentProof] = useState<ProofImage>();
   const [settlementSummary, setSettlementSummary] = useState<CodSettlementSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const codOrders = orders.filter((order) => order.paymentType === 'COD');
@@ -110,19 +105,11 @@ export function CodScreen() {
   }
 
   async function pickPaymentProof() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.45,
-      base64: true,
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    });
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setPaymentProof({
-        uri: asset.uri,
-        base64: asset.base64 || undefined,
-        mimeType: asset.mimeType || 'image/jpeg',
-        fileName: asset.fileName ?? `settlement-proof-${Date.now()}.jpg`,
-      });
+    try {
+      const proof = await pickProofImage({ fileName: `settlement-proof-${Date.now()}.jpg` });
+      if (proof) setPaymentProof(proof);
+    } catch (err) {
+      Alert.alert('Screenshot not ready', err instanceof Error ? err.message : 'Please select the payment screenshot again.');
     }
   }
 

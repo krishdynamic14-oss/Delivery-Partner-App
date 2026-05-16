@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,6 +9,7 @@ import { useOrders } from '../state/OrdersContext';
 import type { PaymentReceivedMode, RootStackParamList } from '../types';
 import { openNavigation } from '../services/maps';
 import { buildUpiPaymentUrl, pickUpiId, UPI_NAME } from '../services/upi';
+import { captureProofImage, type ProofImage } from '../services/proofImages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Delivery'>;
 
@@ -27,12 +27,7 @@ export function DeliveryScreen({ route, navigation }: Props) {
   const { orders, deliverOrder, sendOrderOtp } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
   const [otp, setOtp] = useState('');
-  const [photo, setPhoto] = useState<{
-    uri: string;
-    base64?: string;
-    mimeType?: string;
-    fileName?: string;
-  }>();
+  const [photo, setPhoto] = useState<ProofImage>();
   const [loading, setLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentReceivedMode>(order?.paymentType === 'Prepaid' ? 'Prepaid' : 'Cash');
@@ -42,21 +37,14 @@ export function DeliveryScreen({ route, navigation }: Props) {
   const currentOrder = order;
 
   async function pickImage() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Camera permission needed', 'Allow camera access to capture delivery proof.');
-      return;
-    }
-    const pickerOptions: ImagePicker.ImagePickerOptions = { quality: 0.35, base64: true };
-    const result = await ImagePicker.launchCameraAsync(pickerOptions).catch(() => ImagePicker.launchImageLibraryAsync(pickerOptions));
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setPhoto({
-        uri: asset.uri,
-        base64: asset.base64 || undefined,
-        mimeType: asset.mimeType || 'image/jpeg',
-        fileName: asset.fileName ?? `delivery-proof-${currentOrder.id}-${Date.now()}.jpg`,
+    try {
+      const nextPhoto = await captureProofImage({
+        fileName: `delivery-proof-${currentOrder.id}-${Date.now()}.jpg`,
+        permissionMessage: 'Allow camera access to capture delivery proof.',
       });
+      if (nextPhoto) setPhoto(nextPhoto);
+    } catch (err) {
+      Alert.alert('Photo not ready', err instanceof Error ? err.message : 'Please capture the proof photo again.');
     }
   }
 

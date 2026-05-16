@@ -28,7 +28,7 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Offline queue foundation | [x] | [~] | Sync card, queued fallback, and manual retry exist; reconnect sync still needs full device test |
 | GAS API starter | [~] | [x] | `meta.columns` verified against deployed Web App |
 | Real Google Sheets sync | [~] | [~] | Login, partner order fetch, and COD settlement write verified |
-| Photo upload to Drive | [~] | [ ] | Delivery/failed screens send compressed base64 to GAS; verify Drive URL on Android |
+| Photo upload to Drive | [~] | [ ] | Shared proof-image compression and size guard added; verify Drive URL on Android |
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
 | Admin dashboard shell | [x] | [ ] | Admin role opens hidden admin tabs, all-order monitoring, settlement approval, stock view/update, and quick assignment |
 | Partner password login | [~] | [ ] | Password login added; real SMS OTP still needs provider if required later |
@@ -113,7 +113,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Persist local status changes
 - [x] Queue offline delivered/failed/settlement actions
 - [~] Real customer delivery OTP validation
-- [ ] Photo compression before upload
+- [x] Photo compression before upload
 - [~] Google Drive upload through GAS
 - [ ] Delivery success receipt screen
 - [~] Failed delivery reason dropdown
@@ -198,6 +198,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Offline delivery queues and syncs after reconnect
 - [x] Photo capture works on real Android device
 - [ ] Remote photo URL is stored against correct order
+- [ ] Oversized proof image is blocked before upload with clear message
 - [ ] Cancelled parcel call recording URL is stored against correct order
 - [ ] App handles bad network without crashing
 - [ ] App handles GAS API errors clearly

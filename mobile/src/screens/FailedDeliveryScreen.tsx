@@ -1,6 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,6 +8,7 @@ import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
 import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
+import { captureProofImage, type ProofImage } from '../services/proofImages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FailedDelivery'>;
 
@@ -28,12 +28,7 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   const [reason, setReason] = useState('Customer not available');
   const [notes, setNotes] = useState('');
   const [nextAttemptDate, setNextAttemptDate] = useState('');
-  const [photo, setPhoto] = useState<{
-    uri: string;
-    base64?: string;
-    mimeType?: string;
-    fileName?: string;
-  }>();
+  const [photo, setPhoto] = useState<ProofImage>();
   const [callRecording, setCallRecording] = useState<{
     uri: string;
     base64?: string;
@@ -47,21 +42,14 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   const requiresCallRecording = /cancel/i.test(reason);
 
   async function pickImage() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Camera permission needed', 'Allow camera access to capture house proof.');
-      return;
-    }
-    const pickerOptions: ImagePicker.ImagePickerOptions = { quality: 0.35, base64: true };
-    const result = await ImagePicker.launchCameraAsync(pickerOptions).catch(() => ImagePicker.launchImageLibraryAsync(pickerOptions));
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setPhoto({
-        uri: asset.uri,
-        base64: asset.base64 || undefined,
-        mimeType: asset.mimeType || 'image/jpeg',
-        fileName: asset.fileName ?? `failed-proof-${route.params.orderId}-${Date.now()}.jpg`,
+    try {
+      const nextPhoto = await captureProofImage({
+        fileName: `failed-proof-${route.params.orderId}-${Date.now()}.jpg`,
+        permissionMessage: 'Allow camera access to capture house proof.',
       });
+      if (nextPhoto) setPhoto(nextPhoto);
+    } catch (err) {
+      Alert.alert('Photo not ready', err instanceof Error ? err.message : 'Please capture the house proof again.');
     }
   }
 
