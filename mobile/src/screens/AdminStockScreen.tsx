@@ -3,13 +3,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Button, Card, Field, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import { addStockDispatch, fetchDeliveryPartners, fetchStockMaster } from '../services/api';
 import type { DeliveryPartnerSummary, StockItem, StockPartnerBreakdown } from '../types';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function AdminStockScreen() {
+  useScreenThemeStyles();
   const { user } = useAuth();
   const { loading: ordersLoading, refresh: refreshOrders } = useOrders();
   const [products, setProducts] = useState<StockItem[]>([]);
@@ -338,7 +349,8 @@ function getDistrictName(line: StockPartnerBreakdown) {
   return (line.district || line.name || 'Unassigned').trim().toUpperCase();
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   title: { color: colors.text, fontSize: 27, fontWeight: '900' },
   sub: { color: colors.muted, marginTop: 5, fontSize: 12 },
@@ -387,3 +399,4 @@ const styles = StyleSheet.create({
   restockButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,75,110,0.22)', backgroundColor: 'rgba(255,75,110,0.1)' },
   restockText: { color: colors.red, fontSize: 11, fontWeight: '900' },
 });
+}

@@ -4,16 +4,26 @@ import { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Badge, Button, Card, Field, Header, InfoRow, Money, Screen, StepPill } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import type { PaymentReceivedMode, RootStackParamList } from '../types';
 import { openNavigation } from '../services/maps';
+import { buildUpiPaymentUrl, pickUpiId, UPI_NAME } from '../services/upi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Delivery'>;
-const UPI_ID = process.env.EXPO_PUBLIC_UPI_ID || '';
-const UPI_NAME = process.env.EXPO_PUBLIC_UPI_NAME || 'Dynamic Bazar';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function DeliveryScreen({ route, navigation }: Props) {
+  useScreenThemeStyles();
   const { orders, deliverOrder, sendOrderOtp } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
   const [otp, setOtp] = useState('');
@@ -88,11 +98,12 @@ export function DeliveryScreen({ route, navigation }: Props) {
     }
   }
 
+  const selectedUpiId = pickUpiId(currentOrder.orderNo || currentOrder.id);
   const upiQrValue = buildUpiPaymentUrl({
-    upiId: UPI_ID,
+    upiId: selectedUpiId,
     payeeName: UPI_NAME,
     amount: currentOrder.amount,
-    orderNo: currentOrder.orderNo,
+    note: `Dynamic Bazar Order ${currentOrder.orderNo}`,
   });
   const paymentOptions: PaymentReceivedMode[] = currentOrder.paymentType === 'Prepaid' ? ['Prepaid'] : ['Cash', 'UPI QR'];
 
@@ -151,14 +162,14 @@ export function DeliveryScreen({ route, navigation }: Props) {
           </View>
           {paymentMode === 'UPI QR' ? (
             <View style={styles.qrBlock}>
-              {UPI_ID ? (
+              {selectedUpiId ? (
                 <View style={styles.qrBox}>
                   <QRCode value={upiQrValue} size={190} backgroundColor="#ffffff" color="#111111" />
                 </View>
               ) : (
-                <Text style={styles.meta}>UPI ID is not configured. Add EXPO_PUBLIC_UPI_ID before using QR payment.</Text>
+                <Text style={styles.meta}>UPI ID is not configured. Add EXPO_PUBLIC_UPI_IDS before using QR payment.</Text>
               )}
-              <Text style={styles.qrMeta}>{UPI_NAME}{UPI_ID ? ` · ${UPI_ID}` : ''}</Text>
+              <Text style={styles.qrMeta}>{UPI_NAME}{selectedUpiId ? ` · ${selectedUpiId}` : ''}</Text>
               <Money value={currentOrder.amount} size={24} />
               <Field
                 value={paymentReference}
@@ -180,7 +191,8 @@ export function DeliveryScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   scrollContent: { paddingBottom: 20 },
   steps: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
@@ -208,14 +220,4 @@ const styles = StyleSheet.create({
   qrBox: { padding: 14, borderRadius: 12, backgroundColor: '#ffffff', marginTop: 2 },
   qrMeta: { color: colors.text, fontSize: 13, fontWeight: '800', textAlign: 'center' },
 });
-
-function buildUpiPaymentUrl({ upiId, payeeName, amount, orderNo }: { upiId: string; payeeName: string; amount: number; orderNo: string }) {
-  const params = [
-    ['pa', upiId],
-    ['pn', payeeName],
-    ['am', amount.toFixed(2)],
-    ['cu', 'INR'],
-    ['tn', `Dynamic Bazar Order ${orderNo}`],
-  ];
-  return `upi://pay?${params.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')}`;
 }

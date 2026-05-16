@@ -1,15 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import type { DeliveryOrder, Partner, QueueAction, SyncMeta } from '../types';
+import type { DeliveryOrder, Partner, PushRegistrationStatus, QueueAction, SyncMeta } from '../types';
 
 const USER_KEY = 'db.partner';
 const ORDERS_KEY = 'db.orders';
 const QUEUE_KEY = 'db.offlineQueue';
 const SYNC_META_KEY = 'db.syncMeta';
+const PUSH_STATUS_KEY = 'db.pushRegistrationStatus';
 
 export const DEFAULT_SYNC_META: SyncMeta = {
   status: 'idle',
   message: 'No sync activity yet.',
+};
+
+export const DEFAULT_PUSH_STATUS: PushRegistrationStatus = {
+  status: 'idle',
+  message: 'Push notification registration not checked yet.',
 };
 
 export async function savePartner(partner: Partner) {
@@ -59,4 +65,16 @@ export async function saveSyncMeta(meta: SyncMeta) {
 export async function loadSyncMeta(): Promise<SyncMeta> {
   const raw = await AsyncStorage.getItem(SYNC_META_KEY);
   return raw ? JSON.parse(raw) : DEFAULT_SYNC_META;
+}
+
+export async function savePushRegistrationStatus(status: PushRegistrationStatus) {
+  await AsyncStorage.setItem(PUSH_STATUS_KEY, JSON.stringify({
+    ...status,
+    updatedAt: status.updatedAt || new Date().toISOString(),
+  }));
+}
+
+export async function loadPushRegistrationStatus(): Promise<PushRegistrationStatus> {
+  const raw = await AsyncStorage.getItem(PUSH_STATUS_KEY);
+  return raw ? JSON.parse(raw) : DEFAULT_PUSH_STATUS;
 }

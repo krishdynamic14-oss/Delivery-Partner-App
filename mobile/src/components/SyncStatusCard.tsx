@@ -1,14 +1,18 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, Card } from './ui';
-import { colors } from '../theme';
+import type { AppColors } from '../theme';
 import { useOrders } from '../state/OrdersContext';
 import type { SyncStatus } from '../types';
+import { useTheme } from '../state/ThemeContext';
 
 export function SyncStatusCard({ compact = false }: { compact?: boolean }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+  const styles = getStyles(colors);
   const { isOnline, pendingSync, syncMeta, syncing, syncOfflineQueue } = useOrders();
   const status = isOnline === false ? 'offline' : syncMeta.status;
-  const color = getStatusColor(status);
+  const color = getStatusColor(status, colors);
   const title = getStatusTitle(status, pendingSync, syncing);
   const message = isOnline === false
     ? pendingSync
@@ -50,7 +54,7 @@ function getStatusTitle(status: SyncStatus, pendingSync: number, syncing: boolea
   return 'Sync status';
 }
 
-function getStatusColor(status: SyncStatus) {
+function getStatusColor(status: SyncStatus, colors: AppColors) {
   if (status === 'success') return colors.green;
   if (status === 'warning' || status === 'offline') return colors.amber;
   if (status === 'error') return colors.red;
@@ -63,7 +67,18 @@ function formatSyncTime(value?: string) {
   return new Date(value).toLocaleString();
 }
 
-const styles = StyleSheet.create({
+const styleCache = new WeakMap<AppColors, ReturnType<typeof createStyles>>();
+
+function getStyles(colors: AppColors) {
+  const cached = styleCache.get(colors);
+  if (cached) return cached;
+  const next = createStyles(colors);
+  styleCache.set(colors, next);
+  return next;
+}
+
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   statusIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   titleBlock: { flex: 1 },
@@ -74,4 +89,5 @@ const styles = StyleSheet.create({
   error: { color: colors.red, marginTop: 8, lineHeight: 18, fontSize: 12 },
   footer: { gap: 10, marginTop: 14 },
   time: { color: colors.muted, fontSize: 12 },
-});
+  });
+}

@@ -1,23 +1,31 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Header, InfoRow, Screen } from '../components/ui';
 import { SyncStatusCard } from '../components/SyncStatusCard';
-import { colors } from '../theme';
+import { themes, type AppColors, type ThemeName } from '../theme';
 import { useAuth } from '../state/AuthContext';
 import { useOrders } from '../state/OrdersContext';
 import { loadQueue, saveQueue } from '../services/storage';
 import { loadQueueForUser, queueBelongsToUser } from '../services/offlineQueue';
-import type { QueueAction } from '../types';
+import { loadPushRegistrationStatus } from '../services/storage';
+import { setupPushNotifications } from '../services/notifications';
+import type { PushRegistrationStatus, QueueAction } from '../types';
+import { useTheme } from '../state/ThemeContext';
 
 export function ProfileScreen() {
   const { user, logout } = useAuth();
   const { pendingSync, discardQueuedAction } = useOrders();
+  const { theme, themeName, setThemeName } = useTheme();
+  const styles = createStyles(theme.colors);
   const [queuedActions, setQueuedActions] = useState<QueueAction[]>([]);
+  const [pushStatus, setPushStatus] = useState<PushRegistrationStatus>();
+  const [pushRetrying, setPushRetrying] = useState(false);
 
   async function refreshQueueDetails() {
     const queue = await loadQueueForUser(user);
     setQueuedActions(queue);
+    setPushStatus(await loadPushRegistrationStatus());
   }
 
   useEffect(() => {
@@ -58,6 +66,19 @@ export function ProfileScreen() {
     Alert.alert('Screenshot attached', 'Ab Sync now dabao. Ye pending payment proof upload hoga.');
   }
 
+  async function retryPushRegistration() {
+    if (!user) return;
+    setPushRetrying(true);
+    try {
+      await setupPushNotifications(user);
+      const nextStatus = await loadPushRegistrationStatus();
+      setPushStatus(nextStatus);
+      Alert.alert(nextStatus.status === 'registered' ? 'Push registered' : 'Push not registered', nextStatus.message);
+    } finally {
+      setPushRetrying(false);
+    }
+  }
+
   function confirmRemove(action: QueueAction) {
     Alert.alert(
       'Remove pending action?',
@@ -88,6 +109,45 @@ export function ProfileScreen() {
           <InfoRow icon="cloud-sync-outline" label="Pending offline actions" value={String(pendingSync)} />
         </Card>
         <SyncStatusCard />
+        <Card>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>App Theme</Text>
+          <Text style={[styles.helperText, { color: theme.colors.muted }]}>Choose the display style for this phone.</Text>
+          <View style={styles.themeGrid}>
+            {(Object.keys(themes) as ThemeName[]).map((name) => {
+              const item = themes[name];
+              const active = name === themeName;
+              return (
+                <Pressable
+                  key={name}
+                  onPress={() => { void setThemeName(name); }}
+                  style={({ pressed }) => [
+                    styles.themeOption,
+                    {
+                      borderColor: active ? theme.colors.orange : theme.colors.border,
+                      backgroundColor: active ? `${theme.colors.orange}20` : theme.colors.glass,
+                    },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <View style={styles.themeSwatches}>
+                    <View style={[styles.themeSwatch, { backgroundColor: item.colors.bg }]} />
+                    <View style={[styles.themeSwatch, { backgroundColor: item.colors.orange }]} />
+                    <View style={[styles.themeSwatch, { backgroundColor: item.colors.green }]} />
+                  </View>
+                  <Text style={[styles.themeTitle, { color: theme.colors.text }]}>{item.label}</Text>
+                  <Text style={[styles.themeSub, { color: theme.colors.muted }]}>{item.description}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+        <Card>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Push Notifications</Text>
+          <Text style={[styles.helperText, { color: theme.colors.muted }]}>{pushStatus?.message || 'Push notification registration not checked yet.'}</Text>
+          {pushStatus?.tokenPreview ? <Text style={styles.queueTime}>Token {pushStatus.tokenPreview}</Text> : null}
+          {pushStatus?.updatedAt ? <Text style={styles.queueTime}>Checked {formatQueueDate(pushStatus.updatedAt).replace('Saved ', '')}</Text> : null}
+          <Button label="Register Push Token" tone="secondary" loading={pushRetrying} onPress={retryPushRegistration} />
+        </Card>
         {queuedActions.length ? (
           <Card>
             <Text style={styles.sectionTitle}>Pending Action Details</Text>
@@ -149,7 +209,8 @@ function formatQueueDate(value: string) {
   return `Saved ${date.toLocaleString('en-IN')}`;
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   scrollContent: { paddingBottom: 18 },
   avatar: { width: 62, height: 62, borderRadius: 20, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   avatarText: { color: colors.text, fontSize: 26, fontWeight: '900' },
@@ -166,4 +227,12 @@ const styles = StyleSheet.create({
   queueMeta: { color: colors.muted, marginTop: 4, lineHeight: 19 },
   queueTime: { color: colors.amber, fontSize: 11, fontWeight: '800', marginTop: 6 },
   queueActions: { gap: 10, marginTop: 12 },
-});
+  pressed: { opacity: 0.82 },
+  themeGrid: { gap: 10 },
+  themeOption: { borderWidth: 1, borderRadius: 14, padding: 12 },
+  themeSwatches: { flexDirection: 'row', gap: 6, marginBottom: 9 },
+  themeSwatch: { width: 22, height: 22, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  themeTitle: { fontSize: 14, fontWeight: '900' },
+  themeSub: { marginTop: 3, fontSize: 11, lineHeight: 16 },
+  });
+}

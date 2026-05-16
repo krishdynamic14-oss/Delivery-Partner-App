@@ -1,15 +1,27 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, Header, InfoRow, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { Badge, Button, Card, DeadlineBadge, Header, InfoRow, Money, Screen } from '../components/ui';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import type { RootStackParamList } from '../types';
 import { openNavigation } from '../services/maps';
+import { getDeadlineLabel, getDeadlineStatus } from '../services/deadlines';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderDetail'>;
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function OrderDetailScreen({ route, navigation }: Props) {
+  useScreenThemeStyles();
   const { user } = useAuth();
   const { orders } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
@@ -44,6 +56,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
             <View style={styles.badges}>
               <Badge label={order.status} tone={order.status} />
               <Badge label={order.paymentType} tone="info" />
+              {order.status === 'pending' ? <DeadlineBadge status={getDeadlineStatus(order)} label={getDeadlineLabel(order)} /> : null}
             </View>
             <Money value={order.amount} />
           </View>
@@ -55,6 +68,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
         </Card>
         <Card>
           <InfoRow icon="credit-card-outline" label="Payment" value={order.paymentType} />
+          <InfoRow icon="calendar-clock" label="Delivery deadline" value={getDeadlineLabel(order)} />
           <InfoRow icon="repeat" label="Attempts" value={String(order.attempts)} />
           <InfoRow icon="clock-outline" label="Last update" value={new Date(order.updatedAt).toLocaleString()} />
           {proofUrl ? <InfoRow icon="image-check-outline" label="Proof photo" value={hasRemoteProof ? 'Uploaded to Drive' : 'Captured on this device'} /> : null}
@@ -73,10 +87,12 @@ export function OrderDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   scrollContent: { paddingBottom: 20 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   badges: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
   product: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   remarks: { color: colors.red, marginTop: 12 },
 });
+}

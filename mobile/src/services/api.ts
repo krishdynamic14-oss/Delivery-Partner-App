@@ -8,6 +8,7 @@ import type {
   FailPayload,
   LoginPayload,
   Partner,
+  PushTokenRegistration,
   SendDeliveryOtpResult,
   SettlementPayload,
   StockDispatchPayload,
@@ -133,6 +134,16 @@ export async function assignOrder(orderId: string, partner: DeliveryPartnerSumma
 export async function addStockDispatch(payload: StockDispatchPayload, token?: string): Promise<{ added: true }> {
   if (GAS_URL) return request<{ added: true }>('stock.dispatch', payload, token);
   return { added: true };
+}
+
+export async function registerPushToken(payload: PushTokenRegistration, token?: string): Promise<{ registered: true }> {
+  if (GAS_URL) return request<{ registered: true }>('notifications.registerToken', payload, token);
+  return { registered: true };
+}
+
+export async function deactivatePushToken(expoPushToken: string, token?: string): Promise<{ deactivated: true }> {
+  if (GAS_URL) return request<{ deactivated: true }>('notifications.deactivateToken', { expoPushToken }, token);
+  return { deactivated: true };
 }
 
 export function getCodSummary(orders: DeliveryOrder[]): CodSummary {

@@ -5,17 +5,30 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Card, Money, Screen } from '../components/ui';
 import { SyncStatusCard } from '../components/SyncStatusCard';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
+import { getDeadlineStatus } from '../services/deadlines';
 import type { AdminTabParamList, DeliveryOrder } from '../types';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function AdminDashboardScreen() {
+  useScreenThemeStyles();
   const navigation = useNavigation<BottomTabNavigationProp<AdminTabParamList>>();
   const { orders, loading, refresh } = useOrders();
   const todayOrders = orders.filter((order) => isToday(parseSheetDate(order.orderDate) || parseSheetDate(order.deliveryDate)));
   const delivered = orders.filter((order) => order.status === 'delivered').length;
   const failed = orders.filter((order) => order.status === 'failed').length;
   const pending = orders.filter((order) => order.status === 'pending').length;
+  const overdue = orders.filter((order) => getDeadlineStatus(order) === 'overdue').length;
   const codOrders = orders.filter((order) => order.paymentType === 'COD');
   const collectedCod = codOrders.filter((order) => order.status === 'delivered').reduce((sum, order) => sum + order.amount, 0);
   const assignedCod = codOrders.reduce((sum, order) => sum + order.amount, 0);
@@ -39,7 +52,7 @@ export function AdminDashboardScreen() {
 
         <View style={styles.stockAlert}>
           <MaterialCommunityIcons name="alert" size={16} color={colors.amber} />
-          <Text style={styles.stockText}>{failed} failed/RTO needs review</Text>
+          <Text style={styles.stockText}>{overdue} overdue · {failed} failed/RTO needs review</Text>
         </View>
 
         <View style={styles.greeting}>
@@ -57,7 +70,7 @@ export function AdminDashboardScreen() {
           <Metric icon="package-variant-closed" label="Today's Orders" value={todayOrders.length} color={colors.blue} sub={`${orders.length} total orders`} />
           <Metric icon="moped" label="Active Partners" value={partnerCount} color={colors.green} sub={`${pending} pending`} />
           <Metric icon="speedometer" label="Performance" value={`${performanceScore}%`} color={colors.amber} sub="Live from Sheet" />
-          <Metric icon="backup-restore" label="RTO Pending" value={failed} color={colors.red} sub="Needs admin check" />
+          <Metric icon="calendar-alert" label="Overdue" value={overdue} color={colors.red} sub="Past 2-day window" />
         </View>
 
         <View style={styles.quickGrid}>
@@ -154,7 +167,8 @@ function isToday(date: Date | null) {
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
@@ -192,3 +206,4 @@ const styles = StyleSheet.create({
   activityMeta: { color: colors.muted, fontSize: 11, marginTop: 4 },
   activityRight: { alignItems: 'flex-end', gap: 5 },
 });
+}

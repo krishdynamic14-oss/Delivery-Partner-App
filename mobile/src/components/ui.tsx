@@ -3,13 +3,17 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, TextInputPro
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
+import { spacing, type AppColors } from '../theme';
+import type { DeadlineStatus } from '../types';
+import { useTheme } from '../state/ThemeContext';
 
 export function Screen({ children, bottomPadding = 104 }: PropsWithChildren<{ bottomPadding?: number }>) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = getStyles(theme.colors);
   return (
     <LinearGradient
-      colors={['#170b08', colors.bg, '#07111d']}
+      colors={theme.colors.gradient}
       locations={[0, 0.42, 1]}
       style={[styles.screen, { paddingTop: Math.max(42, insets.top + 18), paddingBottom: insets.bottom + bottomPadding }]}
     >
@@ -21,6 +25,8 @@ export function Screen({ children, bottomPadding = 104 }: PropsWithChildren<{ bo
 }
 
 export function Card({ children }: PropsWithChildren) {
+  const { theme } = useTheme();
+  const styles = getStyles(theme.colors);
   return (
     <View style={styles.card}>
       <View style={styles.cardHighlight} />
@@ -30,6 +36,9 @@ export function Card({ children }: PropsWithChildren) {
 }
 
 export function Button({ label, onPress, tone = 'primary', loading = false }: { label: string; onPress?: () => void; tone?: 'primary' | 'secondary' | 'danger'; loading?: boolean }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+  const styles = getStyles(colors);
   const content = loading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>{label}</Text>;
   if (tone === 'primary') {
     return (
@@ -48,19 +57,36 @@ export function Button({ label, onPress, tone = 'primary', loading = false }: { 
 }
 
 export function Field({ style, ...props }: TextInputProps) {
-  return <TextInput placeholderTextColor={colors.muted} style={[styles.field, style]} {...props} />;
+  const { theme } = useTheme();
+  const styles = getStyles(theme.colors);
+  return <TextInput placeholderTextColor={theme.colors.muted} style={[styles.field, style]} {...props} />;
 }
 
 export function Badge({ label, tone }: { label: string; tone: 'pending' | 'delivered' | 'failed' | 'info' }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+  const styles = getStyles(colors);
   const color = tone === 'delivered' ? colors.green : tone === 'failed' ? colors.red : tone === 'info' ? colors.blue : colors.amber;
   return <Text style={[styles.badge, { color, borderColor: color, backgroundColor: `${color}18` }]}>{label}</Text>;
 }
 
+export function DeadlineBadge({ status, label }: { status: DeadlineStatus; label: string }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+  const styles = getStyles(colors);
+  const color = status === 'overdue' ? colors.red : status === 'due_today' ? colors.amber : colors.green;
+  return <Text style={[styles.badge, { color, borderColor: color, backgroundColor: `${color}18` }]}>{label}</Text>;
+}
+
 export function Money({ value, size = 24 }: { value: number; size?: number }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
   return <Text style={{ color: colors.amber, fontWeight: '900', fontSize: size }}>₹{value.toLocaleString('en-IN')}</Text>;
 }
 
 export function Header({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { theme } = useTheme();
+  const styles = getStyles(theme.colors);
   return (
     <View style={styles.header}>
       <Text style={styles.title}>{title}</Text>
@@ -70,6 +96,9 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
 }
 
 export function InfoRow({ icon, label, value }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: string }) {
+  const { theme } = useTheme();
+  const colors = theme.colors;
+  const styles = getStyles(colors);
   return (
     <View style={styles.infoRow}>
       <View style={styles.infoIcon}>
@@ -84,6 +113,8 @@ export function InfoRow({ icon, label, value }: { icon: keyof typeof MaterialCom
 }
 
 export function StepPill({ index, label, active = false, done = false }: { index: number; label: string; active?: boolean; done?: boolean }) {
+  const { theme } = useTheme();
+  const styles = getStyles(theme.colors);
   return (
     <View style={[styles.stepPill, active && styles.stepActive, done && styles.stepDone]}>
       <Text style={[styles.stepIndex, (active || done) && styles.stepIndexActive]}>{done ? '✓' : index}</Text>
@@ -92,7 +123,18 @@ export function StepPill({ index, label, active = false, done = false }: { index
   );
 }
 
-const styles = StyleSheet.create({
+const styleCache = new WeakMap<AppColors, ReturnType<typeof createStyles>>();
+
+function getStyles(colors: AppColors) {
+  const cached = styleCache.get(colors);
+  if (cached) return cached;
+  const next = createStyles(colors);
+  styleCache.set(colors, next);
+  return next;
+}
+
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: spacing.page,
@@ -102,7 +144,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: 'rgba(255,107,0,0.16)',
+    backgroundColor: colors.glowTop,
     top: -92,
     right: -110,
   },
@@ -111,7 +153,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: 'rgba(78,156,255,0.11)',
+    backgroundColor: colors.glowBottom,
     bottom: 40,
     left: -130,
   },
@@ -135,7 +177,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: colors.cardHighlight,
   },
   header: { marginBottom: 18 },
   title: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: 0 },
@@ -219,4 +261,5 @@ const styles = StyleSheet.create({
   stepIndexActive: { color: colors.text },
   stepLabel: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   stepLabelActive: { color: colors.text },
-});
+  });
+}

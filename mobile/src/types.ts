@@ -3,6 +3,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type OrderStatus = 'pending' | 'delivered' | 'failed';
 export type PaymentType = 'COD' | 'Prepaid';
 export type PaymentReceivedMode = 'Cash' | 'UPI QR' | 'Prepaid';
+export type DeadlineStatus = 'normal' | 'due_today' | 'overdue';
 
 export type Partner = {
   id: string;
@@ -44,6 +45,9 @@ export type DeliveryOrder = {
   attempts: number;
   assignedTo: string;
   orderDate?: string;
+  deliveryDeadline?: string;
+  hoursLeft?: number;
+  deadlineStatus?: DeadlineStatus;
   deliveryDate?: string;
   updatedAt: string;
   photoUrl?: string;
@@ -126,6 +130,25 @@ export type StockDispatchPayload = {
   partnerPhone?: string;
   district?: string;
   notes?: string;
+};
+
+export type PushTokenRegistration = {
+  expoPushToken: string;
+  userId: string;
+  role: Partner['role'];
+  phone: string;
+  partnerName: string;
+  district: string;
+  platform: string;
+  deviceName?: string;
+  appVersion?: string;
+};
+
+export type PushRegistrationStatus = {
+  status: 'idle' | 'registered' | 'skipped' | 'error';
+  message: string;
+  tokenPreview?: string;
+  updatedAt?: string;
 };
 
 export type QueueAction =

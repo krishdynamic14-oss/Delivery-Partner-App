@@ -5,11 +5,22 @@ import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { Button, Card, Field, Header, Screen } from '../components/ui';
 import { useOrders } from '../state/OrdersContext';
 import type { RootStackParamList } from '../types';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FailedDelivery'>;
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function FailedDeliveryScreen({ route, navigation }: Props) {
+  useScreenThemeStyles();
   const { failOrder } = useOrders();
   const [reason, setReason] = useState('Customer not available');
   const [notes, setNotes] = useState('');
@@ -101,7 +112,8 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   scrollContent: { paddingBottom: 20 },
   label: { color: colors.muted, textTransform: 'uppercase', fontWeight: '900', marginBottom: 12 },
   reasonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -112,3 +124,4 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, lineHeight: 20, marginBottom: 12 },
   photo: { height: 180, borderRadius: 12, marginBottom: 12 },
 });
+}

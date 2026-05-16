@@ -2,24 +2,42 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Badge, Card, Field, Header, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { Badge, Card, DeadlineBadge, Field, Header, Money, Screen } from '../components/ui';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import { assignOrder, fetchDeliveryPartners } from '../services/api';
+import { getDeadlineLabel, getDeadlineStatus, sortByDeadlinePriority } from '../services/deadlines';
 import type { DeliveryOrder, DeliveryPartnerSummary, OrderStatus, RootStackParamList } from '../types';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function AdminOrdersScreen() {
+  useScreenThemeStyles();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
-  const [tab, setTab] = useState<OrderStatus | 'all'>('all');
+  const [tab, setTab] = useState<OrderStatus | 'all' | 'overdue'>('all');
   const [query, setQuery] = useState('');
   const [partners, setPartners] = useState<DeliveryPartnerSummary[]>([]);
   const [assigningOrderId, setAssigningOrderId] = useState('');
   const { orders, loading, refresh } = useOrders();
   const normalizedQuery = query.trim().toLowerCase();
   const districts = useMemo(() => new Set(orders.map((order) => order.district).filter(Boolean)).size, [orders]);
-  const filtered = (tab === 'all' ? orders : orders.filter((order) => order.status === tab))
+  const overdueCount = useMemo(() => orders.filter((order) => getDeadlineStatus(order) === 'overdue').length, [orders]);
+  const tabOrders = tab === 'all'
+    ? orders
+    : tab === 'overdue'
+      ? orders.filter((order) => getDeadlineStatus(order) === 'overdue')
+      : orders.filter((order) => order.status === tab);
+  const filtered = sortByDeadlinePriority(tabOrders
     .filter((order) => {
       if (!normalizedQuery) return true;
       return [
@@ -31,7 +49,7 @@ export function AdminOrdersScreen() {
         order.assignedTo,
         order.phoneMasked,
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
+    }));
 
   useEffect(() => {
     if (!user?.token) return;
@@ -55,10 +73,10 @@ export function AdminOrdersScreen() {
 
   return (
     <Screen>
-      <Header title="All Orders" subtitle={`${filtered.length} visible · ${districts} districts · pull to refresh`} />
+      <Header title="All Orders" subtitle={`${filtered.length} visible · ${overdueCount} overdue · ${districts} districts`} />
       <Field value={query} onChangeText={setQuery} placeholder="Search order, customer, district, partner" />
       <View style={styles.tabs}>
-        {(['all', 'pending', 'delivered', 'failed'] as const).map((item) => (
+        {(['all', 'overdue', 'pending', 'delivered', 'failed'] as const).map((item) => (
           <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.activeTab]}>
             <Text style={[styles.tabText, tab === item && styles.activeTabText]}>{item.toUpperCase()}</Text>
           </Pressable>
@@ -109,6 +127,7 @@ function AdminOrderCard({
             <View style={styles.badgeRow}>
               <Badge label={order.status} tone={order.status} />
               <Badge label={order.paymentType} tone="info" />
+              {order.status === 'pending' ? <DeadlineBadge status={getDeadlineStatus(order)} label={getDeadlineLabel(order)} /> : null}
             </View>
           </View>
           <Money value={order.amount} size={20} />
@@ -136,8 +155,9 @@ function AdminOrderCard({
   );
 }
 
-const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   tab: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },
   activeTab: { backgroundColor: 'rgba(255,107,0,0.92)', borderColor: colors.orange },
   tabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
@@ -158,3 +178,4 @@ const styles = StyleSheet.create({
   partnerEmpty: { color: colors.muted, fontSize: 12 },
   pressed: { opacity: 0.72 },
 });
+}

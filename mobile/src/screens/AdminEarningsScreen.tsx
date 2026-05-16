@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Button, Card, Field, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import { approveCodSettlement, fetchCodSettlements } from '../services/api';
@@ -17,7 +18,17 @@ const RANGE_OPTIONS = [
   { label: '30D', days: 30 },
 ];
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function AdminEarningsScreen() {
+  useScreenThemeStyles();
   const { user } = useAuth();
   const [rangeDays, setRangeDays] = useState(7);
   const [showSettlementReport, setShowSettlementReport] = useState(false);
@@ -459,7 +470,8 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'NA';
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   hero: { marginHorizontal: -18, marginTop: -56, paddingHorizontal: 18, paddingTop: 56, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   title: { color: colors.text, fontSize: 25, fontWeight: '900' },
@@ -518,3 +530,4 @@ const styles = StyleSheet.create({
   orderNo: { color: colors.text, fontWeight: '900', marginBottom: 5 },
   orderRight: { alignItems: 'flex-end', gap: 6 },
 });
+}

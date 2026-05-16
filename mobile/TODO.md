@@ -35,6 +35,10 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
 | Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
 | Core glass-style UI polish | [x] | [x] | Visual direction approved in preview; continue screen-by-screen polish |
+| Multi-theme support | [~] | [ ] | Dark Orange, Light Clean, and High Contrast added; verify every screen on real Android |
+| Push notification foundation | [~] | [x] | Expo/Firebase token registration and GAS push test working; production cleanup pending |
+| Maps route handoff | [~] | [ ] | Android Google Maps/geo/browser fallback added; verify on delivery partner phones |
+| Multi-UPI routing | [~] | [ ] | Comma-separated `EXPO_PUBLIC_UPI_IDS` supported; verify QR payments across all UPI IDs |
 
 ## Product Goal
 
@@ -157,6 +161,9 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [x] Replace text-only tab icons with proper icon set
 - [~] Add polished splash screen and adaptive app icon
 - [ ] Add Gujarati/Hindi/English language-ready copy structure
+- [~] Add selectable app themes: Dark Orange, Light Clean, High Contrast
+- [ ] Verify theme contrast and text fit on all partner/admin screens
+- [ ] Hide debug-only support UI before production launch
 
 ## Android And Deployment
 
@@ -173,6 +180,9 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Feature graphic 1024x500
 - [ ] Play Store screenshots
 - [ ] Data safety form
+- [x] Configure Firebase FCM V1 service account key in Expo credentials
+- [ ] Keep `google-services.json`, Firebase service-account JSON, `.env`, and APK files out of GitHub
+- [ ] Confirm final APK uses the correct Firebase project and `google-services.json`
 
 ## Testing Checklist
 
@@ -189,6 +199,23 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] App handles bad network without crashing
 - [ ] App handles GAS API errors clearly
 - [ ] App works on Android 8, 11, 13+, and one low-end device
+- [x] Push token reaches `PUSH TOKENS` sheet on real APK
+- [x] Test push notification reaches phone after FCM V1 credentials upload
+- [ ] Auto push registration works after fresh install/login without pressing debug button
+- [ ] Admin device receives COD settlement and overdue alerts
+- [ ] Partner device receives order assignment, stock, and deadline reminders
+- [ ] Maps button opens Google Maps or browser fallback on partner device
+- [ ] Theme selector persists after app restart
+
+## Production Launch Cleanup
+
+- [ ] Hide partner-facing `Register Push Token` button
+- [ ] Remove token preview and raw Firebase/Expo error text from partner Profile
+- [ ] Keep push retry tools admin-only or debug-build-only
+- [ ] Replace technical notification errors with simple user-safe copy
+- [ ] Confirm push registration runs automatically after login
+- [ ] Remove any temporary debug/testing functions from production GAS if not needed
+- [ ] Re-check `.gitignore` before pushing secrets/build files
 
 ## Build Order
 

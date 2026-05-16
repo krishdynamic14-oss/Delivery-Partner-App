@@ -2,18 +2,30 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Badge, Card, Field, Header, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { Badge, Card, DeadlineBadge, Field, Header, Money, Screen } from '../components/ui';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
+import { getDeadlineLabel, getDeadlineStatus, sortByDeadlinePriority } from '../services/deadlines';
 import type { DeliveryOrder, OrderStatus, RootStackParamList } from '../types';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function OrdersScreen() {
+  useScreenThemeStyles();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [tab, setTab] = useState<OrderStatus | 'all'>('pending');
   const [query, setQuery] = useState('');
   const { orders, loading, refresh } = useOrders();
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = (tab === 'all' ? orders : orders.filter((order) => order.status === tab))
+  const filtered = sortByDeadlinePriority((tab === 'all' ? orders : orders.filter((order) => order.status === tab))
     .filter((order) => {
       if (!normalizedQuery) return true;
       return [
@@ -23,7 +35,7 @@ export function OrdersScreen() {
         order.product,
         order.phoneMasked,
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
+    }));
 
   return (
     <Screen>
@@ -61,6 +73,7 @@ function OrderCard({ order, onPress }: { order: DeliveryOrder; onPress: () => vo
             <View style={styles.badgeRow}>
               <Badge label={order.status} tone={order.status} />
               <Badge label={order.paymentType} tone="info" />
+              {order.status === 'pending' ? <DeadlineBadge status={getDeadlineStatus(order)} label={getDeadlineLabel(order)} /> : null}
             </View>
           </View>
           <Money value={order.amount} size={20} />
@@ -70,7 +83,8 @@ function OrderCard({ order, onPress }: { order: DeliveryOrder; onPress: () => vo
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   tab: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },
   activeTab: { backgroundColor: 'rgba(255,107,0,0.92)', borderColor: colors.orange },
@@ -84,3 +98,4 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', gap: 8 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 34 },
 });
+}

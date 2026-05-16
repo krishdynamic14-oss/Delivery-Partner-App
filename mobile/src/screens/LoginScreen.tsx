@@ -3,11 +3,22 @@ import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Te
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useAuth } from '../state/AuthContext';
 import { requestPasswordReset } from '../services/api';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function LoginScreen() {
+  useScreenThemeStyles();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -96,7 +107,8 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   screen: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.bg, overflow: 'hidden' },
   glow: { position: 'absolute', width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(255,107,0,0.18)', top: -120, right: -150 },
   logo: { width: 78, height: 78, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 22, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
@@ -112,3 +124,4 @@ const styles = StyleSheet.create({
   resetText: { color: colors.amber, fontSize: 13, fontWeight: '900' },
   note: { color: colors.muted, fontSize: 12, marginTop: 18, lineHeight: 18 },
 });
+}

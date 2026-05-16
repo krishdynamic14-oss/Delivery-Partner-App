@@ -2,17 +2,28 @@ import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, StyleSheet, Text } from 'react-native';
 import { Badge, Button, Card, Field, Header, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { fetchCodSettlementSummary, submitSettlement } from '../services/api';
 import { enqueueAction } from '../services/offlineQueue';
 import { useAuth } from '../state/AuthContext';
 import type { CodSettlementSummary } from '../types';
+import { buildUpiPaymentUrl, pickUpiId, UPI_NAME } from '../services/upi';
 
-const UPI_ID = process.env.EXPO_PUBLIC_UPI_ID || '';
-const UPI_NAME = process.env.EXPO_PUBLIC_UPI_NAME || 'Dynamic Bazar';
+const todayKey = new Date().toISOString().slice(0, 10);
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function CodScreen() {
+  useScreenThemeStyles();
   const { user } = useAuth();
   const { orders, codSummary } = useOrders();
   const [amount, setAmount] = useState('');
@@ -46,6 +57,7 @@ export function CodScreen() {
     pendingCodCount,
   }), [codOrders.length, codSummary.assigned, codSummary.collected, deliveredCodCount, localCommission, localPayable, pendingCodCount]);
   const summary = settlementSummary || fallbackSummary;
+  const selectedUpiId = useMemo(() => pickUpiId(`${user?.phone || user?.id || 'partner'}-${todayKey}`), [user?.id, user?.phone]);
 
   useEffect(() => {
     let mounted = true;
@@ -82,14 +94,15 @@ export function CodScreen() {
       Alert.alert('Amount too high', `Pay to Company ${formatMoney(summary.cashInHand)} hai.`);
       return;
     }
-    if (!UPI_ID) {
-      Alert.alert('UPI not configured', 'EXPO_PUBLIC_UPI_ID set karo, tab UPI app open hoga.');
+    if (!selectedUpiId) {
+      Alert.alert('UPI not configured', 'EXPO_PUBLIC_UPI_IDS set karo, tab UPI app open hoga.');
       return;
     }
     try {
       await openUpiPayment({
         amount: settlementAmount,
         partnerName: user?.name || 'Delivery Partner',
+        upiId: selectedUpiId,
       });
     } catch {
       Alert.alert('UPI app not opened', 'Phone me UPI app/default handler check karo.');
@@ -194,7 +207,7 @@ export function CodScreen() {
           {summaryLoading ? <Text style={styles.sync}>Syncing ledger...</Text> : null}
         </Card>
         <Field value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder="Payable amount" />
-        <Text style={styles.upiMeta}>{UPI_ID ? `${UPI_NAME} · ${UPI_ID}` : 'UPI ID not configured'}</Text>
+        <Text style={styles.upiMeta}>{selectedUpiId ? `${UPI_NAME} · ${selectedUpiId}` : 'UPI ID not configured'}</Text>
         <Button label="Open UPI App" onPress={openPaymentApp} />
         <Card>
           <Text style={styles.label}>Payment proof</Text>
@@ -216,7 +229,8 @@ export function CodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   label: { color: colors.muted, textTransform: 'uppercase', fontWeight: '800', marginBottom: 8 },
   meta: { color: colors.muted, marginTop: 8 },
   order: { color: colors.text, fontWeight: '800' },
@@ -226,6 +240,7 @@ const styles = StyleSheet.create({
   sync: { color: colors.amber, marginTop: 8, fontWeight: '800' },
   upiMeta: { color: colors.muted, fontSize: 12, marginBottom: 10, textAlign: 'center' },
 });
+}
 
 function formatMoney(value: number) {
   return `₹${Number(value || 0).toLocaleString('en-IN')}`;
@@ -240,23 +255,12 @@ function getCodCommission(amount: number) {
   return 300;
 }
 
-async function openUpiPayment({ amount, partnerName }: { amount: number; partnerName: string }) {
+async function openUpiPayment({ amount, partnerName, upiId }: { amount: number; partnerName: string; upiId: string }) {
   const url = buildUpiPaymentUrl({
-    upiId: UPI_ID,
+    upiId,
     payeeName: UPI_NAME,
     amount,
     note: `Dynamic Bazar COD ${partnerName}`,
   });
   await Linking.openURL(url);
-}
-
-function buildUpiPaymentUrl({ upiId, payeeName, amount, note }: { upiId: string; payeeName: string; amount: number; note: string }) {
-  const params = [
-    ['pa', upiId],
-    ['pn', payeeName],
-    ['am', amount.toFixed(2)],
-    ['cu', 'INR'],
-    ['tn', note],
-  ];
-  return `upi://pay?${params.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')}`;
 }

@@ -2,13 +2,24 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Card, Money, Screen } from '../components/ui';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import type { DeliveryOrder } from '../types';
 
 const FILTERS = ['All', 'Active', 'Idle', 'Delayed', 'Zone A', 'Zone B'] as const;
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function AdminLiveMapScreen() {
+  useScreenThemeStyles();
   const { orders, loading, refresh } = useOrders();
   const postmen = getPostmen(orders);
   const active = postmen.filter((postman) => postman.state === 'Active').length;
@@ -198,7 +209,8 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'NA';
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { color: colors.text, fontSize: 27, fontWeight: '900' },
   sub: { color: colors.muted, marginTop: 5, fontSize: 12 },
@@ -239,3 +251,4 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 10, marginTop: 4 },
   right: { alignItems: 'flex-end', gap: 5 },
 });
+}

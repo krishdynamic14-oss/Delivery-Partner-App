@@ -6,9 +6,9 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useMemo, useState } from 'react';
-import { colors } from './src/theme';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
 import { OrdersProvider } from './src/state/OrdersContext';
+import { ThemeProvider, useTheme } from './src/state/ThemeContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { OrdersScreen } from './src/screens/OrdersScreen';
@@ -30,6 +30,8 @@ const AdminTabs = createBottomTabNavigator<AdminTabParamList>();
 
 function TabNavigator() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const colors = theme.colors;
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -41,7 +43,7 @@ function TabNavigator() {
           left: 14,
           right: 14,
           bottom: Math.max(10, insets.bottom + 8),
-          backgroundColor: 'rgba(14,14,22,0.92)',
+          backgroundColor: colors.tabBar,
           borderTopColor: colors.border,
           borderTopWidth: 1,
           height: 66,
@@ -67,6 +69,8 @@ function TabNavigator() {
 
 function AdminTabNavigator() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const colors = theme.colors;
   return (
     <AdminTabs.Navigator
       screenOptions={{
@@ -78,7 +82,7 @@ function AdminTabNavigator() {
           left: 14,
           right: 14,
           bottom: Math.max(10, insets.bottom + 8),
-          backgroundColor: 'rgba(14,14,22,0.92)',
+          backgroundColor: colors.tabBar,
           borderTopColor: colors.border,
           borderTopWidth: 1,
           height: 66,
@@ -106,6 +110,8 @@ function AdminTabNavigator() {
 
 function AppNavigator() {
   const { user, loading } = useAuth();
+  const { theme } = useTheme();
+  const colors = theme.colors;
 
   if (loading) {
     return (
@@ -163,10 +169,17 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <Bootstrapper />
-        <StatusBar style="light" />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Bootstrapper />
+          <ThemedStatusBar />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+function ThemedStatusBar() {
+  const { theme } = useTheme();
+  return <StatusBar style={theme.statusBar} />;
 }

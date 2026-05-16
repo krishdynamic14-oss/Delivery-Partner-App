@@ -5,6 +5,7 @@ const DELIVERY_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getPrope
 const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_MASTER_SHEET') || 'Stock Master';
 const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
 const PASSWORD_RESET_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PASSWORD_RESET_SHEET') || 'PASSWORD RESET';
+const PUSH_TOKEN_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PUSH_TOKEN_SHEET') || 'PUSH TOKENS';
 const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
 const BILL_TEMPLATE_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_TEMPLATE_ID') || '';
 const BILL_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_FOLDER_ID') || '';
@@ -112,6 +113,11 @@ function doPost(e) {
       'stock.dispatch': () => addStockDispatch_(body, token),
       'admin.partners': () => getAdminPartners_(token),
       'orders.assign': () => assignOrderToPartner_(body, token),
+      'notifications.registerToken': () => registerPushToken_(body, token),
+      'notifications.deactivateToken': () => deactivatePushToken_(body, token),
+      'notifications.deadlineReminders': () => runDeadlineReminders_(body, token),
+      'notifications.test': () => sendTestNotification_(body, token),
+      'notifications.inspectTokens': () => inspectPushTokens_(token),
       'meta.columns': () => inspectColumns_(),
       'meta.partners': () => inspectPartners_(),
     };
@@ -349,6 +355,10 @@ function markOrderFailed_(body, token) {
   if (photoUrl) updates.DELIVERY_PHOTO = photoUrl;
   if (detail.length) updates.REMARK2 = detail.join(' | ');
   updateOrderRow_(body.orderId, updates);
+  notifyAdmins_('Delivery failed', 'Order #' + String(body.orderId || '').replace('#', '') + ' failed: ' + reason, {
+    type: 'delivery_failed',
+    orderId: String(body.orderId || '').replace('#', ''),
+  });
   return { updated: true, photoUrl: photoUrl || '' };
 }
 
@@ -394,6 +404,11 @@ function submitCodSettlement_(body, token) {
     'APPROVED BY': '',
     'APPROVED AT': '',
     'ADMIN NOTES': String(body.notes || '').trim(),
+  });
+  notifyAdmins_('COD settlement pending', String(body.partnerName || 'Partner').trim() + ' submitted Rs. ' + amount + ' COD settlement.', {
+    type: 'cod_settlement_pending',
+    settlementId: settlementId,
+    partnerPhone: onlyDigits_(body.partnerPhone).slice(-10),
   });
   return { settlementId: settlementId, status: 'PENDING', cashInHand: summary.cashInHand };
 }
@@ -511,6 +526,10 @@ function assignOrderToPartner_(body, token) {
   if (partnerPhone) updates.POSTMAN_NUMBER = partnerPhone;
   if (district) updates.DISTRICT = district;
   updateOrderRow_(orderId, updates);
+  notifyPartnerByPhone_(partnerPhone, 'New order assigned', 'Order #' + orderId + ' assigned to you.', {
+    type: 'order_assigned',
+    orderId: orderId,
+  });
   return { updated: true };
 }
 
@@ -609,6 +628,7 @@ function rowToOrder_(accessor, row) {
     : deliveryStatus === 'FAILED' || remarksUpper.indexOf('FAILED:') === 0 || remarksUpper.indexOf('CANCEL') !== -1 || remarksUpper.indexOf('RTO') !== -1
       ? 'failed'
       : 'pending';
+  const deadline = buildDeliveryDeadline_(accessor.read(row, 'ORDER_DATE'), status);
   return {
     id: orderNo.replace('#', ''),
     orderNo: orderNo.replace('#', ''),
@@ -626,12 +646,62 @@ function rowToOrder_(accessor, row) {
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
     assignedTo: String(accessor.read(row, 'POSTMAN') || '').trim(),
     orderDate: String(accessor.read(row, 'ORDER_DATE') || ''),
+    deliveryDeadline: deadline.deliveryDeadline,
+    hoursLeft: deadline.hoursLeft,
+    deadlineStatus: deadline.deadlineStatus,
     deliveryDate: String(accessor.read(row, 'DELIVERY_DATE') || ''),
     updatedAt: new Date().toISOString(),
     photoUrl: String(accessor.read(row, 'DELIVERY_PHOTO') || ''),
     deliveryOtpSentStatus: String(accessor.read(row, 'DELIVERY_OTP_SENT_STATUS') || ''),
     remarks: remarks,
   };
+}
+
+function buildDeliveryDeadline_(orderDateValue, orderStatus) {
+  const normal = { deliveryDeadline: '', hoursLeft: undefined, deadlineStatus: 'normal' };
+  if (orderStatus !== 'pending') return normal;
+  const orderDate = parseSheetDate_(orderDateValue);
+  if (!orderDate) return normal;
+
+  const deadline = addDays_(orderDate, 2);
+  const today = startOfLocalDay_(new Date());
+  const hoursLeft = Math.ceil((deadline.getTime() - today.getTime()) / 3600000);
+  const deadlineStatus = deadline.getTime() < today.getTime()
+    ? 'overdue'
+    : deadline.getTime() === today.getTime()
+      ? 'due_today'
+      : 'normal';
+  return {
+    deliveryDeadline: Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'dd-MM-yyyy'),
+    hoursLeft: hoursLeft,
+    deadlineStatus: deadlineStatus,
+  };
+}
+
+function parseSheetDate_(value) {
+  if (!value) return null;
+  if (value instanceof Date && !isNaN(value.getTime())) return startOfLocalDay_(value);
+  if (typeof value === 'number' && value > 0) {
+    return startOfLocalDay_(new Date(Date.UTC(1899, 11, 30) + value * 86400000));
+  }
+  const raw = String(value || '').trim();
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (dmy) {
+    const year = Number(dmy[3].length === 2 ? '20' + dmy[3] : dmy[3]);
+    return startOfLocalDay_(new Date(year, Number(dmy[2]) - 1, Number(dmy[1])));
+  }
+  const parsed = new Date(raw);
+  return isNaN(parsed.getTime()) ? null : startOfLocalDay_(parsed);
+}
+
+function addDays_(date, days) {
+  const next = new Date(date.getTime());
+  next.setDate(next.getDate() + days);
+  return startOfLocalDay_(next);
+}
+
+function startOfLocalDay_(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function assertToken_(token) {
@@ -970,6 +1040,13 @@ function addStockDispatch_(body, token) {
     return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
   });
   sheet.appendRow(row);
+  if (partnerPhone) {
+    notifyPartnerByPhone_(partnerPhone, 'Stock updated', String(qty) + ' ' + product + ' added to your stock.', {
+      type: 'stock_dispatch',
+      product: product,
+      quantity: String(qty),
+    });
+  }
   return { added: true };
 }
 
@@ -1016,6 +1093,386 @@ function getDpMasterPartners_(includePhone) {
       orderCount: 0,
     };
   }).filter(Boolean);
+}
+
+function registerPushToken_(body, token) {
+  assertToken_(token);
+  const expoPushToken = String(body.expoPushToken || '').trim();
+  if (!expoPushToken) throw new Error('Expo push token required');
+
+  const sheet = getPushTokenSheet_();
+  ensurePushTokenHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const tokenCol = indexByHeader['EXPO PUSH TOKEN'];
+  const rowData = {
+    'TIMESTAMP': new Date(),
+    'USER ID': String(body.userId || '').trim(),
+    'ROLE': String(body.role || '').trim(),
+    'PHONE': onlyDigits_(body.phone).slice(-10),
+    'PARTNER NAME': String(body.partnerName || '').trim(),
+    'DISTRICT': String(body.district || '').trim(),
+    'EXPO PUSH TOKEN': expoPushToken,
+    'PLATFORM': String(body.platform || '').trim(),
+    'DEVICE NAME': String(body.deviceName || '').trim(),
+    'APP VERSION': String(body.appVersion || '').trim(),
+    'STATUS': 'ACTIVE',
+    'LAST SEEN': new Date(),
+  };
+
+  if (tokenCol !== undefined) {
+    for (let r = 2; r <= values.length; r += 1) {
+      if (String(values[r - 1][tokenCol] || '').trim() !== expoPushToken) continue;
+      Object.keys(rowData).forEach((header) => {
+        const col = ensureLogColumn_(sheet, headers, indexByHeader, header);
+        sheet.getRange(r, col + 1).setValue(rowData[header]);
+      });
+      return { registered: true };
+    }
+  }
+
+  const row = headers.map((header) => {
+    const key = String(header || '').trim().toUpperCase();
+    return Object.prototype.hasOwnProperty.call(rowData, key) ? rowData[key] : '';
+  });
+  sheet.appendRow(row);
+  return { registered: true };
+}
+
+function deactivatePushToken_(body, token) {
+  assertToken_(token);
+  const expoPushToken = String(body.expoPushToken || '').trim();
+  if (!expoPushToken) throw new Error('Expo push token required');
+
+  const sheet = getPushTokenSheet_();
+  ensurePushTokenHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const tokenCol = indexByHeader['EXPO PUSH TOKEN'];
+  const statusCol = ensureLogColumn_(sheet, headers, indexByHeader, 'STATUS');
+  const lastSeenCol = ensureLogColumn_(sheet, headers, indexByHeader, 'LAST SEEN');
+  if (tokenCol === undefined) return { deactivated: true };
+
+  for (let r = 2; r <= values.length; r += 1) {
+    if (String(values[r - 1][tokenCol] || '').trim() !== expoPushToken) continue;
+    sheet.getRange(r, statusCol + 1).setValue('INACTIVE');
+    sheet.getRange(r, lastSeenCol + 1).setValue(new Date());
+    return { deactivated: true };
+  }
+  return { deactivated: true };
+}
+
+function getPushTokenSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(PUSH_TOKEN_SHEET_NAME) || ss.insertSheet(PUSH_TOKEN_SHEET_NAME);
+}
+
+function ensurePushTokenHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'USER ID',
+    'ROLE',
+    'PHONE',
+    'PARTNER NAME',
+    'DISTRICT',
+    'EXPO PUSH TOKEN',
+    'PLATFORM',
+    'DEVICE NAME',
+    'APP VERSION',
+    'STATUS',
+    'LAST SEEN',
+  ];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
+  const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+  if (existingUpper[0] !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
+  sheet.setFrozenRows(1);
+}
+
+function notifyAdmins_(title, message, data) {
+  const tokens = getActivePushTokens_({ role: 'admin' });
+  return sendExpoPushNotifications_(tokens, title, message, data || {});
+}
+
+function notifyPartnerByPhone_(phone, title, message, data) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  if (!normalizedPhone) return { sent: 0 };
+  const tokens = getActivePushTokens_({ role: 'partner', phone: normalizedPhone });
+  return sendExpoPushNotifications_(tokens, title, message, data || {});
+}
+
+function getActivePushTokens_(filter) {
+  const sheet = getPushTokenSheet_();
+  ensurePushTokenHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+  const headers = values[0];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const roleFilter = normalizeText_(filter && filter.role);
+  const phoneFilter = onlyDigits_(filter && filter.phone).slice(-10);
+  const seen = {};
+  const tokens = [];
+
+  values.slice(1).forEach((row) => {
+    const status = normalizeText_(readLogValue_(row, indexByHeader, 'STATUS') || 'ACTIVE');
+    if (status !== 'ACTIVE') return;
+    const token = String(readLogValue_(row, indexByHeader, 'EXPO PUSH TOKEN') || '').trim();
+    if (!token || seen[token]) return;
+    const role = normalizeText_(readLogValue_(row, indexByHeader, 'ROLE'));
+    const phone = onlyDigits_(readLogValue_(row, indexByHeader, 'PHONE')).slice(-10);
+    if (roleFilter && role !== roleFilter) return;
+    if (phoneFilter && phone !== phoneFilter) return;
+    seen[token] = true;
+    tokens.push(token);
+  });
+  return tokens;
+}
+
+function sendExpoPushNotifications_(tokens, title, message, data) {
+  if (!tokens || !tokens.length) return { sent: 0 };
+  const payload = tokens.map((token) => ({
+    to: token,
+    sound: 'default',
+    priority: 'high',
+    title: String(title || 'Dynamic Bazar'),
+    body: String(message || ''),
+    data: data || {},
+  }));
+  const response = UrlFetchApp.fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  if (code < 200 || code >= 300) {
+    Logger.log('Expo push failed HTTP ' + code + ': ' + text);
+    return { sent: 0, error: 'Expo push HTTP ' + code };
+  }
+  return { sent: tokens.length, response: truncate_(text, 450) };
+}
+
+function runDeadlineReminders_(body, token) {
+  assertAdminToken_(token);
+  return sendDeadlineRemindersDaily({ dryRun: body && body.dryRun === true });
+}
+
+function sendTestNotification_(body, token) {
+  assertAdminToken_(token);
+  const phone = onlyDigits_(body && body.phone).slice(-10);
+  const role = normalizeText_(body && body.role);
+  const title = String(body && body.title || 'Dynamic Bazar test').trim();
+  const message = String(body && body.message || 'Test notification from Delivery App').trim();
+  let tokens = [];
+
+  if (phone) {
+    tokens = getActivePushTokens_({ phone: phone });
+  } else if (role === 'ADMIN' || role === 'PARTNER') {
+    tokens = getActivePushTokens_({ role: role.toLowerCase() });
+  } else {
+    tokens = getActivePushTokens_({});
+  }
+
+  const result = sendExpoPushNotifications_(tokens, title, message, {
+    type: 'test_notification',
+    phone: phone,
+    role: role,
+  });
+  return {
+    matchedTokens: tokens.length,
+    sent: result.sent || 0,
+    error: result.error || '',
+    response: result.response || '',
+  };
+}
+
+function testPushNotificationToAdmins() {
+  const result = sendManualTestPush_({
+    role: 'admin',
+    title: 'Dynamic Bazar Test',
+    message: 'Admin push notification test working.',
+  });
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function testPushNotificationToPhone() {
+  const phone = onlyDigits_(PropertiesService.getScriptProperties().getProperty('DB_TEST_PUSH_PHONE')).slice(-10);
+  if (!phone) {
+    throw new Error('Set script property DB_TEST_PUSH_PHONE to the 10-digit phone you want to test.');
+  }
+  const result = sendManualTestPush_({
+    phone: phone,
+    title: 'Dynamic Bazar Test',
+    message: 'Phone push notification test working.',
+  });
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function testPushNotificationToAllActiveDevices() {
+  const result = sendManualTestPush_({
+    title: 'Dynamic Bazar Test',
+    message: 'All active device push notification test working.',
+  });
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function inspectPushTokens() {
+  return inspectPushTokensInternal_();
+}
+
+function inspectPushTokens_(token) {
+  assertAdminToken_(token);
+  return inspectPushTokensInternal_();
+}
+
+function inspectPushTokensInternal_() {
+  const sheet = getPushTokenSheet_();
+  ensurePushTokenHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const rows = values.slice(1).map((row) => ({
+    role: String(readLogValue_(row, indexByHeader, 'ROLE') || ''),
+    phone: String(readLogValue_(row, indexByHeader, 'PHONE') || ''),
+    status: String(readLogValue_(row, indexByHeader, 'STATUS') || ''),
+    tokenPreview: String(readLogValue_(row, indexByHeader, 'EXPO PUSH TOKEN') || '').slice(0, 22),
+    lastSeen: formatLogDate_(readLogValue_(row, indexByHeader, 'LAST SEEN')),
+  }));
+  const result = {
+    sheetName: sheet.getName(),
+    totalRows: rows.length,
+    activeRows: rows.filter((row) => normalizeText_(row.status || 'ACTIVE') === 'ACTIVE').length,
+    rows: rows,
+  };
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function sendManualTestPush_(options) {
+  const phone = onlyDigits_(options && options.phone).slice(-10);
+  const role = normalizeText_(options && options.role);
+  const title = String(options && options.title || 'Dynamic Bazar test').trim();
+  const message = String(options && options.message || 'Test notification from Delivery App').trim();
+  let tokens = [];
+
+  if (phone) {
+    tokens = getActivePushTokens_({ phone: phone });
+  } else if (role === 'ADMIN' || role === 'PARTNER') {
+    tokens = getActivePushTokens_({ role: role.toLowerCase() });
+  } else {
+    tokens = getActivePushTokens_({});
+  }
+
+  const result = sendExpoPushNotifications_(tokens, title, message, {
+    type: 'manual_test_notification',
+    phone: phone,
+    role: role,
+  });
+  return {
+    matchedTokens: tokens.length,
+    sent: result.sent || 0,
+    error: result.error || '',
+    response: result.response || '',
+  };
+}
+
+function sendDeadlineRemindersDaily(options) {
+  const dryRun = options && options.dryRun === true;
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return { checked: 0, partnerReminders: 0, adminAlerts: 0, dryRun: dryRun };
+
+  const headers = values.shift();
+  const accessor = buildAccessor_(headers);
+  const today = startOfLocalDay_(new Date());
+  const props = PropertiesService.getScriptProperties();
+  const result = { checked: 0, partnerReminders: 0, adminAlerts: 0, skipped: 0, dryRun: dryRun };
+
+  values.forEach((row) => {
+    const order = rowToOrder_(accessor, row);
+    if (!order.id || order.status !== 'pending') return;
+    result.checked += 1;
+
+    const orderDate = parseSheetDate_(accessor.read(row, 'ORDER_DATE'));
+    if (!orderDate) {
+      result.skipped += 1;
+      return;
+    }
+
+    const daysSinceOrder = Math.floor((today.getTime() - orderDate.getTime()) / 86400000);
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+    if (daysSinceOrder === 1) {
+      if (sendReminderOnce_(props, dryRun, 'partner_day_1', order.id, () => {
+        notifyPartnerByPhone_(partnerPhone, 'Delivery reminder', 'Order #' + order.orderNo + ' is still pending. Please deliver within 2 days.', {
+          type: 'delivery_deadline_reminder',
+          orderId: order.id,
+          deadlineStatus: order.deadlineStatus,
+        });
+      })) result.partnerReminders += 1;
+    } else if (daysSinceOrder === 2) {
+      if (sendReminderOnce_(props, dryRun, 'partner_due_today', order.id, () => {
+        notifyPartnerByPhone_(partnerPhone, 'Delivery due today', 'Order #' + order.orderNo + ' reaches its 2-day delivery deadline today.', {
+          type: 'delivery_due_today',
+          orderId: order.id,
+          deadlineStatus: order.deadlineStatus,
+        });
+      })) result.partnerReminders += 1;
+    } else if (daysSinceOrder > 2) {
+      if (sendReminderOnce_(props, dryRun, 'admin_overdue', order.id, () => {
+        notifyAdmins_('Order overdue', 'Order #' + order.orderNo + ' is past the 2-day delivery window.', {
+          type: 'delivery_overdue',
+          orderId: order.id,
+          partner: order.assignedTo || '',
+          district: order.district || '',
+        });
+      })) result.adminAlerts += 1;
+    }
+  });
+
+  return result;
+}
+
+function sendReminderOnce_(props, dryRun, type, orderId, sender) {
+  const key = 'DEADLINE_REMINDER_SENT_' + getReminderDateKey_() + '_' + type + '_' + String(orderId || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (props.getProperty(key)) return false;
+  if (!dryRun) {
+    sender();
+    props.setProperty(key, new Date().toISOString());
+  }
+  return true;
+}
+
+function getReminderDateKey_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
+}
+
+function setupDeadlineReminderTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === 'sendDeadlineRemindersDaily')
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+
+  ScriptApp.newTrigger('sendDeadlineRemindersDaily')
+    .timeBased()
+    .everyDays(1)
+    .atHour(10)
+    .create();
+
+  return { installed: true, handler: 'sendDeadlineRemindersDaily', schedule: 'daily 10:00' };
 }
 
 function ensurePaymentLogHeader_(sheet) {

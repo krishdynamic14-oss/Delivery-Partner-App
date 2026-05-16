@@ -4,12 +4,23 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Header, Money, Screen } from '../components/ui';
 import { SyncStatusCard } from '../components/SyncStatusCard';
-import { colors } from '../theme';
+import { colors as defaultColors, type AppColors } from '../theme';
+import { useTheme } from '../state/ThemeContext';
 import { useAuth } from '../state/AuthContext';
 import { useOrders } from '../state/OrdersContext';
 import type { TabParamList } from '../types';
 
+
+let colors: AppColors = defaultColors;
+let styles = createStyles(colors);
+
+function useScreenThemeStyles() {
+  const { theme } = useTheme();
+  colors = theme.colors;
+  styles = createStyles(colors);
+}
 export function DashboardScreen() {
+  useScreenThemeStyles();
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { user } = useAuth();
   const { orders, loading, refresh, codSummary } = useOrders();
@@ -56,7 +67,8 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   hero: { borderWidth: 1, borderColor: 'rgba(255,179,71,0.22)', borderRadius: 22, padding: 18, marginBottom: 12, overflow: 'hidden' },
   label: { color: colors.muted, fontSize: 12, textTransform: 'uppercase', fontWeight: '800', marginBottom: 8 },
   meta: { color: colors.muted, marginTop: 8, fontSize: 12 },
@@ -66,3 +78,4 @@ const styles = StyleSheet.create({
   order: { color: colors.text, fontSize: 24, fontWeight: '900' },
   actions: { gap: 10, marginBottom: 22 },
 });
+}
