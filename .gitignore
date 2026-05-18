@@ -1,0 +1,26 @@
+# Local secrets and generated release files
+.env
+.env.*
+*.apk
+*.aab
+*.apks
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+google-services.json
+*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Logs and OS files
+*.log
+.DS_Store

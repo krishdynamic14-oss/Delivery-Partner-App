@@ -107,6 +107,8 @@ Column mapping inspection action:
 ## Build
 
 Detailed APK build steps are in [`APK_BUILD.md`](./APK_BUILD.md).
+Play Store internal testing release gates are in [`PLAY_STORE_RELEASE.md`](./PLAY_STORE_RELEASE.md).
+Draft Play policy inputs are in [`PRIVACY_POLICY_DRAFT.md`](./PRIVACY_POLICY_DRAFT.md) and [`PLAY_DATA_SAFETY.md`](./PLAY_DATA_SAFETY.md).
 
 Preview APK:
 

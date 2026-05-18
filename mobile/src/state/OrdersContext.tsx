@@ -5,6 +5,7 @@ import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp 
 import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveQueue, saveSyncMeta } from '../services/storage';
 import { enqueueAction, loadQueueForUser, queueBelongsToUser, syncQueue } from '../services/offlineQueue';
 import { deleteActionProofFiles, deletePayloadProofFiles } from '../services/proofFiles';
+import { getUserSafeErrorMessage } from '../services/errors';
 import { useAuth } from './AuthContext';
 
 type OrdersState = {
@@ -154,7 +155,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() }, user);
         setPendingSync((count) => count + 1);
         await persistSyncMeta({ status: 'warning', message: 'Delivery queued because sync failed.', lastError: message });
-        return { status: 'queued', message: `Delivery saved locally. Sync error: ${message}` };
+        return { status: 'queued', message: `Delivery saved locally. ${message}` };
       }
     }
 
@@ -211,8 +212,8 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         const message = getErrorMessage(err);
         await enqueueAction({ id: `fail-${Date.now()}`, type: 'fail', orderId, payload, createdAt: new Date().toISOString() }, user);
         setPendingSync((count) => count + 1);
-        await persistSyncMeta({ status: 'warning', message: 'Failed delivery queued because GAS sync failed.', lastError: message });
-        return { status: 'queued', message: `Failed delivery saved locally. GAS error: ${message}` };
+        await persistSyncMeta({ status: 'warning', message: 'Failed delivery queued because sync failed.', lastError: message });
+        return { status: 'queued', message: `Failed delivery saved locally. ${message}` };
       }
     }
 
@@ -263,5 +264,5 @@ export function useOrders() {
 }
 
 function getErrorMessage(err: unknown) {
-  return err instanceof Error ? err.message : 'Unknown sync error.';
+  return getUserSafeErrorMessage(err, 'Sync failed. Please try again.');
 }

@@ -32,7 +32,10 @@ yarn-error.*
 *.pem
 google-services.json
 *-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
 *.apk
+*.aab
+*.apks
 
 # local env files
 .env

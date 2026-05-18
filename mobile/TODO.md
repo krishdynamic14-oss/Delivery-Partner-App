@@ -33,10 +33,10 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Admin dashboard shell | [x] | [ ] | Admin role opens hidden admin tabs, all-order monitoring, settlement approval, stock view/update, and quick assignment |
 | Partner password login | [~] | [ ] | Password login added; real SMS OTP still needs provider if required later |
 | Android preview APK | [ ] | [ ] | Build APK and install on phone |
-| Play internal testing | [ ] | [ ] | Upload AAB and complete internal test install |
+| Play internal testing | [~] | [ ] | Release runbook, data-safety draft, privacy-policy draft added; upload AAB and complete internal test install |
 | Core glass-style UI polish | [x] | [x] | Visual direction approved in preview; continue screen-by-screen polish |
 | Multi-theme support | [~] | [ ] | Dark Orange, Light Clean, and High Contrast added; verify every screen on real Android |
-| Push notification foundation | [~] | [x] | Expo/Firebase token registration and GAS push test working; production cleanup pending |
+| Push notification foundation | [~] | [x] | Expo/Firebase token registration and GAS push test working; internal-test auto registration still needs fresh install verification |
 | Maps route handoff | [~] | [ ] | Android Google Maps/geo/browser fallback added; verify on delivery partner phones |
 | Multi-UPI routing | [~] | [ ] | Comma-separated `EXPO_PUBLIC_UPI_IDS` supported; verify QR payments across all UPI IDs |
 | Cancel call recording proof | [~] | [ ] | Cancelled parcel now requires attached call recording; verify upload link in Sheet/Drive |
@@ -105,6 +105,7 @@ Build a production-ready Android operations app for Dynamic Bazar. Admin and del
 - [x] Write COD settlement to `PAYMENT LOG`
 - [~] Upload delivery photo and store photo URL
 - [ ] Return consistent API error codes/messages
+- [~] Map raw backend/network failures to user-safe app messages
 
 ## Delivery Workflow
 
@@ -179,14 +180,15 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Install APK on at least two Android phones
 - [ ] Build production AAB
 - [ ] Prepare Play Console internal testing release
-- [ ] Privacy policy URL
+- [~] Privacy policy URL
 - [ ] App icon 512x512
 - [ ] Feature graphic 1024x500
 - [ ] Play Store screenshots
-- [ ] Data safety form
+- [~] Data safety form
 - [x] Configure Firebase FCM V1 service account key in Expo credentials
 - [ ] Keep `google-services.json`, Firebase service-account JSON, `.env`, and APK files out of GitHub
 - [ ] Confirm final APK uses the correct Firebase project and `google-services.json`
+- [~] Play Store internal testing release runbook
 
 ## Testing Checklist
 
@@ -203,7 +205,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Oversized proof image is blocked before upload with clear message
 - [ ] Cancelled parcel call recording URL is stored against correct order
 - [ ] App handles bad network without crashing
-- [ ] App handles GAS API errors clearly
+- [~] App handles GAS API errors clearly
 - [ ] App works on Android 8, 11, 13+, and one low-end device
 - [x] Push token reaches `PUSH TOKENS` sheet on real APK
 - [x] Test push notification reaches phone after FCM V1 credentials upload

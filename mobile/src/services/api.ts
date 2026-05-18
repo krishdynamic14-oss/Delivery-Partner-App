@@ -15,21 +15,28 @@ import type {
   StockItem,
 } from '../types';
 import { mockOrders } from '../data/mockOrders';
+import { getUserSafeMessageFromText } from './errors';
 
 const GAS_URL = process.env.EXPO_PUBLIC_GAS_API_URL;
 
 type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };
 
 async function request<T>(action: string, body?: unknown, token?: string): Promise<T> {
-  if (!GAS_URL) throw new Error('GAS URL is not configured');
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ action, body, ...(token ? { __token: token } : {}) }),
-  });
-  const json = (await res.json()) as ApiResponse<T>;
-  if (!json.ok) throw new Error(json.error);
-  return json.data;
+  if (!GAS_URL) throw new Error('App server is not configured.');
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action, body, ...(token ? { __token: token } : {}) }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = (await res.json()) as ApiResponse<T>;
+    if (!json.ok) throw new Error(json.error);
+    return json.data;
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err || '');
+    throw new Error(getUserSafeMessageFromText(raw, 'Request failed. Please try again.'));
+  }
 }
 
 export async function loginWithPhone(payload: LoginPayload): Promise<Partner> {
