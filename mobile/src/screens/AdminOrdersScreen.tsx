@@ -62,7 +62,7 @@ export function AdminOrdersScreen() {
     setAssigningOrderId(order.id);
     try {
       await assignOrder(order.id, partner, user?.token);
-      Alert.alert('Order assigned', `#${order.orderNo} ${partner.name} ko assign ho gaya.`);
+      Alert.alert('Order assigned', `#${order.orderNo} assigned to ${partner.name}.`);
       await refresh();
     } catch (err) {
       Alert.alert('Assign failed', err instanceof Error ? err.message : 'Could not assign order.');
@@ -147,7 +147,7 @@ function AdminOrderCard({
                 <Text style={styles.partnerChipText}>{partner.name || 'Partner'}</Text>
                 <Text style={styles.partnerChipMeta}>{partner.district || partner.numberMasked || '-'}</Text>
               </Pressable>
-            )) : <Text style={styles.partnerEmpty}>DP MASTER me active partners nahi mile.</Text>}
+            )) : <Text style={styles.partnerEmpty}>No active partners found in DP Master.</Text>}
           </View>
         </View>
       ) : null}

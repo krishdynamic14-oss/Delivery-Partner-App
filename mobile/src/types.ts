@@ -155,6 +155,20 @@ export type StockDispatchPayload = {
   notes?: string;
 };
 
+export type StockReorderItem = {
+  product: string;
+  sku?: string;
+  remainingQty: number;
+  daysLeft: number;
+  status: 'critical' | 'low' | 'ok';
+};
+
+export type StockReorderPayload = {
+  items: StockReorderItem[];
+  requestedBy?: string;
+  notes?: string;
+};
+
 export type PushTokenRegistration = {
   expoPushToken: string;
   userId: string;

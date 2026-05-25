@@ -82,15 +82,15 @@ export function CodScreen() {
   async function openPaymentApp() {
     const settlementAmount = Number(amount || 0);
     if (!settlementAmount || settlementAmount <= 0) {
-      Alert.alert('Amount required', 'Company ko payable amount enter karo.');
+      Alert.alert('Amount required', 'Enter the payable amount.');
       return;
     }
     if (settlementAmount > summary.cashInHand) {
-      Alert.alert('Amount too high', `Pay to Company ${formatMoney(summary.cashInHand)} hai.`);
+      Alert.alert('Amount too high', `Pay to Company is ${formatMoney(summary.cashInHand)}.`);
       return;
     }
     if (!selectedUpiId) {
-      Alert.alert('UPI not configured', 'EXPO_PUBLIC_UPI_IDS set karo, tab UPI app open hoga.');
+      Alert.alert('UPI not configured', 'Set EXPO_PUBLIC_UPI_IDS before opening a UPI app.');
       return;
     }
     try {
@@ -100,7 +100,7 @@ export function CodScreen() {
         upiId: selectedUpiId,
       });
     } catch {
-      Alert.alert('UPI app not opened', 'Phone me UPI app/default handler check karo.');
+      Alert.alert('UPI app not opened', 'Check that a UPI app is installed and set as the default handler.');
     }
   }
 
@@ -116,15 +116,15 @@ export function CodScreen() {
   async function settle() {
     const settlementAmount = Number(amount || 0);
     if (!settlementAmount || settlementAmount <= 0) {
-      Alert.alert('Amount required', 'Company ko payable amount enter karo.');
+      Alert.alert('Amount required', 'Enter the payable amount.');
       return;
     }
     if (settlementAmount > summary.cashInHand) {
-      Alert.alert('Amount too high', `Pay to Company ${formatMoney(summary.cashInHand)} hai.`);
+      Alert.alert('Amount too high', `Pay to Company is ${formatMoney(summary.cashInHand)}.`);
       return;
     }
     if (!paymentProof?.uri || !paymentProof.base64) {
-      Alert.alert('Screenshot required', 'UPI payment complete hone ke baad payment screenshot attach karo.');
+      Alert.alert('Screenshot required', 'Attach the payment screenshot after completing the UPI payment.');
       return;
     }
     const payload = {
@@ -159,7 +159,7 @@ export function CodScreen() {
         return;
       }
       await enqueueAction({ id: `settle-${Date.now()}`, type: 'settle', orderId: 'cod', payload, createdAt: new Date().toISOString() }, user);
-      Alert.alert('Queued offline', 'Settlement request network aate hi sync hogi.');
+      Alert.alert('Queued offline', 'The settlement request will sync when the network is available.');
       return;
     }
 
@@ -172,7 +172,7 @@ export function CodScreen() {
     setAmount(String(next.cashInHand || ''));
     setPaymentReference('');
     setPaymentProof(undefined);
-    Alert.alert('Proof submitted', `Settlement ${settlementId} admin approval ke liye pending hai.`);
+    Alert.alert('Proof submitted', `Settlement ${settlementId} is pending admin approval.`);
   }
 
   return (
@@ -198,7 +198,7 @@ export function CodScreen() {
         <Button label="Open UPI App" onPress={openPaymentApp} />
         <Card>
           <Text style={styles.label}>Payment proof</Text>
-          {paymentProof?.uri ? <Image source={{ uri: paymentProof.uri }} style={styles.proofImage} /> : <Text style={styles.meta}>UPI payment ke baad screenshot attach karo.</Text>}
+          {paymentProof?.uri ? <Image source={{ uri: paymentProof.uri }} style={styles.proofImage} /> : <Text style={styles.meta}>Attach the screenshot after UPI payment.</Text>}
           <Button label="Attach Screenshot" tone="secondary" onPress={pickPaymentProof} />
         </Card>
         <Field value={paymentReference} onChangeText={setPaymentReference} placeholder="UPI reference / UTR optional" autoCapitalize="characters" />

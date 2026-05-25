@@ -7,7 +7,7 @@ import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
-import { addStockDispatch, fetchDeliveryPartners, fetchStockMaster } from '../services/api';
+import { addStockDispatch, createStockReorderRequest, fetchDeliveryPartners, fetchStockMaster } from '../services/api';
 import type { DeliveryPartnerSummary, StockItem, StockPartnerBreakdown } from '../types';
 
 
@@ -33,6 +33,7 @@ export function AdminStockScreen() {
   const [stockPartnerPhone, setStockPartnerPhone] = useState('');
   const [stockNotes, setStockNotes] = useState('');
   const [savingStock, setSavingStock] = useState(false);
+  const [reorderLoading, setReorderLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -70,6 +71,33 @@ export function AdminStockScreen() {
   const totalStockLeft = products.reduce((sum, product) => sum + product.remainingQty, 0);
   const districtStocks = getDistrictStocks(products);
   const refreshing = loading || ordersLoading;
+  const reorderItems = [...critical, ...low];
+
+  async function requestReorder() {
+    if (!reorderItems.length) {
+      Alert.alert('No low stock items', 'Inventory does not have any critical or low stock items right now.');
+      return;
+    }
+    setReorderLoading(true);
+    try {
+      const result = await createStockReorderRequest({
+        requestedBy: user?.name || user?.phone || 'admin',
+        notes: 'Created from Inventory Forecast.',
+        items: reorderItems.map((product) => ({
+          product: product.product,
+          sku: product.sku,
+          remainingQty: product.remainingQty,
+          daysLeft: product.daysLeft,
+          status: product.status,
+        })),
+      }, user?.token);
+      Alert.alert('Reorder request saved', `${result.itemCount} items saved for admin follow-up. Request ${result.requestId}.`);
+    } catch (err) {
+      Alert.alert('Reorder request failed', err instanceof Error ? err.message : 'Could not save reorder request.');
+    } finally {
+      setReorderLoading(false);
+    }
+  }
 
   return (
     <Screen>
@@ -90,7 +118,7 @@ export function AdminStockScreen() {
         {showUpdateForm ? (
           <Card>
             <Text style={styles.sectionTitle}>Add Stock Dispatch</Text>
-            <Text style={styles.meta}>Stock Master me new sent-stock row add hoga.</Text>
+            <Text style={styles.meta}>A new sent-stock row will be saved in Stock Master.</Text>
             <Field value={stockProduct} onChangeText={setStockProduct} placeholder="Product name" />
             <Field value={stockQty} onChangeText={setStockQty} keyboardType="number-pad" placeholder="Quantity sent" />
             <Field value={stockDistrict} onChangeText={setStockDistrict} placeholder="District / location" autoCapitalize="characters" />
@@ -118,15 +146,15 @@ export function AdminStockScreen() {
             <Button label="Save Stock Dispatch" loading={savingStock} onPress={async () => {
               const quantity = Number(stockQty || 0);
               if (!stockProduct.trim()) {
-                Alert.alert('Product required', 'Product name enter karo.');
+                Alert.alert('Product required', 'Enter the product name.');
                 return;
               }
               if (!quantity || quantity <= 0) {
-                Alert.alert('Quantity required', 'Quantity sent enter karo.');
+                Alert.alert('Quantity required', 'Enter the quantity sent.');
                 return;
               }
               if (!stockDistrict.trim() && !stockPartnerName.trim()) {
-                Alert.alert('Location required', 'District ya partner select karo.');
+                Alert.alert('Location required', 'Select a district or delivery partner.');
                 return;
               }
               setSavingStock(true);
@@ -139,7 +167,7 @@ export function AdminStockScreen() {
                   partnerPhone: stockPartnerPhone.trim(),
                   notes: stockNotes.trim(),
                 }, user?.token);
-                Alert.alert('Stock updated', 'Stock Master me dispatch row add ho gaya.');
+                Alert.alert('Stock updated', 'Dispatch row saved in Stock Master.');
                 setStockProduct('');
                 setStockQty('');
                 setStockNotes('');
@@ -169,10 +197,7 @@ export function AdminStockScreen() {
           {forecast.length ? forecast.map((product) => <ForecastRow key={product.product} product={product} />) : (
             <Text style={styles.meta}>No product movement visible yet.</Text>
           )}
-          <Pressable onPress={() => Alert.alert('Reorder request', `${critical.length + low.length} low-stock items marked for reorder.`)} style={({ pressed }) => [styles.reorderButton, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="warehouse" size={16} color={colors.orange} />
-            <Text style={styles.reorderText}>Auto-Reorder Critical Items</Text>
-          </Pressable>
+          <Button label="Create Reorder Request" tone="secondary" loading={reorderLoading} onPress={requestReorder} />
         </Card>
 
         <View style={styles.alertBanner}>

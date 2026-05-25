@@ -19,7 +19,7 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
 
   const Notifications = await loadNotifications();
   if (!Notifications) {
-    await savePushStatus('error', 'Push notifications are not available in this app build. Install the latest APK.');
+    await savePushStatus('error', 'Push notifications are not available on this device.');
     return null;
   }
 
@@ -41,7 +41,7 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
   if (!projectId) {
-    await savePushStatus('error', 'Push notifications are not configured in this app build.');
+    await savePushStatus('error', 'Push notification project ID is missing. Contact admin.');
     return null;
   }
 
@@ -114,7 +114,7 @@ async function savePushStatus(status: 'registered' | 'skipped' | 'error', messag
 function getUserSafePushError(err: unknown) {
   const message = err instanceof Error ? err.message : String(err || '');
   if (/permission|denied/i.test(message)) return 'Notification permission is off. Enable notifications from Android App Info.';
-  if (/firebase|fcm|credential|project|server key|Default FirebaseApp/i.test(message)) return 'Push notifications are not configured in this app build. Install the latest APK.';
+  if (/firebase|fcm|credential|project|server key|Default FirebaseApp/i.test(message)) return 'Push notification service is not configured for this project. Contact admin.';
   if (/network|fetch|internet|timeout/i.test(message)) return 'Could not register notifications. Check internet and try again.';
   return 'Could not register notifications on this device. Try again later.';
 }

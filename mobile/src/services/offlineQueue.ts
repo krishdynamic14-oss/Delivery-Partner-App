@@ -51,6 +51,7 @@ export async function syncQueue(token?: string, user?: Partner | null): Promise<
 
   const remaining: QueueAction[] = [];
   let synced = 0;
+  let discarded = 0;
 
   for (const action of queue) {
     try {
@@ -59,8 +60,13 @@ export async function syncQueue(token?: string, user?: Partner | null): Promise<
       if (action.type === 'settle') await submitSettlement(await hydrateSettlementPayload(action.payload), token);
       await deleteActionProofFiles(action);
       synced += 1;
-    } catch {
-      remaining.push(action);
+    } catch (err) {
+      if (isPermanentQueueError(err)) {
+        await deleteActionProofFiles(action);
+        discarded += 1;
+      } else {
+        remaining.push(action);
+      }
     }
   }
 
@@ -73,10 +79,12 @@ export async function syncQueue(token?: string, user?: Partner | null): Promise<
     synced,
     remaining: failed,
     failed,
-    status: failed ? 'warning' : 'success',
+    status: failed || discarded ? 'warning' : 'success',
     message: failed
-      ? `${synced} synced. ${failed} action(s) still need retry.`
-      : `${synced} queued action(s) synced successfully.`,
+      ? `${synced} synced. ${failed} action(s) still need retry.${discarded ? ` ${discarded} invalid action(s) removed.` : ''}`
+      : discarded
+        ? `${synced} synced. ${discarded} invalid queued action(s) removed.`
+        : `${synced} queued action(s) synced successfully.`,
   };
 }
 
@@ -162,4 +170,9 @@ async function hydrateSettlementPayload(payload: SettlementPayload): Promise<Set
 function estimateBase64Bytes(value: string) {
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
   return Math.ceil((value.length * 3) / 4) - padding;
+}
+
+function isPermanentQueueError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err || '');
+  return /otp|order not found|access denied|invalid token|missing token|amount required|amount cannot be greater/i.test(message);
 }

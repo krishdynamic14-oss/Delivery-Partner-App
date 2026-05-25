@@ -43,7 +43,7 @@ export function AdminDashboardScreen() {
           <View style={styles.brandRow}>
             <View style={styles.avatar}><Image source={require('../../assets/icon.png')} style={styles.logoImage} /></View>
             <View>
-              <Text style={styles.hqTitle}>Mahotsav HQ</Text>
+              <Text style={styles.hqTitle}>Dynamic Bazar Admin</Text>
               <Text style={styles.hqSub}>Admin Panel</Text>
             </View>
           </View>
@@ -56,12 +56,12 @@ export function AdminDashboardScreen() {
         </View>
 
         <View style={styles.greeting}>
-          <Text style={styles.greetingTitle}>Good Morning</Text>
+          <Text style={styles.greetingTitle}>Operations Overview</Text>
           <Text style={styles.greetingSub}>Dynamic Bazar operations · {new Date().toLocaleDateString('en-IN')}</Text>
         </View>
 
         <LinearGradient colors={['rgba(255,107,0,0.34)', 'rgba(255,179,71,0.12)', 'rgba(18,18,27,0.88)']} style={styles.hero}>
-          <Text style={styles.heroLabel}>Total COD Collected</Text>
+          <Text style={styles.heroLabel}>Delivered COD</Text>
           <Money value={collectedCod} size={38} />
           <Text style={styles.trend}>Assigned ₹{assignedCod.toLocaleString('en-IN')} · {codOrders.length} COD orders</Text>
         </LinearGradient>

@@ -111,15 +111,15 @@ export function DeliveryScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header title="Confirm Delivery" subtitle={`#${order.orderNo} · ${order.customerName}`} />
         <View style={styles.steps}>
-          <StepPill index={1} label="Route" done />
-          <StepPill index={2} label="OTP" active={!photo?.uri} />
-          <StepPill index={3} label="Photo" active={!!photo?.uri} />
-          <StepPill index={4} label="COD" />
+          <StepPill index={1} label="OTP" active={!photo?.uri} />
+          <StepPill index={2} label="Photo" active={!!photo?.uri} />
+          <StepPill index={3} label="Payment" />
+          <StepPill index={4} label="Done" />
         </View>
         <Card>
           <View style={styles.topRow}>
             <Badge label={order.paymentType} tone="info" />
-            <Text style={styles.priority}>Priority route</Text>
+            <Text style={styles.priority}>Proof required</Text>
           </View>
           <Text style={styles.label}>Collect COD</Text>
           <Money value={order.amount} size={34} />

@@ -144,35 +144,34 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
 
   async function deliverOrder(orderId: string, payload: DeliverPayload): Promise<ActionSubmitResult> {
     const state = await NetInfo.fetch();
-    const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'delivered' as const, photoUrl: payload.photoUri, updatedAt: new Date().toISOString() } : order);
-    setOrders(updatedOrders);
-    await saveOrders(updatedOrders);
-    if (state.isConnected) {
-      try {
-        const result = await markDelivered(orderId, payload, user?.token);
-        const photoUrl = result.photoUrl || payload.photoUri;
-        const syncedOrders = updatedOrders.map((order) => order.id === orderId ? { ...order, photoUrl } : order);
-        setOrders(syncedOrders);
-        await saveOrders(syncedOrders);
-        await deletePayloadProofFiles(payload);
-        return {
-          status: 'synced',
-          message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet. Proof photo stays on this device for now.',
-          photoUrl: result.photoUrl,
-        };
-      } catch (err) {
-        const message = getErrorMessage(err);
-        await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() }, user);
-        setPendingSync((count) => count + 1);
-        await persistSyncMeta({ status: 'warning', message: 'Delivery queued because sync failed.', lastError: message });
-        return { status: 'queued', message: `Delivery saved locally. ${message}` };
-      }
+    if (!state.isConnected) {
+      await persistSyncMeta({ status: 'offline', message: 'Delivery confirmation needs internet to verify the customer OTP.' });
+      throw new Error('Delivery confirmation needs internet to verify the customer OTP. Reconnect and try again.');
     }
 
-    await enqueueAction({ id: `deliver-${Date.now()}`, type: 'deliver', orderId, payload, createdAt: new Date().toISOString() }, user);
-    setPendingSync((count) => count + 1);
-    await persistSyncMeta({ status: 'offline', message: 'Delivery queued offline.' });
-    return { status: 'queued', message: 'Delivery saved offline. It will sync when network returns.' };
+    try {
+      const result = await markDelivered(orderId, payload, user?.token);
+      const photoUrl = result.photoUrl || payload.photoUri;
+      const syncedOrders = orders.map((order) => order.id === orderId ? {
+        ...order,
+        status: 'delivered' as const,
+        photoUrl,
+        updatedAt: new Date().toISOString(),
+      } : order);
+      setOrders(syncedOrders);
+      await saveOrders(syncedOrders);
+      await deletePayloadProofFiles(payload);
+      await persistSyncMeta({ status: 'success', message: 'Delivery synced to Google Sheets.', lastSyncAt: new Date().toISOString() });
+      return {
+        status: 'synced',
+        message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet.',
+        photoUrl: result.photoUrl,
+      };
+    } catch (err) {
+      const message = getErrorMessage(err);
+      await persistSyncMeta({ status: 'error', message: 'Delivery was not saved.', lastError: message });
+      throw new Error(message);
+    }
   }
 
   async function sendOrderOtp(orderId: string): Promise<ActionSubmitResult> {

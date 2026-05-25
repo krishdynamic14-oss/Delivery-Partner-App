@@ -3,6 +3,7 @@ const ORDERS_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('D
 const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PAYMENT_LOG_SHEET') || 'PAYMENT LOG';
 const DELIVERY_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DELIVERY_LOG_SHEET') || 'DELIVERY LOG';
 const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_MASTER_SHEET') || 'Stock Master';
+const STOCK_REORDER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_REORDER_SHEET') || 'STOCK REORDER REQUESTS';
 const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
 const PASSWORD_RESET_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PASSWORD_RESET_SHEET') || 'PASSWORD RESET';
 const PUSH_TOKEN_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PUSH_TOKEN_SHEET') || 'PUSH TOKENS';
@@ -130,6 +131,7 @@ function doPost(e) {
       'bills.generate': () => generateBillByOrderId_(body.orderId, token),
       'stock.master': () => getStockMaster_(token),
       'stock.dispatch': () => addStockDispatch_(body, token),
+      'stock.reorder': () => createStockReorderRequest_(body, token),
       'admin.partners': () => getAdminPartners_(token),
       'orders.assign': () => assignOrderToPartner_(body, token),
       'calls.startMaskedCall': () => startMaskedCall_(body, token),
@@ -1685,6 +1687,77 @@ function addStockDispatch_(body, token) {
     });
   }
   return { added: true };
+}
+
+function createStockReorderRequest_(body, token) {
+  const auth = assertAdminToken_(token);
+  const items = Array.isArray(body && body.items) ? body.items : [];
+  if (!items.length) throw new Error('At least one reorder item is required');
+
+  const requestId = 'REQ-' + Date.now();
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(STOCK_REORDER_SHEET_NAME) || ss.insertSheet(STOCK_REORDER_SHEET_NAME);
+  ensureStockReorderHeader_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const requestedBy = String((body && body.requestedBy) || auth.name || auth.phone || 'admin').trim();
+  const notes = String((body && body.notes) || '').trim();
+
+  items.forEach((item) => {
+    const rowByHeader = {
+      'TIMESTAMP': new Date(),
+      'REQUEST ID': requestId,
+      'PRODUCT': String(item.product || '').trim(),
+      'SKU': String(item.sku || '').trim(),
+      'STATUS': normalizeText_(item.status || 'LOW'),
+      'REMAINING QTY': Number(item.remainingQty || 0),
+      'DAYS LEFT': Number(item.daysLeft || 0),
+      'REQUESTED BY': requestedBy,
+      'REQUESTED BY PHONE': auth.phone || '',
+      'NOTES': notes,
+      'APPROVAL STATUS': 'OPEN',
+    };
+    const row = headers.map((header) => {
+      const key = String(header || '').trim().toUpperCase();
+      return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+    });
+    sheet.appendRow(row);
+  });
+
+  return {
+    requestId: requestId,
+    itemCount: items.length,
+  };
+}
+
+function ensureStockReorderHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'REQUEST ID',
+    'PRODUCT',
+    'SKU',
+    'STATUS',
+    'REMAINING QTY',
+    'DAYS LEFT',
+    'REQUESTED BY',
+    'REQUESTED BY PHONE',
+    'NOTES',
+    'APPROVAL STATUS',
+  ];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
+  const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+  if (existingUpper[0] !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
+  sheet.setFrozenRows(1);
 }
 
 function ensureStockMasterDispatchColumns_(sheet) {

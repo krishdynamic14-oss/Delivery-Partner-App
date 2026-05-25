@@ -9,8 +9,16 @@ import { useAuth } from '../state/AuthContext';
 import { fetchPartnerLiveLocations } from '../services/api';
 import type { DeliveryOrder, PartnerLiveLocation } from '../types';
 
-const FILTERS = ['All', 'Active', 'Idle', 'Delayed', 'Zone A', 'Zone B'] as const;
+type LocationFilter = 'all' | 'active' | 'idle' | 'delayed' | 'tracked' | 'missing';
 
+const FILTERS: { key: LocationFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'idle', label: 'Idle' },
+  { key: 'delayed', label: 'Delayed' },
+  { key: 'tracked', label: 'GPS available' },
+  { key: 'missing', label: 'GPS missing' },
+];
 
 let colors: AppColors = defaultColors;
 let styles = createStyles(colors);
@@ -20,6 +28,7 @@ function useScreenThemeStyles() {
   colors = theme.colors;
   styles = createStyles(colors);
 }
+
 export function AdminLiveMapScreen() {
   useScreenThemeStyles();
   const { user } = useAuth();
@@ -27,6 +36,8 @@ export function AdminLiveMapScreen() {
   const [locations, setLocations] = useState<PartnerLiveLocation[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [filter, setFilter] = useState<LocationFilter>('all');
+
   const loadLocations = useCallback(async () => {
     if (!user?.token) return;
     setLocationLoading(true);
@@ -34,8 +45,7 @@ export function AdminLiveMapScreen() {
     try {
       setLocations(await fetchPartnerLiveLocations(user.token));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err || 'Location refresh failed');
-      setLocationError(message);
+      setLocationError(err instanceof Error ? err.message : 'Location refresh failed.');
     } finally {
       setLocationLoading(false);
     }
@@ -46,11 +56,16 @@ export function AdminLiveMapScreen() {
   }, [loadLocations]);
 
   const postmen = useMemo(() => getPostmen(orders, locations), [orders, locations]);
+  const filteredPostmen = useMemo(() => postmen.filter((postman) => {
+    if (filter === 'all') return true;
+    if (filter === 'tracked') return hasGps(postman);
+    if (filter === 'missing') return !hasGps(postman);
+    return postman.state.toLowerCase() === filter;
+  }), [filter, postmen]);
   const active = postmen.filter((postman) => postman.state === 'Active').length;
   const delayed = postmen.filter((postman) => postman.state === 'Delayed').length;
   const idle = postmen.filter((postman) => postman.state === 'Idle').length;
-  const tracked = postmen.filter((postman) => postman.latitude && postman.longitude).length;
-  const delivered = orders.filter((order) => order.status === 'delivered').length;
+  const tracked = postmen.filter(hasGps).length;
   const pending = orders.filter((order) => order.status === 'pending').length;
   const refreshAll = useCallback(async () => {
     await Promise.all([refresh(), loadLocations()]);
@@ -61,109 +76,55 @@ export function AdminLiveMapScreen() {
       <ScrollView refreshControl={<RefreshControl refreshing={loading || locationLoading} onRefresh={refreshAll} tintColor={colors.orange} />}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Live Map</Text>
-            <Text style={styles.sub}>{tracked}/{postmen.length} postmen tracked · {new Set(orders.map((order) => order.district).filter(Boolean)).size} districts</Text>
+            <Text style={styles.title}>Field Locations</Text>
+            <Text style={styles.sub}>{tracked}/{postmen.length} partners sharing GPS · {pending} pending orders</Text>
           </View>
           <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>Live</Text></View>
         </View>
 
+        <View style={styles.summaryGrid}>
+          <Metric icon="crosshairs-gps" label="Tracked" value={tracked} color={colors.blue} />
+          <Metric icon="moped" label="Active" value={active} color={colors.green} />
+          <Metric icon="timer-sand" label="Idle" value={idle} color={colors.muted} />
+          <Metric icon="alert-circle-outline" label="Delayed" value={delayed} color={colors.red} />
+        </View>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>
-          {FILTERS.map((filter, index) => (
-            <Pressable key={filter} style={[styles.filter, index === 0 && styles.filterActive]}>
-              <Text style={[styles.filterText, index === 0 && styles.filterActiveText]}>{filter}</Text>
+          {FILTERS.map((item) => (
+            <Pressable
+              key={item.key}
+              onPress={() => setFilter(item.key)}
+              style={[styles.filter, filter === item.key && styles.filterActive]}
+            >
+              <Text style={[styles.filterText, filter === item.key && styles.filterActiveText]}>{item.label}</Text>
             </Pressable>
           ))}
         </ScrollView>
 
-        <View style={styles.mapCanvas}>
-          <View style={styles.roadH1} />
-          <View style={styles.roadH2} />
-          <View style={styles.roadV1} />
-          <View style={styles.roadV2} />
-          <Zone label="Zone A" left="5%" top="8%" width="38%" height="34%" />
-          <Zone label="Zone B" left="50%" top="8%" width="44%" height="34%" />
-          <Zone label="Zone C" left="5%" top="50%" width="38%" height="38%" />
-          <Zone label="Zone D" left="50%" top="50%" width="44%" height="38%" />
-          <Cluster label={`${pending} pending`} left="13%" top="18%" />
-          <Cluster label={`${delivered} done`} left="56%" top="14%" />
-          <Cluster label={`${delayed} delayed`} left="60%" top="60%" />
-          {postmen.slice(0, 8).map((postman, index) => (
-            <PostmanDot key={postman.name} postman={postman} index={index} />
-          ))}
-          <View style={styles.liveCounter}>
-            <View style={[styles.liveDot, { backgroundColor: colors.orange }]} />
-            <Text style={styles.liveCounterText}>{active} active postmen</Text>
-          </View>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statScroller}>
-          <MapChip color={colors.green} label="Active" value={active} />
-          <MapChip color={colors.muted} label="Idle" value={idle} />
-          <MapChip color={colors.red} label="Delayed" value={delayed} />
-          <MapChip color={colors.blue} label="Tracked" value={tracked} icon="crosshairs-gps" />
-          <MapChip color={colors.amber} label="Orders out" value={orders.length} icon="package-variant-closed" />
-          <MapChip color={colors.green} label="Delivered" value={delivered} icon="check-circle-outline" />
-        </ScrollView>
-
-        <Text style={styles.sectionTitle}>Field Team</Text>
         {locationError ? <Card><Text style={[styles.meta, { color: colors.red }]}>{locationError}</Text></Card> : null}
-        {postmen.length ? postmen.map((postman) => <PostmanListItem key={postman.name} postman={postman} />) : (
-          <Card><Text style={styles.meta}>No assigned postmen visible yet.</Text></Card>
+
+        <Text style={styles.sectionTitle}>Delivery Partners</Text>
+        {filteredPostmen.length ? filteredPostmen.map((postman) => <PostmanListItem key={postman.key} postman={postman} />) : (
+          <Card><Text style={styles.meta}>No delivery partners match this filter.</Text></Card>
         )}
       </ScrollView>
     </Screen>
   );
 }
 
-function Zone({ label, left, top, width, height }: { label: string; left: `${number}%`; top: `${number}%`; width: `${number}%`; height: `${number}%` }) {
+function Metric({ icon, label, value, color }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: number; color: string }) {
   return (
-    <View style={[styles.zone, { left, top, width, height }]}>
-      <Text style={styles.zoneText}>{label}</Text>
-    </View>
-  );
-}
-
-function Cluster({ label, left, top }: { label: string; left: `${number}%`; top: `${number}%` }) {
-  return (
-    <View style={[styles.cluster, { left, top }]}>
-      <Text style={styles.clusterText}>{label}</Text>
-    </View>
-  );
-}
-
-function PostmanDot({ postman, index }: { postman: MapPostman; index: number }) {
-  const positions = [
-    ['18%', '23%'], ['60%', '17%'], ['22%', '58%'], ['70%', '64%'],
-    ['45%', '42%'], ['34%', '74%'], ['78%', '34%'], ['10%', '70%'],
-  ] as const;
-  const [left, top] = positions[index % positions.length];
-  const stateColor = getStateColor(postman.state);
-  return (
-    <View style={[styles.pmDot, { left, top }]}>
-      <View style={[styles.ping, { borderColor: stateColor }]} />
-      <View style={[styles.pmCircle, { backgroundColor: postman.color, borderColor: `${stateColor}aa` }]}>
-        <Text style={styles.pmCircleText}>{initials(postman.name)}</Text>
-      </View>
-      <Text style={[styles.pmDotLabel, { color: stateColor }]} numberOfLines={1}>{postman.shortName} · {postman.delivered} done</Text>
-    </View>
-  );
-}
-
-function MapChip({ color, label, value, icon }: { color: string; label: string; value: number; icon?: keyof typeof MaterialCommunityIcons.glyphMap }) {
-  return (
-    <View style={styles.mapChip}>
-      {icon ? <MaterialCommunityIcons name={icon} size={15} color={color} /> : <View style={[styles.statusDot, { backgroundColor: color }]} />}
-      <View>
-        <Text style={[styles.mapChipValue, { color }]}>{value}</Text>
-        <Text style={styles.mapChipLabel}>{label}</Text>
-      </View>
+    <View style={styles.metricTile}>
+      <MaterialCommunityIcons name={icon} size={17} color={color} />
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
 
 function PostmanListItem({ postman }: { postman: MapPostman }) {
   const stateColor = getStateColor(postman.state);
-  const hasLocation = Boolean(postman.latitude && postman.longitude);
+  const gpsAvailable = hasGps(postman);
   return (
     <Card>
       <View style={styles.listStack}>
@@ -173,29 +134,27 @@ function PostmanListItem({ postman }: { postman: MapPostman }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{postman.name}</Text>
-            <Text style={[styles.meta, postman.state === 'Delayed' && { color: colors.red }]}>
-              {postman.zone} · {postman.pending ? `${postman.pending} orders remaining` : 'Route complete'}
-            </Text>
+            <Text style={styles.meta}>{postman.district || 'District not set'} · {postman.pending ? `${postman.pending} pending` : 'No pending orders'}</Text>
             <Text style={styles.meta}>
-              {hasLocation ? `Last seen ${formatLastSeen(postman.lastSeen)}${postman.accuracy ? ` · ${Math.round(postman.accuracy)}m accuracy` : ''}` : 'Location not received yet'}
+              {gpsAvailable ? `GPS ${formatLastSeen(postman.lastSeen)}${postman.accuracy ? ` · ${Math.round(postman.accuracy)}m accuracy` : ''}` : 'GPS not received yet'}
             </Text>
           </View>
           <View style={styles.right}>
             <Money value={postman.cod} size={15} />
             <Badge label={postman.state.toLowerCase()} tone={postman.state === 'Delayed' ? 'failed' : postman.state === 'Active' ? 'delivered' : 'pending'} />
           </View>
-          <View style={[styles.statusDot, { backgroundColor: hasLocation ? colors.blue : stateColor }]} />
+          <View style={[styles.statusDot, { backgroundColor: gpsAvailable ? colors.blue : stateColor }]} />
         </View>
-        {hasLocation ? <Button label="Open in Google Maps" tone="secondary" onPress={() => openPartnerLocation(postman)} /> : null}
+        {gpsAvailable ? <Button label="Open GPS Location" tone="secondary" onPress={() => openPartnerLocation(postman)} /> : null}
       </View>
     </Card>
   );
 }
 
 type MapPostman = {
+  key: string;
   name: string;
-  shortName: string;
-  zone: string;
+  district: string;
   state: 'Active' | 'Idle' | 'Delayed';
   delivered: number;
   pending: number;
@@ -210,55 +169,62 @@ type MapPostman = {
 
 function getPostmen(orders: DeliveryOrder[], locations: PartnerLiveLocation[]) {
   const palette = [colors.orange, colors.blue, colors.green, colors.red, '#8b5cf6', colors.amber];
-  const byName = new Map<string, MapPostman>();
+  const byPartner = new Map<string, MapPostman>();
+
   orders.forEach((order) => {
-    const name = order.assignedTo || 'Unassigned';
-    const current = byName.get(name) || {
-      name,
-      shortName: name.split(/\s+/)[0] || 'Team',
-      zone: zoneFromDistrict(order.district),
+    const key = normalizePartnerKey(order.assignedTo, '');
+    const current = byPartner.get(key) || {
+      key,
+      name: order.assignedTo || 'Unassigned',
+      district: order.district || '',
       state: 'Idle' as const,
       delivered: 0,
       pending: 0,
       cod: 0,
-      color: palette[byName.size % palette.length],
+      color: palette[byPartner.size % palette.length],
     };
+    if (!current.district && order.district) current.district = order.district;
     if (order.status === 'delivered') current.delivered += 1;
     if (order.status === 'pending') current.pending += 1;
     if (order.status === 'failed') current.state = 'Delayed';
     if (order.paymentType === 'COD' && order.status === 'delivered') current.cod += order.amount;
     if (current.state !== 'Delayed' && current.pending > 0) current.state = 'Active';
-    byName.set(name, current);
+    byPartner.set(key, current);
   });
+
   locations.forEach((location) => {
-    const key = location.partnerName || location.numberMasked || location.phone || 'Unknown';
-    const existing = byName.get(key);
-    const current = existing || {
-      name: key,
-      shortName: key.split(/\s+/)[0] || 'Team',
-      zone: zoneFromDistrict(location.district),
+    const key = normalizePartnerKey(location.partnerName, location.phone || location.numberMasked);
+    const current = byPartner.get(key) || {
+      key,
+      name: location.partnerName || location.numberMasked || 'Unknown partner',
+      district: location.district || '',
       state: 'Idle' as const,
       delivered: 0,
       pending: 0,
       cod: 0,
-      color: palette[byName.size % palette.length],
+      color: palette[byPartner.size % palette.length],
     };
     current.latitude = location.latitude;
     current.longitude = location.longitude;
     current.accuracy = location.accuracy;
     current.lastSeen = location.lastSeen;
     current.numberMasked = location.numberMasked;
-    byName.set(key, current);
+    if (location.partnerName) current.name = location.partnerName;
+    if (location.district) current.district = location.district;
+    byPartner.set(key, current);
   });
-  return Array.from(byName.values()).sort((a, b) => b.pending - a.pending || b.delivered - a.delivered);
+
+  return Array.from(byPartner.values()).sort((a, b) => Number(hasGps(b)) - Number(hasGps(a)) || b.pending - a.pending || a.name.localeCompare(b.name));
 }
 
-function zoneFromDistrict(district: string) {
-  const first = (district || 'A').trim()[0]?.toUpperCase() || 'A';
-  if (first <= 'F') return 'Zone A';
-  if (first <= 'L') return 'Zone B';
-  if (first <= 'R') return 'Zone C';
-  return 'Zone D';
+function normalizePartnerKey(name?: string, phone?: string) {
+  const phoneKey = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (phoneKey) return `phone:${phoneKey}`;
+  return `name:${String(name || 'unassigned').trim().toUpperCase()}`;
+}
+
+function hasGps(postman: MapPostman) {
+  return Boolean(postman.latitude && postman.longitude);
 }
 
 function getStateColor(state: MapPostman['state']) {
@@ -281,7 +247,7 @@ function openPartnerLocation(postman: MapPostman) {
 }
 
 function formatLastSeen(value?: string) {
-  if (!value) return 'unknown';
+  if (!value) return 'time unknown';
   const time = new Date(value).getTime();
   if (!time || Number.isNaN(time)) return value;
   const diff = Math.max(0, Date.now() - time);
@@ -301,32 +267,15 @@ function createStyles(colors: AppColors) {
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 },
   liveDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.green },
   liveText: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 10 },
+  metricTile: { width: '48%', minHeight: 78, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.glass, padding: 12, marginBottom: 10 },
+  metricValue: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 6 },
+  metricLabel: { color: colors.muted, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 2 },
   filters: { marginHorizontal: -18, paddingHorizontal: 18, marginBottom: 12 },
   filter: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, marginRight: 7 },
   filterActive: { borderColor: colors.orange, backgroundColor: 'rgba(255,107,0,0.13)' },
   filterText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
   filterActiveText: { color: colors.orange },
-  mapCanvas: { position: 'relative', height: 430, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a18', marginBottom: 12 },
-  roadH1: { position: 'absolute', top: '38%', left: 0, right: 0, height: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
-  roadH2: { position: 'absolute', top: '62%', left: 0, right: 0, height: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
-  roadV1: { position: 'absolute', left: '30%', top: 0, bottom: 0, width: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
-  roadV2: { position: 'absolute', left: '65%', top: 0, bottom: 0, width: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
-  zone: { position: 'absolute', borderRadius: 20, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(78,156,255,0.23)', backgroundColor: 'rgba(78,156,255,0.05)', alignItems: 'flex-end', padding: 8 },
-  zoneText: { color: 'rgba(78,156,255,0.55)', fontSize: 9, fontWeight: '900' },
-  cluster: { position: 'absolute', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,179,71,0.36)', backgroundColor: 'rgba(255,179,71,0.15)' },
-  clusterText: { color: colors.amber, fontSize: 10, fontWeight: '900' },
-  pmDot: { position: 'absolute', alignItems: 'center', gap: 3, zIndex: 5 },
-  ping: { position: 'absolute', width: 44, height: 44, top: -6, borderRadius: 99, borderWidth: 1, opacity: 0.45 },
-  pmCircle: { width: 32, height: 32, borderRadius: 99, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  pmCircleText: { color: colors.text, fontSize: 10, fontWeight: '900' },
-  pmDotLabel: { maxWidth: 92, backgroundColor: 'rgba(10,10,24,0.88)', borderColor: colors.border, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, fontSize: 9, fontWeight: '900', overflow: 'hidden' },
-  liveCounter: { position: 'absolute', top: 10, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,107,0,0.32)', backgroundColor: 'rgba(10,10,24,0.88)' },
-  liveCounterText: { color: colors.orange, fontSize: 11, fontWeight: '900' },
-  statScroller: { marginHorizontal: -18, paddingHorizontal: 18, marginBottom: 14 },
-  mapChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass, marginRight: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 99 },
-  mapChipValue: { fontSize: 12, fontWeight: '900' },
-  mapChipLabel: { color: colors.muted, fontSize: 9 },
   sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '900', marginBottom: 10 },
   listStack: { gap: 10 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -335,5 +284,6 @@ function createStyles(colors: AppColors) {
   name: { color: colors.text, fontSize: 13, fontWeight: '900' },
   meta: { color: colors.muted, fontSize: 10, marginTop: 4 },
   right: { alignItems: 'flex-end', gap: 5 },
+  statusDot: { width: 8, height: 8, borderRadius: 99 },
 });
 }

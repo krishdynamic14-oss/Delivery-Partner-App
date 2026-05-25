@@ -111,11 +111,11 @@ export function AdminEarningsScreen() {
     };
     const approvedAmount = status === 'APPROVED' ? Number(input.approvedAmount || 0) : 0;
     if (status === 'APPROVED' && (!approvedAmount || approvedAmount <= 0)) {
-      Alert.alert('Amount required', 'Approved amount enter karo.');
+      Alert.alert('Amount required', 'Enter the approved amount.');
       return;
     }
     if (status === 'APPROVED' && approvedAmount > settlement.requestedAmount) {
-      Alert.alert('Amount too high', 'Approved amount requested amount se zyada nahi ho sakta.');
+      Alert.alert('Amount too high', 'Approved amount cannot be greater than the requested amount.');
       return;
     }
     try {

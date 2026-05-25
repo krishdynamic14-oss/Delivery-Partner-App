@@ -21,7 +21,7 @@ export function ProfileScreen() {
   const [queuedActions, setQueuedActions] = useState<QueueAction[]>([]);
   const [pushStatus, setPushStatus] = useState<PushRegistrationStatus>();
   const [pushRetrying, setPushRetrying] = useState(false);
-  const showPushDebugTools = user?.role === 'admin' || __DEV__;
+  const showPushDebugTools = __DEV__;
 
   async function refreshQueueDetails() {
     const queue = await loadQueueForUser(user);
@@ -59,7 +59,7 @@ export function ProfileScreen() {
     });
     await saveQueue(nextQueue);
     setQueuedActions(nextQueue.filter((action) => queueBelongsToUser(action, user)));
-    Alert.alert('Screenshot attached', 'Ab Sync now dabao. Ye pending payment proof upload hoga.');
+    Alert.alert('Screenshot attached', 'Tap Sync now to upload this pending payment proof.');
   }
 
   async function retryPushRegistration() {
@@ -69,7 +69,6 @@ export function ProfileScreen() {
       await setupPushNotifications(user);
       const nextStatus = await loadPushRegistrationStatus();
       setPushStatus(nextStatus);
-      Alert.alert(nextStatus.status === 'registered' ? 'Notifications active' : 'Notifications not active', nextStatus.message);
     } finally {
       setPushRetrying(false);
     }
@@ -78,7 +77,7 @@ export function ProfileScreen() {
   function confirmRemove(action: QueueAction) {
     Alert.alert(
       'Remove pending action?',
-      'Ye sirf phone se local pending action delete karega. Google Sheet me kuch upload nahi hoga.',
+      'This only removes the pending action from this phone. Nothing will be uploaded to Google Sheets.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -149,7 +148,7 @@ export function ProfileScreen() {
         {queuedActions.length ? (
           <Card>
             <Text style={styles.sectionTitle}>Pending Action Details</Text>
-            <Text style={styles.helperText}>Ye actions phone me saved hain. Sync now dabane par Google Sheets me upload honge.</Text>
+            <Text style={styles.helperText}>These actions are saved on this phone and will upload to Google Sheets when you tap Sync now.</Text>
             {queuedActions.map((action) => (
               <View key={action.id} style={styles.queueItem}>
                 <Text style={styles.queueTitle}>{getQueueActionTitle(action)}</Text>
