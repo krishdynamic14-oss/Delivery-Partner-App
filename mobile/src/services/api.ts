@@ -7,7 +7,10 @@ import type {
   DeliveryPartnerSummary,
   FailPayload,
   LoginPayload,
+  MaskedCallResult,
   Partner,
+  PartnerLiveLocation,
+  PartnerLocationUpdate,
   PushTokenRegistration,
   SendDeliveryOtpResult,
   SettlementPayload,
@@ -70,6 +73,15 @@ export async function markDelivered(orderId: string, payload: DeliverPayload, to
 export async function sendDeliveryOtp(orderId: string, token?: string): Promise<SendDeliveryOtpResult> {
   if (GAS_URL) return request<SendDeliveryOtpResult>('orders.sendDeliveryOtp', { orderId }, token);
   return { sent: true, orderId, statusCode: 200 };
+}
+
+export async function startMaskedCall(orderId: string, token?: string): Promise<MaskedCallResult> {
+  if (GAS_URL) return request<MaskedCallResult>('calls.startMaskedCall', { orderId }, token);
+  return {
+    status: 'not_configured',
+    message: 'Calling is not configured yet.',
+    orderId,
+  };
 }
 
 export async function markFailed(orderId: string, payload: FailPayload, token?: string) {
@@ -136,6 +148,16 @@ export async function assignOrder(orderId: string, partner: DeliveryPartnerSumma
     }, token);
   }
   return { updated: true };
+}
+
+export async function updatePartnerLocation(payload: PartnerLocationUpdate, token?: string): Promise<{ updated: true; timestamp: string }> {
+  if (GAS_URL) return request<{ updated: true; timestamp: string }>('location.update', payload, token);
+  return { updated: true, timestamp: new Date().toISOString() };
+}
+
+export async function fetchPartnerLiveLocations(token?: string): Promise<PartnerLiveLocation[]> {
+  if (GAS_URL) return request<PartnerLiveLocation[]>('location.latest', {}, token);
+  return [];
 }
 
 export async function addStockDispatch(payload: StockDispatchPayload, token?: string): Promise<{ added: true }> {

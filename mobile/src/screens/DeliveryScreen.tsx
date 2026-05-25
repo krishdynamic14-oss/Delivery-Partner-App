@@ -7,7 +7,6 @@ import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import type { PaymentReceivedMode, RootStackParamList } from '../types';
-import { openNavigation } from '../services/maps';
 import { buildUpiPaymentUrl, pickUpiId, UPI_NAME } from '../services/upi';
 import { captureProofImage, type ProofImage } from '../services/proofImages';
 
@@ -126,7 +125,6 @@ export function DeliveryScreen({ route, navigation }: Props) {
           <Money value={order.amount} size={34} />
           <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${order.phoneMasked}`} />
           <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
-          <Button label="Open Route in Maps" tone="secondary" onPress={() => openNavigation(order.address, order.district)} />
         </Card>
         <Button
           label={order.deliveryOtpSentStatus === 'SENT' ? 'Resend OTP to Customer' : 'Send OTP to Customer'}

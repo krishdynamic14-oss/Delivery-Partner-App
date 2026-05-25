@@ -6,8 +6,9 @@ import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
 import type { RootStackParamList } from '../types';
-import { openNavigation } from '../services/maps';
 import { getDeadlineLabel, getDeadlineStatus } from '../services/deadlines';
+import { startMaskedCall } from '../services/api';
+import { useState } from 'react';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderDetail'>;
 
@@ -24,6 +25,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
   useScreenThemeStyles();
   const { user } = useAuth();
   const { orders } = useOrders();
+  const [calling, setCalling] = useState(false);
   const order = orders.find((item) => item.id === route.params.orderId);
 
   if (!order) {
@@ -35,22 +37,35 @@ export function OrderDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  const currentOrder = order;
   const proofUrl = order.photoUrl || '';
   const hasRemoteProof = proofUrl.startsWith('http');
   const isAdmin = user?.role === 'admin';
-  const customerPhone = String(order.customerPhone || '').replace(/\D/g, '');
-  const callCustomer = () => {
-    if (!customerPhone) {
-      Alert.alert('Customer number missing', 'Refresh orders after deploying the latest Apps Script. Full customer number is required for direct calling.');
+  const customerContact = order.phoneMasked || 'Number hidden';
+
+  async function callCustomer() {
+    if (!user?.token) {
+      Alert.alert('Login required', 'Please login again before starting a call.');
       return;
     }
-    Linking.openURL(`tel:${customerPhone}`);
-  };
+    setCalling(true);
+    try {
+      const result = await startMaskedCall(currentOrder.id, user.token);
+      Alert.alert(
+        result.status === 'initiated' ? 'Call started' : 'Calling',
+        result.message,
+      );
+    } catch (err) {
+      Alert.alert('Call failed', err instanceof Error ? err.message : 'Could not start call.');
+    } finally {
+      setCalling(false);
+    }
+  }
 
   return (
     <Screen bottomPadding={20}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${customerPhone || order.phoneMasked}`} />
+        <Header title={`#${order.orderNo}`} subtitle={`${order.customerName} · ${customerContact}`} />
         <Card>
           <View style={styles.topRow}>
             <View style={styles.badges}>
@@ -61,7 +76,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
             <Money value={order.amount} />
           </View>
           <Text style={styles.product}>{order.product} × {order.quantity}</Text>
-          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${customerPhone || order.phoneMasked}`} />
+          <InfoRow icon="account-outline" label="Customer" value={`${order.customerName} · ${customerContact}`} />
           <InfoRow icon="map-marker-outline" label="Address" value={order.address} />
           <InfoRow icon="map-outline" label="Area" value={`${order.area}, ${order.district}`} />
           <InfoRow icon="account-hard-hat-outline" label="Delivery partner" value={order.assignedTo || 'Not assigned'} />
@@ -75,8 +90,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
         <View style={{ gap: 10 }}>
-          <Button label="Open Route in Maps" onPress={() => openNavigation(order.address, order.district)} />
-          {!isAdmin ? <Button label="Call Customer" tone="secondary" onPress={callCustomer} /> : null}
+          {!isAdmin ? <Button label="Call Customer" tone="secondary" loading={calling} onPress={callCustomer} /> : null}
           {hasRemoteProof ? <Button label="Open Proof Photo" tone="secondary" onPress={() => Linking.openURL(proofUrl)} /> : null}
           {!isAdmin ? <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} /> : null}
           {!isAdmin ? <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} /> : null}

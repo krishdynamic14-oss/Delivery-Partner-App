@@ -4,10 +4,12 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
+    "postinstall": "node scripts/patch-android-native-linking.js",
     "typecheck": "tsc --noEmit",
+    "build:local:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-local-release-apk.ps1",
     "eas:whoami": "npx eas whoami",
     "build:apk": "npx eas build --platform android --profile preview",
     "build:aab": "npx eas build --platform android --profile production"
@@ -29,6 +31,7 @@
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
+    "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",

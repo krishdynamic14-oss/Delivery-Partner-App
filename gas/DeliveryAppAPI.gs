@@ -6,6 +6,8 @@ const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getPrope
 const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
 const PASSWORD_RESET_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PASSWORD_RESET_SHEET') || 'PASSWORD RESET';
 const PUSH_TOKEN_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PUSH_TOKEN_SHEET') || 'PUSH TOKENS';
+const CALL_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_CALL_LOG_SHEET') || 'CALL LOG';
+const LOCATION_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_LOCATION_LOG_SHEET') || 'LOCATION LOG';
 const PROOF_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_PROOF_FOLDER_ID');
 const BILL_TEMPLATE_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_TEMPLATE_ID') || '';
 const BILL_FOLDER_ID = PropertiesService.getScriptProperties().getProperty('DB_BILL_FOLDER_ID') || '';
@@ -17,6 +19,15 @@ const ADMIN_PHONES = PropertiesService.getScriptProperties().getProperty('DB_ADM
 const ADMIN_CREDENTIALS_JSON = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_CREDENTIALS_JSON') || '';
 const ADMIN_PASSWORD = PropertiesService.getScriptProperties().getProperty('DB_ADMIN_PASSWORD') || '';
 const COD_COMMISSION_SLABS_JSON = PropertiesService.getScriptProperties().getProperty('DB_COD_COMMISSION_SLABS_JSON') || '';
+const BONVOICE_API_KEY = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_API_KEY') || '';
+const BONVOICE_AUTH_TOKEN = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_AUTH_TOKEN') || BONVOICE_API_KEY;
+const BONVOICE_API_URL = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_API_URL') || 'https://backend.pbx.bonvoice.com/autoDialManagement/autoCallBridging/';
+const BONVOICE_DID_NUMBER = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_DID_NUMBER') || '';
+const BONVOICE_FALLBACK_NUMBER = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_FALLBACK_NUMBER') || '';
+const BONVOICE_LEG_A_CHANNEL_ID = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_LEG_A_CHANNEL_ID') || '1';
+const BONVOICE_LEG_B_CHANNEL_ID = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_LEG_B_CHANNEL_ID') || '1';
+const BONVOICE_DIAL_ATTEMPTS = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_DIAL_ATTEMPTS') || '1';
+const BONVOICE_NUMBER_FORMAT = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_NUMBER_FORMAT') || '91';
 
 const DEFAULT_COD_COMMISSION_SLABS = [
   { min: 0, max: 1199, commission: 150 },
@@ -90,10 +101,17 @@ const DP_COLUMN_ALIASES = {
 
 function doPost(e) {
   try {
-    const input = JSON.parse(e.postData.contents || '{}');
+    const input = parsePostInput_(e);
     const action = input.action;
     const body = input.body || {};
     const token = getToken_(e, input);
+
+    if (!action && input.did && input.from) {
+      return json_(handleBonvoiceDynamicRoute_(input));
+    }
+    if (!action && (input.callID || input.eventID || input.SourceNumber || input.DestinationNumber)) {
+      return json_(handleBonvoiceCallLog_(input));
+    }
 
     const routes = {
       'auth.login': () => demoLogin_(body),
@@ -114,6 +132,11 @@ function doPost(e) {
       'stock.dispatch': () => addStockDispatch_(body, token),
       'admin.partners': () => getAdminPartners_(token),
       'orders.assign': () => assignOrderToPartner_(body, token),
+      'calls.startMaskedCall': () => startMaskedCall_(body, token),
+      'calls.dynamicRoute': () => handleBonvoiceDynamicRoute_(body),
+      'calls.bonvoiceLog': () => handleBonvoiceCallLog_(body),
+      'location.update': () => updatePartnerLocation_(body, token),
+      'location.latest': () => getLatestPartnerLocations_(token),
       'notifications.registerToken': () => registerPushToken_(body, token),
       'notifications.deactivateToken': () => deactivatePushToken_(body, token),
       'notifications.deadlineReminders': () => runDeadlineReminders_(body, token),
@@ -128,6 +151,26 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
+}
+
+function parsePostInput_(e) {
+  const contents = e && e.postData && e.postData.contents ? String(e.postData.contents || '') : '';
+  if (contents) {
+    try {
+      return JSON.parse(contents);
+    } catch (err) {
+      const params = {};
+      contents.split('&').forEach((pair) => {
+        const parts = pair.split('=');
+        if (!parts[0]) return;
+        const key = decodeURIComponent(String(parts[0] || '').replace(/\+/g, ' '));
+        const value = decodeURIComponent(String(parts.slice(1).join('=') || '').replace(/\+/g, ' '));
+        params[key] = value;
+      });
+      if (Object.keys(params).length) return params;
+    }
+  }
+  return e && e.parameter ? e.parameter : {};
 }
 
 function demoLogin_(body) {
@@ -551,6 +594,506 @@ function assignOrderToPartner_(body, token) {
   return { updated: true };
 }
 
+function startMaskedCall_(body, token) {
+  const auth = assertToken_(token);
+  const orderId = String(body.orderId || '').replace('#', '').trim();
+  if (!orderId) throw new Error('Order ID required');
+  assertOrderAccess_(orderId, token);
+
+  const context = getOrderRowContextById_(orderId);
+  const accessor = context.accessor;
+  const row = context.row;
+  const orderNo = String(accessor.read(row, 'ORDER_NO') || orderId).replace('#', '').trim();
+  const customerPhone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
+  const orderPartnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+  const partnerPhone = auth.role === 'partner' && auth.phone ? auth.phone : orderPartnerPhone;
+  const partnerName = String(accessor.read(row, 'POSTMAN') || auth.name || '').trim();
+  const did = onlyDigits_(BONVOICE_DID_NUMBER).slice(-10);
+  const eventId = makeBonvoiceEventId_(orderNo);
+
+  if (!customerPhone || !partnerPhone) {
+    appendCallLog_({
+      'TIMESTAMP': new Date(),
+      'ORDER NO': orderNo,
+      'DIRECTION': 'OUTBOUND',
+      'STATUS': 'FAILED',
+      'DID NUMBER': did,
+      'CUSTOMER NUMBER MASKED': maskPhone_(customerPhone),
+      'PARTNER NAME': partnerName,
+      'PARTNER NUMBER': partnerPhone,
+      'PROVIDER CALL ID': eventId,
+      'MESSAGE': 'Customer or partner number missing',
+      'SOURCE': 'mobile-app',
+    });
+    return {
+      status: 'failed',
+      message: 'Call could not start because customer or partner number is missing.',
+      orderId: orderNo,
+      maskedNumber: did || '',
+    };
+  }
+
+  if (!BONVOICE_AUTH_TOKEN || !BONVOICE_API_URL || !did) {
+    appendCallLog_({
+      'TIMESTAMP': new Date(),
+      'ORDER NO': orderNo,
+      'DIRECTION': 'OUTBOUND',
+      'STATUS': 'NOT_CONFIGURED',
+      'DID NUMBER': did,
+      'CUSTOMER NUMBER MASKED': maskPhone_(customerPhone),
+      'PARTNER NAME': partnerName,
+      'PARTNER NUMBER': partnerPhone,
+      'PROVIDER CALL ID': eventId,
+      'MESSAGE': 'Bonvoice token, API URL, or DID number missing',
+      'SOURCE': 'mobile-app',
+    });
+    return {
+      status: 'not_configured',
+      message: 'Calling is not configured yet.',
+      orderId: orderNo,
+      maskedNumber: did || '',
+      providerCallId: eventId,
+    };
+  }
+
+  const providerResult = callBonvoiceClickToCall_({
+    orderNo: orderNo,
+    customerPhone: customerPhone,
+    partnerPhone: partnerPhone,
+    partnerName: partnerName,
+    did: did,
+    eventId: eventId,
+  });
+
+  appendCallLog_({
+    'TIMESTAMP': new Date(),
+    'ORDER NO': orderNo,
+    'DIRECTION': 'OUTBOUND',
+    'STATUS': providerResult.ok ? 'INITIATED' : 'FAILED',
+    'DID NUMBER': did,
+    'CUSTOMER NUMBER MASKED': maskPhone_(customerPhone),
+    'PARTNER NAME': partnerName,
+    'PARTNER NUMBER': partnerPhone,
+    'PROVIDER CALL ID': eventId,
+    'MESSAGE': providerResult.message,
+    'SOURCE': 'mobile-app',
+  });
+
+  if (!providerResult.ok) {
+    return {
+      status: 'failed',
+      message: 'Call could not be started. Please try again or contact admin.',
+      orderId: orderNo,
+      maskedNumber: did,
+      providerCallId: eventId,
+    };
+  }
+
+  return {
+    status: 'initiated',
+    message: 'Call started. You will receive a call from the company number shortly.',
+    orderId: orderNo,
+    maskedNumber: did,
+    providerCallId: eventId,
+  };
+}
+
+function callBonvoiceClickToCall_(call) {
+  const partnerDialNumber = formatBonvoicePhone_(call.partnerPhone);
+  const customerDialNumber = formatBonvoicePhone_(call.customerPhone);
+  const didCallerId = formatBonvoiceDid_(call.did);
+  const payload = {
+    autocallType: '3',
+    destination: partnerDialNumber,
+    ringStrategy: 'ringall',
+    legACallerID: didCallerId,
+    legAChannelID: BONVOICE_LEG_A_CHANNEL_ID,
+    legADialAttempts: BONVOICE_DIAL_ATTEMPTS,
+    legBDestination: customerDialNumber,
+    legBCallerID: didCallerId,
+    legBChannelID: BONVOICE_LEG_B_CHANNEL_ID,
+    legBDialAttempts: BONVOICE_DIAL_ATTEMPTS,
+    eventID: call.eventId,
+    callBackParams: {
+      orderNo: call.orderNo,
+      partnerName: call.partnerName,
+      source: 'dynamic-bazar-delivery-app',
+    },
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(BONVOICE_API_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        Authorization: normalizeBonvoiceAuthHeader_(BONVOICE_AUTH_TOKEN),
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    const code = response.getResponseCode();
+    const text = response.getContentText();
+    const parsed = parseJsonSafe_(text);
+    const ok = code >= 200 && code < 300 && isBonvoiceSuccess_(parsed, text);
+    return {
+      ok: ok,
+      message: ok
+        ? 'Bonvoice click-to-call accepted: ' + truncate_(text, 300)
+        : 'Bonvoice click-to-call failed HTTP ' + code + ': ' + truncate_(text, 300),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: 'Bonvoice click-to-call error: ' + String(err && err.message ? err.message : err),
+    };
+  }
+}
+
+function formatBonvoicePhone_(phone) {
+  const digits = onlyDigits_(phone).slice(-10);
+  if (!digits) return '';
+  const format = normalizeText_(BONVOICE_NUMBER_FORMAT);
+  if (format === '10') return digits;
+  if (format === '0') return '0' + digits;
+  if (format === '+91') return '+91' + digits;
+  return '91' + digits;
+}
+
+function formatBonvoiceDid_(did) {
+  const digits = onlyDigits_(did);
+  if (!digits) return '';
+  const format = normalizeText_(BONVOICE_NUMBER_FORMAT);
+  if (format === '+91' && digits.length === 10) return '+91' + digits;
+  if (format === '91' && digits.length === 10) return '91' + digits;
+  return digits;
+}
+
+function normalizeBonvoiceAuthHeader_(token) {
+  const value = String(token || '').trim();
+  if (!value) return '';
+  return value.indexOf('Token ') === 0 ? value : 'Token ' + value;
+}
+
+function parseJsonSafe_(value) {
+  try {
+    return JSON.parse(String(value || ''));
+  } catch (err) {
+    return null;
+  }
+}
+
+function isBonvoiceSuccess_(parsed, text) {
+  if (parsed) {
+    if (String(parsed.responseCode || '') === '200') return true;
+    if (normalizeText_(parsed.responseType) === 'SUCCESS') return true;
+    if (normalizeText_(parsed.responseDescription) === 'SUCCESS') return true;
+    if (String(parsed.status || '') === '1') return true;
+  }
+  return normalizeText_(text).indexOf('SUCCESS') !== -1;
+}
+
+function makeBonvoiceEventId_(orderNo) {
+  const cleanedOrder = String(orderNo || '').replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase();
+  const timePart = Date.now().toString(36).toUpperCase().slice(-8);
+  const randomPart = Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0');
+  return ('DB' + cleanedOrder + timePart + randomPart).slice(0, 16);
+}
+
+function handleBonvoiceDynamicRoute_(body) {
+  const did = onlyDigits_(body && body.did).slice(-10);
+  const from = onlyDigits_(body && body.from).slice(-10);
+  const match = findActiveOrderForCaller_(from);
+  const fallback = onlyDigits_(BONVOICE_FALLBACK_NUMBER).slice(-10);
+  const destination = match.partnerPhone || fallback;
+  const status = destination ? '1' : '0';
+
+  appendCallLog_({
+    'TIMESTAMP': new Date(),
+    'ORDER NO': match.orderNo || '',
+    'DIRECTION': 'INBOUND',
+    'STATUS': status === '1' ? (match.partnerPhone ? 'ROUTED' : 'FALLBACK') : 'NOT_FOUND',
+    'DID NUMBER': did,
+    'CUSTOMER NUMBER MASKED': maskPhone_(from),
+    'PARTNER NAME': match.partnerName || '',
+    'PARTNER NUMBER': destination || '',
+    'MESSAGE': match.message || (destination ? 'Dynamic route resolved' : 'No active route found'),
+    'SOURCE': 'bonvoice-dynamic-route',
+  });
+
+  return {
+    status: status,
+    destination: destination || '',
+  };
+}
+
+function handleBonvoiceCallLog_(body) {
+  const source = onlyDigits_(readFirst_(body, ['SourceNumber', 'sourceNumber', 'source', 'from'])).slice(-10);
+  const destination = onlyDigits_(readFirst_(body, ['DestinationNumber', 'destinationNumber', 'destination', 'to'])).slice(-10);
+  const displayNumber = onlyDigits_(readFirst_(body, ['DisplayNumber', 'displayNumber', 'did'])).slice(-10);
+  const eventId = String(readFirst_(body, ['eventID', 'eventId', 'event_id']) || '').trim();
+  const callId = String(readFirst_(body, ['callID', 'callId', 'call_id']) || '').trim();
+  const status = String(readFirst_(body, ['Status', 'status', 'AgentStatus', 'agentStatus']) || '').trim();
+  const direction = String(readFirst_(body, ['Direction', 'direction']) || '').trim();
+  const duration = Number(readFirst_(body, ['CallDuration', 'callDuration', 'duration']) || 0);
+  const recordingUrl = String(readFirst_(body, ['ResourceURL', 'resourceUrl', 'recordingUrl']) || '').trim();
+  const orderNo = findOrderNoFromBonvoiceLog_(body, source, destination, eventId);
+
+  appendCallLog_({
+    'TIMESTAMP': new Date(),
+    'ORDER NO': orderNo,
+    'DIRECTION': direction || 'CALL_LOG',
+    'STATUS': status || 'CALL_LOG',
+    'DID NUMBER': displayNumber,
+    'CUSTOMER NUMBER MASKED': maskPhone_(source),
+    'PARTNER NAME': '',
+    'PARTNER NUMBER': destination,
+    'PROVIDER CALL ID': eventId || callId,
+    'DURATION SECONDS': duration,
+    'RECORDING URL': recordingUrl,
+    'MESSAGE': 'Bonvoice call log received',
+    'SOURCE': 'bonvoice-call-log',
+  });
+
+  return { status: '1', received: true };
+}
+
+function readFirst_(object, keys) {
+  for (let i = 0; i < keys.length; i += 1) {
+    if (object && object[keys[i]] !== undefined && object[keys[i]] !== null) return object[keys[i]];
+  }
+  return '';
+}
+
+function findOrderNoFromBonvoiceLog_(body, source, destination, eventId) {
+  const params = body && body.callBackParams;
+  if (params && typeof params === 'object' && params.orderNo) return String(params.orderNo || '').replace('#', '').trim();
+  const rawParams = String(params || '').trim();
+  if (rawParams) {
+    const parsed = parseJsonSafe_(rawParams);
+    if (parsed && parsed.orderNo) return String(parsed.orderNo || '').replace('#', '').trim();
+  }
+
+  const fromEvent = String(eventId || '').match(/[A-Za-z]*([0-9]{3,})/);
+  if (fromEvent) return fromEvent[1];
+
+  const customerMatch = findActiveOrderForCaller_(source);
+  if (customerMatch.orderNo) return customerMatch.orderNo;
+  const partnerMatch = findActiveOrderForPartnerPhone_(destination);
+  return partnerMatch.orderNo || '';
+}
+
+function findActiveOrderForCaller_(callerPhone) {
+  const from = onlyDigits_(callerPhone).slice(-10);
+  if (!from) return { message: 'Caller number missing' };
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return { message: 'Orders sheet is empty' };
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+
+  for (let i = values.length - 1; i >= 1; i -= 1) {
+    const row = values[i];
+    const customerPhone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
+    if (customerPhone !== from) continue;
+    const order = rowToOrder_(accessor, row);
+    if (order.status !== 'pending') continue;
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+    if (!partnerPhone) return { orderNo: order.orderNo, message: 'Assigned partner number missing' };
+    return {
+      orderNo: order.orderNo,
+      partnerName: String(accessor.read(row, 'POSTMAN') || '').trim(),
+      partnerPhone: partnerPhone,
+      message: 'Dynamic route resolved',
+    };
+  }
+  return { message: 'No pending order found for caller' };
+}
+
+function findActiveOrderForPartnerPhone_(phone) {
+  const partner = onlyDigits_(phone).slice(-10);
+  if (!partner) return { message: 'Partner number missing' };
+  const values = getOrderSheet_().getDataRange().getValues();
+  if (!values.length) return { message: 'Orders sheet is empty' };
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+
+  for (let i = values.length - 1; i >= 1; i -= 1) {
+    const row = values[i];
+    const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+    if (partnerPhone !== partner) continue;
+    const order = rowToOrder_(accessor, row);
+    if (order.status !== 'pending') continue;
+    return {
+      orderNo: order.orderNo,
+      message: 'Partner route resolved',
+    };
+  }
+  return { message: 'No pending order found for partner' };
+}
+
+function getCallLogSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(CALL_LOG_SHEET_NAME) || ss.insertSheet(CALL_LOG_SHEET_NAME);
+}
+
+function ensureCallLogHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'ORDER NO',
+    'DIRECTION',
+    'STATUS',
+    'DID NUMBER',
+    'CUSTOMER NUMBER MASKED',
+    'PARTNER NAME',
+    'PARTNER NUMBER',
+    'PROVIDER CALL ID',
+    'DURATION SECONDS',
+    'RECORDING URL',
+    'MESSAGE',
+    'SOURCE',
+  ];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
+  const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+  if (existingUpper[0] !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
+  sheet.setFrozenRows(1);
+}
+
+function appendCallLog_(rowByHeader) {
+  try {
+    const sheet = getCallLogSheet_();
+    ensureCallLogHeader_(sheet);
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const row = headers.map((header) => {
+      const key = String(header || '').trim().toUpperCase();
+      return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+    });
+    sheet.appendRow(row);
+  } catch (err) {
+    Logger.log('Call log skipped/failed: ' + String(err && err.message ? err.message : err));
+  }
+}
+
+function updatePartnerLocation_(body, token) {
+  const auth = assertToken_(token);
+  if (auth.role !== 'partner' && auth.role !== 'admin') throw new Error('Location update access denied');
+  const latitude = Number(body && body.latitude);
+  const longitude = Number(body && body.longitude);
+  if (!isFinite(latitude) || !isFinite(longitude)) throw new Error('Valid latitude and longitude required');
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) throw new Error('Latitude or longitude out of range');
+
+  const timestamp = new Date();
+  appendLocationLog_({
+    'TIMESTAMP': timestamp,
+    'USER ID': auth.role + '_' + onlyDigits_(auth.phone).slice(-10),
+    'ROLE': auth.role,
+    'PHONE': onlyDigits_(auth.phone).slice(-10),
+    'PARTNER NAME': String(auth.name || '').trim(),
+    'DISTRICT': String(auth.district || '').trim(),
+    'LATITUDE': latitude,
+    'LONGITUDE': longitude,
+    'ACCURACY': Number(body && body.accuracy) || '',
+    'SPEED': Number(body && body.speed) || '',
+    'HEADING': Number(body && body.heading) || '',
+    'APP VERSION': String(body && body.appVersion || '').trim(),
+    'SOURCE': String(body && body.source || 'mobile-app').trim(),
+  });
+  return { updated: true, timestamp: timestamp.toISOString() };
+}
+
+function getLatestPartnerLocations_(token) {
+  assertAdminToken_(token);
+  const sheet = getLocationLogSheet_();
+  ensureLocationLogHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+  const headers = values[0];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const latestByPhone = {};
+
+  for (let i = values.length - 1; i >= 1; i -= 1) {
+    const row = values[i];
+    const phone = onlyDigits_(readLogValue_(row, indexByHeader, 'PHONE')).slice(-10);
+    if (!phone || latestByPhone[phone]) continue;
+    latestByPhone[phone] = {
+      partnerName: String(readLogValue_(row, indexByHeader, 'PARTNER NAME') || '').trim(),
+      phone: phone,
+      numberMasked: maskPhone_(phone),
+      district: String(readLogValue_(row, indexByHeader, 'DISTRICT') || '').trim(),
+      latitude: Number(readLogValue_(row, indexByHeader, 'LATITUDE') || 0),
+      longitude: Number(readLogValue_(row, indexByHeader, 'LONGITUDE') || 0),
+      accuracy: Number(readLogValue_(row, indexByHeader, 'ACCURACY') || 0),
+      speed: Number(readLogValue_(row, indexByHeader, 'SPEED') || 0),
+      heading: Number(readLogValue_(row, indexByHeader, 'HEADING') || 0),
+      lastSeen: formatLogDate_(readLogValue_(row, indexByHeader, 'TIMESTAMP')),
+      source: String(readLogValue_(row, indexByHeader, 'SOURCE') || '').trim(),
+    };
+  }
+
+  return Object.keys(latestByPhone)
+    .map((phone) => latestByPhone[phone])
+    .filter((location) => location.latitude && location.longitude)
+    .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)));
+}
+
+function getLocationLogSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(LOCATION_LOG_SHEET_NAME) || ss.insertSheet(LOCATION_LOG_SHEET_NAME);
+}
+
+function ensureLocationLogHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'USER ID',
+    'ROLE',
+    'PHONE',
+    'PARTNER NAME',
+    'DISTRICT',
+    'LATITUDE',
+    'LONGITUDE',
+    'ACCURACY',
+    'SPEED',
+    'HEADING',
+    'APP VERSION',
+    'SOURCE',
+  ];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
+  const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+  if (existingUpper[0] !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
+  sheet.setFrozenRows(1);
+}
+
+function appendLocationLog_(rowByHeader) {
+  const sheet = getLocationLogSheet_();
+  ensureLocationLogHeader_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row = headers.map((header) => {
+    const key = String(header || '').trim().toUpperCase();
+    return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+  });
+  sheet.appendRow(row);
+}
+
 function authorizeRequiredServices() {
   const orderSheet = getOrderSheet_();
   const proofFolder = getProofFolder_();
@@ -680,7 +1223,6 @@ function rowToOrder_(accessor, row) {
     id: orderNo.replace('#', ''),
     orderNo: orderNo.replace('#', ''),
     customerName: String(accessor.read(row, 'CUSTOMER_NAME') || ''),
-    customerPhone: onlyDigits_(accessor.read(row, 'MOBILE') || accessor.read(row, 'WHATSAPP')).slice(-10),
     phoneMasked: maskPhone_(String(accessor.read(row, 'MOBILE') || '')),
     address: String(address || ''),
     area: area,

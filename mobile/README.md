@@ -44,6 +44,7 @@ If the URL is not set, the app runs in demo mode with mock orders.
 - Admin settlement approval/rejection with payment proof viewing.
 - Admin quick order assignment to active delivery partners.
 - Admin stock dispatch/update into Stock Master.
+- Foreground partner live location upload with admin latest-location view and Google Maps handoff.
 - Persisted local status changes plus offline queue for delivery, failed, and settlement actions.
 - GAS-ready API client using a single Web App endpoint.
 
@@ -68,6 +69,8 @@ Deploy it as a Web App and set `DB_SHEET_ID` in Script Properties. The mobile cl
 - `cod.approveSettlement`
 - `admin.partners`
 - `orders.assign`
+- `location.update`
+- `location.latest`
 - `stock.master`
 - `stock.dispatch`
 
@@ -79,6 +82,7 @@ Recommended GAS Script Properties:
 - `DB_DELIVERY_LOG_SHEET`: delivered-order audit sheet name (default `DELIVERY LOG`)
 - `DB_STOCK_MASTER_SHEET`: stock dispatch sheet name (default `Stock Master`)
 - `DB_DP_MASTER_SHEET`: delivery partner master sheet name (default `DP MASTER`)
+- `DB_LOCATION_LOG_SHEET`: live location log sheet name (default `LOCATION LOG`)
 - `DB_PROOF_FOLDER_ID`: Drive folder ID for delivery/payment proof uploads
 - `DB_COLUMN_ALIASES_JSON`: optional JSON override for logical column aliases
 

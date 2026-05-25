@@ -23,6 +23,30 @@ export type DeliveryPartnerSummary = {
   orderCount?: number;
 };
 
+export type PartnerLocationUpdate = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  speed?: number | null;
+  heading?: number | null;
+  appVersion?: string;
+  source?: string;
+};
+
+export type PartnerLiveLocation = {
+  partnerName: string;
+  phone: string;
+  numberMasked: string;
+  district: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  speed?: number;
+  heading?: number;
+  lastSeen: string;
+  source?: string;
+};
+
 export type LoginPayload = {
   phone: string;
   password?: string;
@@ -32,7 +56,6 @@ export type DeliveryOrder = {
   id: string;
   orderNo: string;
   customerName: string;
-  customerPhone?: string;
   phoneMasked: string;
   address: string;
   area: string;
@@ -166,6 +189,14 @@ export type SendDeliveryOtpResult = {
   sent: boolean;
   orderId?: string;
   statusCode?: number;
+};
+
+export type MaskedCallResult = {
+  status: 'initiated' | 'not_configured' | 'failed';
+  message: string;
+  orderId?: string;
+  maskedNumber?: string;
+  providerCallId?: string;
 };
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'warning' | 'error' | 'offline';

@@ -14,6 +14,7 @@ DB_DELIVERY_LOG_SHEET=DELIVERY LOG
 DB_STOCK_MASTER_SHEET=Stock Master
 DB_DP_MASTER_SHEET=DP MASTER
 DB_PASSWORD_RESET_SHEET=PASSWORD RESET
+DB_LOCATION_LOG_SHEET=LOCATION LOG
 DB_PROOF_FOLDER_ID=<optional Google Drive folder ID for delivery proof photos>
 DB_BILL_TEMPLATE_ID=<Google Slides bill template ID>
 DB_BILL_FOLDER_ID=<Google Drive folder ID for bill PDFs>
@@ -34,6 +35,18 @@ If your stock or delivery partner tabs use different names, change `DB_STOCK_MAS
 `DB_AISENSY_DELIVERY_OTP_CAMPAIGN_NAME` should be `OTP` for the customer delivery confirmation message.
 `DB_ADMIN_PHONES` is a comma-separated hidden admin allowlist. The mobile app does not show an admin login option; admin role is returned only when the entered mobile number matches this list.
 Admin login now requires password. Use either global `DB_ADMIN_PASSWORD`, or per-admin `DB_ADMIN_CREDENTIALS_JSON`.
+
+## Live Location
+
+Partner devices submit foreground GPS location through the mobile app action `location.update`. Admin devices read the latest location per partner through `location.latest`.
+
+The script creates `LOCATION LOG` automatically unless you override it with `DB_LOCATION_LOG_SHEET`. Columns are:
+
+```text
+TIMESTAMP, USER ID, ROLE, PHONE, PARTNER NAME, DISTRICT, LATITUDE, LONGITUDE, ACCURACY, SPEED, HEADING, APP VERSION, SOURCE
+```
+
+The app only tracks while the partner is signed in and the app is open. Android location permission must be accepted on the partner phone, and the APK must be rebuilt after adding the location permission.
 
 ## Stock Master Sheet
 
@@ -262,6 +275,61 @@ ORDER NUMBER, NAME, ADDRESS, PIN CODE, DISTRICT, WHATSAPP NUMBER, MOBILE NUMBER,
 ```
 
 The default aliases in `DeliveryAppAPI.gs` now support this header row directly, so `DB_COLUMN_ALIASES_JSON` is optional for this sheet.
+
+## Bonvoice Masked Calling
+
+Partner app does not expose the full customer mobile number. The **Call via Masked Number** button calls Apps Script action `calls.startMaskedCall`, which starts a Bonvoice Click2Call bridge:
+
+- Leg A: delivery partner number
+- Leg B: customer number
+- Caller ID for both legs: configured DID number
+- Audit sheet: `CALL LOG`
+
+Required Script Properties:
+
+```text
+DB_BONVOICE_AUTH_TOKEN = your Bonvoice token without "Token " prefix
+DB_BONVOICE_DID_NUMBER = your DID / masked caller ID number
+```
+
+Optional Script Properties:
+
+```text
+DB_BONVOICE_API_URL = https://backend.pbx.bonvoice.com/autoDialManagement/autoCallBridging/
+DB_BONVOICE_LEG_A_CHANNEL_ID = 1
+DB_BONVOICE_LEG_B_CHANNEL_ID = 1
+DB_BONVOICE_DIAL_ATTEMPTS = 1
+DB_BONVOICE_NUMBER_FORMAT = 91
+DB_CALL_LOG_SHEET = CALL LOG
+DB_BONVOICE_FALLBACK_NUMBER = admin/fallback number for inbound dynamic routing
+```
+
+`DB_BONVOICE_NUMBER_FORMAT` controls the phone format sent to Bonvoice Click2Call:
+
+- `91` sends `919876543210` and is the default.
+- `10` sends `9876543210`.
+- `0` sends `09876543210`.
+- `+91` sends `+919876543210`.
+
+Bonvoice callback/log endpoint can point to the same Apps Script Web App URL. The script accepts both JSON and x-www-form-urlencoded call log payloads and writes them to `CALL LOG`.
+
+Dynamic routing for inbound DID calls is also supported. Bonvoice can POST:
+
+```json
+{
+  "did": "8037281733",
+  "from": "9567855562"
+}
+```
+
+The response shape is:
+
+```json
+{
+  "status": "1",
+  "destination": "9846098460"
+}
+```
 
 ## Smoke Test
 

@@ -1,11 +1,13 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Badge, Card, Money, Screen } from '../components/ui';
+import { Badge, Button, Card, Money, Screen } from '../components/ui';
 import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
-import type { DeliveryOrder } from '../types';
+import { useAuth } from '../state/AuthContext';
+import { fetchPartnerLiveLocations } from '../services/api';
+import type { DeliveryOrder, PartnerLiveLocation } from '../types';
 
 const FILTERS = ['All', 'Active', 'Idle', 'Delayed', 'Zone A', 'Zone B'] as const;
 
@@ -20,21 +22,47 @@ function useScreenThemeStyles() {
 }
 export function AdminLiveMapScreen() {
   useScreenThemeStyles();
+  const { user } = useAuth();
   const { orders, loading, refresh } = useOrders();
-  const postmen = getPostmen(orders);
+  const [locations, setLocations] = useState<PartnerLiveLocation[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const loadLocations = useCallback(async () => {
+    if (!user?.token) return;
+    setLocationLoading(true);
+    setLocationError('');
+    try {
+      setLocations(await fetchPartnerLiveLocations(user.token));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err || 'Location refresh failed');
+      setLocationError(message);
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [user?.token]);
+
+  useEffect(() => {
+    void loadLocations();
+  }, [loadLocations]);
+
+  const postmen = useMemo(() => getPostmen(orders, locations), [orders, locations]);
   const active = postmen.filter((postman) => postman.state === 'Active').length;
   const delayed = postmen.filter((postman) => postman.state === 'Delayed').length;
   const idle = postmen.filter((postman) => postman.state === 'Idle').length;
+  const tracked = postmen.filter((postman) => postman.latitude && postman.longitude).length;
   const delivered = orders.filter((order) => order.status === 'delivered').length;
   const pending = orders.filter((order) => order.status === 'pending').length;
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refresh(), loadLocations()]);
+  }, [loadLocations, refresh]);
 
   return (
     <Screen>
-      <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.orange} />}>
+      <ScrollView refreshControl={<RefreshControl refreshing={loading || locationLoading} onRefresh={refreshAll} tintColor={colors.orange} />}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Live Map</Text>
-            <Text style={styles.sub}>{postmen.length} postmen · {new Set(orders.map((order) => order.district).filter(Boolean)).size} districts</Text>
+            <Text style={styles.sub}>{tracked}/{postmen.length} postmen tracked · {new Set(orders.map((order) => order.district).filter(Boolean)).size} districts</Text>
           </View>
           <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>Live</Text></View>
         </View>
@@ -72,11 +100,13 @@ export function AdminLiveMapScreen() {
           <MapChip color={colors.green} label="Active" value={active} />
           <MapChip color={colors.muted} label="Idle" value={idle} />
           <MapChip color={colors.red} label="Delayed" value={delayed} />
+          <MapChip color={colors.blue} label="Tracked" value={tracked} icon="crosshairs-gps" />
           <MapChip color={colors.amber} label="Orders out" value={orders.length} icon="package-variant-closed" />
           <MapChip color={colors.green} label="Delivered" value={delivered} icon="check-circle-outline" />
         </ScrollView>
 
         <Text style={styles.sectionTitle}>Field Team</Text>
+        {locationError ? <Card><Text style={[styles.meta, { color: colors.red }]}>{locationError}</Text></Card> : null}
         {postmen.length ? postmen.map((postman) => <PostmanListItem key={postman.name} postman={postman} />) : (
           <Card><Text style={styles.meta}>No assigned postmen visible yet.</Text></Card>
         )}
@@ -133,23 +163,30 @@ function MapChip({ color, label, value, icon }: { color: string; label: string; 
 
 function PostmanListItem({ postman }: { postman: MapPostman }) {
   const stateColor = getStateColor(postman.state);
+  const hasLocation = Boolean(postman.latitude && postman.longitude);
   return (
     <Card>
-      <View style={styles.listRow}>
-        <View style={[styles.listAvatar, { backgroundColor: postman.color }]}>
-          <Text style={styles.listAvatarText}>{initials(postman.name)}</Text>
+      <View style={styles.listStack}>
+        <View style={styles.listRow}>
+          <View style={[styles.listAvatar, { backgroundColor: postman.color }]}>
+            <Text style={styles.listAvatarText}>{initials(postman.name)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{postman.name}</Text>
+            <Text style={[styles.meta, postman.state === 'Delayed' && { color: colors.red }]}>
+              {postman.zone} · {postman.pending ? `${postman.pending} orders remaining` : 'Route complete'}
+            </Text>
+            <Text style={styles.meta}>
+              {hasLocation ? `Last seen ${formatLastSeen(postman.lastSeen)}${postman.accuracy ? ` · ${Math.round(postman.accuracy)}m accuracy` : ''}` : 'Location not received yet'}
+            </Text>
+          </View>
+          <View style={styles.right}>
+            <Money value={postman.cod} size={15} />
+            <Badge label={postman.state.toLowerCase()} tone={postman.state === 'Delayed' ? 'failed' : postman.state === 'Active' ? 'delivered' : 'pending'} />
+          </View>
+          <View style={[styles.statusDot, { backgroundColor: hasLocation ? colors.blue : stateColor }]} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{postman.name}</Text>
-          <Text style={[styles.meta, postman.state === 'Delayed' && { color: colors.red }]}>
-            {postman.zone} · {postman.pending ? `${postman.pending} orders remaining` : 'Route complete'}
-          </Text>
-        </View>
-        <View style={styles.right}>
-          <Money value={postman.cod} size={15} />
-          <Badge label={postman.state.toLowerCase()} tone={postman.state === 'Delayed' ? 'failed' : postman.state === 'Active' ? 'delivered' : 'pending'} />
-        </View>
-        <View style={[styles.statusDot, { backgroundColor: stateColor }]} />
+        {hasLocation ? <Button label="Open in Google Maps" tone="secondary" onPress={() => openPartnerLocation(postman)} /> : null}
       </View>
     </Card>
   );
@@ -164,9 +201,14 @@ type MapPostman = {
   pending: number;
   cod: number;
   color: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  lastSeen?: string;
+  numberMasked?: string;
 };
 
-function getPostmen(orders: DeliveryOrder[]) {
+function getPostmen(orders: DeliveryOrder[], locations: PartnerLiveLocation[]) {
   const palette = [colors.orange, colors.blue, colors.green, colors.red, '#8b5cf6', colors.amber];
   const byName = new Map<string, MapPostman>();
   orders.forEach((order) => {
@@ -188,6 +230,26 @@ function getPostmen(orders: DeliveryOrder[]) {
     if (current.state !== 'Delayed' && current.pending > 0) current.state = 'Active';
     byName.set(name, current);
   });
+  locations.forEach((location) => {
+    const key = location.partnerName || location.numberMasked || location.phone || 'Unknown';
+    const existing = byName.get(key);
+    const current = existing || {
+      name: key,
+      shortName: key.split(/\s+/)[0] || 'Team',
+      zone: zoneFromDistrict(location.district),
+      state: 'Idle' as const,
+      delivered: 0,
+      pending: 0,
+      cod: 0,
+      color: palette[byName.size % palette.length],
+    };
+    current.latitude = location.latitude;
+    current.longitude = location.longitude;
+    current.accuracy = location.accuracy;
+    current.lastSeen = location.lastSeen;
+    current.numberMasked = location.numberMasked;
+    byName.set(key, current);
+  });
   return Array.from(byName.values()).sort((a, b) => b.pending - a.pending || b.delivered - a.delivered);
 }
 
@@ -207,6 +269,28 @@ function getStateColor(state: MapPostman['state']) {
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'NA';
+}
+
+function openPartnerLocation(postman: MapPostman) {
+  if (!postman.latitude || !postman.longitude) {
+    Alert.alert('Location missing', 'This partner has not sent a GPS location yet.');
+    return;
+  }
+  const query = `${postman.latitude},${postman.longitude}`;
+  void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+}
+
+function formatLastSeen(value?: string) {
+  if (!value) return 'unknown';
+  const time = new Date(value).getTime();
+  if (!time || Number.isNaN(time)) return value;
+  const diff = Math.max(0, Date.now() - time);
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return `${Math.floor(hours / 24)} day ago`;
 }
 
 function createStyles(colors: AppColors) {
@@ -244,6 +328,7 @@ function createStyles(colors: AppColors) {
   mapChipValue: { fontSize: 12, fontWeight: '900' },
   mapChipLabel: { color: colors.muted, fontSize: 9 },
   sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '900', marginBottom: 10 },
+  listStack: { gap: 10 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   listAvatar: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   listAvatarText: { color: colors.text, fontSize: 11, fontWeight: '900' },

@@ -50,6 +50,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     }
 
     try {
+      if (user.role === 'partner') void trySubmitCurrentLocation(user);
       const fresh = await fetchOrders(district, user?.token, user?.name);
       setOrders(fresh);
       await saveOrders(fresh);
@@ -72,6 +73,15 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (user?.role !== 'partner') return undefined;
+    void trySubmitCurrentLocation(user, { force: true });
+    const timer = setInterval(() => {
+      void trySubmitCurrentLocation(user);
+    }, 180000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   useEffect(() => {
     Promise.all([loadQueueForUser(user), loadSyncMeta(), NetInfo.fetch()]).then(([queue, meta, state]) => {
@@ -265,4 +275,13 @@ export function useOrders() {
 
 function getErrorMessage(err: unknown) {
   return getUserSafeErrorMessage(err, 'Sync failed. Please try again.');
+}
+
+async function trySubmitCurrentLocation(user: Parameters<typeof import('../services/liveLocation').submitCurrentLocation>[0], options?: { force?: boolean }) {
+  try {
+    const { submitCurrentLocation } = await import('../services/liveLocation');
+    await submitCurrentLocation(user, options);
+  } catch (err) {
+    console.log('Live location skipped:', err instanceof Error ? err.message : String(err || 'unknown error'));
+  }
 }

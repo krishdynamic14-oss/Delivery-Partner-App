@@ -32,14 +32,16 @@ Use this table before marking anything fully complete. `Build` means the feature
 | Hidden admin/partner login mapping | [~] | [ ] | Backend returns role from registered mobile; no visible admin selector |
 | Admin dashboard shell | [x] | [ ] | Admin role opens hidden admin tabs, all-order monitoring, settlement approval, stock view/update, and quick assignment |
 | Partner password login | [~] | [ ] | Password login added; real SMS OTP still needs provider if required later |
-| Android preview APK | [ ] | [ ] | Build APK and install on phone |
-| Play internal testing | [~] | [ ] | Release runbook, data-safety draft, privacy-policy draft added; upload AAB and complete internal test install |
+| Android preview APK | [x] | [~] | Local standalone release APK build works; install/test on phone after every change |
+| Play internal testing | [~] | [ ] | Signed release AAB builds locally; upload AAB and complete internal test install |
 | Core glass-style UI polish | [x] | [x] | Visual direction approved in preview; continue screen-by-screen polish |
 | Multi-theme support | [~] | [ ] | Dark Orange, Light Clean, and High Contrast added; verify every screen on real Android |
 | Push notification foundation | [~] | [x] | Expo/Firebase token registration and GAS push test working; internal-test auto registration still needs fresh install verification |
 | Maps route handoff | [~] | [ ] | Android Google Maps/geo/browser fallback added; verify on delivery partner phones |
+| Live partner location | [~] | [ ] | Foreground GPS upload and admin latest-location view added; rebuild APK, grant location permission, verify `LOCATION LOG` rows |
 | Multi-UPI routing | [~] | [ ] | Comma-separated `EXPO_PUBLIC_UPI_IDS` supported; verify QR payments across all UPI IDs |
 | Cancel call recording proof | [~] | [ ] | Cancelled parcel now requires attached call recording; verify upload link in Sheet/Drive |
+| Masked customer calling | [~] | [ ] | Partner UI no longer exposes full customer number; GAS Bonvoice Click2Call adapter, call log webhook, and Dynamic Call Routing skeleton added |
 
 ## Product Goal
 
@@ -176,9 +178,9 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Verify `npm run android` opens emulator
 - [ ] Test Expo Go preview on physical Android phone
 - [ ] Add EAS project ID after first EAS setup
-- [ ] Build preview APK
-- [ ] Install APK on at least two Android phones
-- [ ] Build production AAB
+- [x] Build local standalone release APK
+- [~] Install APK on at least two Android phones
+- [x] Build production AAB locally
 - [ ] Prepare Play Console internal testing release
 - [~] Privacy policy URL
 - [ ] App icon 512x512
@@ -214,6 +216,8 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Partner device receives order assignment, stock, and deadline reminders
 - [ ] Maps button opens Google Maps or browser fallback on partner device
 - [ ] Theme selector persists after app restart
+- [ ] Partner order detail never shows full customer number
+- [ ] Masked call button logs a safe not-configured call attempt until Bonvoice API details are configured
 
 ## Production Launch Cleanup
 
@@ -224,6 +228,7 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [ ] Confirm push registration runs automatically after login
 - [ ] Remove any temporary debug/testing functions from production GAS if not needed
 - [ ] Re-check `.gitignore` before pushing secrets/build files
+- [~] Keep customer full mobile backend-only for masked calling
 
 ## Build Order
 
