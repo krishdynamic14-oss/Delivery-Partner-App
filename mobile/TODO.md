@@ -32,7 +32,7 @@ This file is the working source of truth for the React Native Android MVP. Updat
 - [ ] Verify notification tap on latest installed APK opens the exact Order Detail, not only Home.
 - [ ] Do one full partner real-device regression: login, refresh, choose planned date, call customer, deliver with OTP/photo, failed/RTO, COD, sync.
 - [ ] Do one admin real-device regression: orders list/detail, stock photo logs, settlement approval, live location, partner assignment.
-- [ ] Confirm Play Store production assets: 512 icon, feature graphic, screenshots, privacy policy, data safety.
+- [~] Confirm Play Store production assets: AAB, 512 icon, feature graphic, listing/privacy/data-safety drafts ready; final screenshots pending ADB authorization.
 - [ ] Prepare Play Console internal testing release and install through Play testing track.
 
 ## Build And Test Tracker
@@ -208,11 +208,11 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [x] Build local standalone release APK
 - [~] Install APK on at least two Android phones
 - [x] Build production AAB locally
-- [ ] Prepare Play Console internal testing release
+- [~] Prepare Play Console internal testing release
 - [~] Privacy policy URL
-- [ ] App icon 512x512
-- [ ] Feature graphic 1024x500
-- [ ] Play Store screenshots
+- [x] App icon 512x512
+- [x] Feature graphic 1024x500
+- [~] Play Store screenshots
 - [~] Data safety form
 - [x] Configure Firebase FCM V1 service account key in Expo credentials
 - [ ] Keep `google-services.json`, Firebase service-account JSON, `.env`, and APK files out of GitHub
