@@ -70,7 +70,7 @@ export function AdminDashboardScreen() {
           <Metric icon="package-variant-closed" label="Today's Orders" value={todayOrders.length} color={colors.blue} sub={`${orders.length} total orders`} />
           <Metric icon="moped" label="Active Partners" value={partnerCount} color={colors.green} sub={`${pending} pending`} />
           <Metric icon="speedometer" label="Performance" value={`${performanceScore}%`} color={colors.amber} sub="Live from Sheet" />
-          <Metric icon="calendar-alert" label="Overdue" value={overdue} color={colors.red} sub="Past 2-day window" />
+          <Metric icon="calendar-alert" label="Overdue" value={overdue} color={colors.red} sub="Past planned date" />
         </View>
 
         <View style={styles.quickGrid}>

@@ -1,7 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ActionSubmitResult, DeliveryOrder, FailPayload, DeliverPayload, SyncMeta, SyncQueueResult } from '../types';
-import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp } from '../services/api';
+import { fetchOrders, getCodSummary, markDelivered, markFailed, sendDeliveryOtp, setPlannedDeliveryDate } from '../services/api';
 import { DEFAULT_SYNC_META, loadOrders, loadQueue, loadSyncMeta, saveOrders, saveQueue, saveSyncMeta } from '../services/storage';
 import { enqueueAction, loadQueueForUser, queueBelongsToUser, syncQueue } from '../services/offlineQueue';
 import { deleteActionProofFiles, deletePayloadProofFiles } from '../services/proofFiles';
@@ -17,6 +17,7 @@ type OrdersState = {
   syncMeta: SyncMeta;
   refresh: () => Promise<void>;
   sendOrderOtp: (orderId: string) => Promise<ActionSubmitResult>;
+  setOrderPlannedDeliveryDate: (orderId: string, plannedDeliveryDate: string) => Promise<void>;
   deliverOrder: (orderId: string, payload: DeliverPayload) => Promise<ActionSubmitResult>;
   failOrder: (orderId: string, payload: FailPayload) => Promise<ActionSubmitResult>;
   syncOfflineQueue: () => Promise<SyncQueueResult>;
@@ -56,7 +57,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
       await saveOrders(fresh);
       await persistSyncMeta({
         status: 'success',
-        message: 'Orders refreshed from Google Sheets.',
+        message: 'Orders refreshed from system.',
         lastSyncAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -161,10 +162,10 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
       setOrders(syncedOrders);
       await saveOrders(syncedOrders);
       await deletePayloadProofFiles(payload);
-      await persistSyncMeta({ status: 'success', message: 'Delivery synced to Google Sheets.', lastSyncAt: new Date().toISOString() });
+      await persistSyncMeta({ status: 'success', message: 'Delivery synced to system.', lastSyncAt: new Date().toISOString() });
       return {
         status: 'synced',
-        message: result.photoUrl ? 'Delivery and proof photo synced to Google Sheets.' : 'Delivery updated in Google Sheet.',
+        message: result.photoUrl ? 'Delivery and proof photo synced to system.' : 'Delivery updated in system.',
         photoUrl: result.photoUrl,
       };
     } catch (err) {
@@ -195,11 +196,35 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     }
   }
 
+  async function setOrderPlannedDeliveryDate(orderId: string, plannedDeliveryDate: string) {
+    const state = await NetInfo.fetch();
+    if (!state.isConnected) {
+      await persistSyncMeta({ status: 'offline', message: 'Delivery date planning needs internet.' });
+      throw new Error('Internet is required to save planned delivery date.');
+    }
+    try {
+      const result = await setPlannedDeliveryDate(orderId, plannedDeliveryDate, user?.token);
+      const updatedOrders = orders.map((order) => order.id === orderId ? {
+        ...order,
+        plannedDeliveryDate: result.plannedDeliveryDate,
+        deliveryDeadline: result.plannedDeliveryDate,
+        deadlineStatus: getLocalDeadlineStatus(result.plannedDeliveryDate),
+        updatedAt: new Date().toISOString(),
+      } : order);
+      setOrders(updatedOrders);
+      await saveOrders(updatedOrders);
+      await persistSyncMeta({ status: 'success', message: 'Planned delivery date saved.', lastSyncAt: new Date().toISOString() });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      await persistSyncMeta({ status: 'error', message: 'Planned delivery date was not saved.', lastError: message });
+      throw new Error(message);
+    }
+  }
+
   async function failOrder(orderId: string, payload: FailPayload): Promise<ActionSubmitResult> {
     const state = await NetInfo.fetch();
     const proofDetail = payload.photoUri ? 'House proof captured locally' : '';
-    const recordingDetail = payload.callRecordingUri ? 'Call recording attached locally' : '';
-    const failureDetail = [payload.notes, payload.nextAttemptDate ? `Next attempt: ${payload.nextAttemptDate}` : '', proofDetail, recordingDetail].filter(Boolean).join(' | ');
+    const failureDetail = [payload.notes, payload.nextAttemptDate ? `Next attempt: ${payload.nextAttemptDate}` : '', proofDetail].filter(Boolean).join(' | ');
     const remarks = `FAILED: ${payload.reason}${failureDetail ? ` | ${failureDetail}` : ''}`;
     const updatedOrders = orders.map((order) => order.id === orderId ? { ...order, status: 'failed' as const, remarks, photoUrl: payload.photoUri || order.photoUrl, attempts: order.attempts + 1, updatedAt: new Date().toISOString() } : order);
     setOrders(updatedOrders);
@@ -214,7 +239,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
         await deletePayloadProofFiles(payload);
         return {
           status: 'synced',
-          message: result.photoUrl ? 'Failed delivery proof synced to Google Sheets.' : 'Failed delivery updated in Google Sheet.',
+          message: result.photoUrl ? 'Failed delivery proof synced to system.' : 'Failed delivery updated in system.',
           photoUrl: result.photoUrl,
         };
       } catch (err) {
@@ -256,6 +281,7 @@ export function OrdersProvider({ children, district }: PropsWithChildren<{ distr
     syncMeta,
     refresh,
     sendOrderOtp,
+    setOrderPlannedDeliveryDate,
     deliverOrder,
     failOrder,
     syncOfflineQueue,
@@ -274,6 +300,27 @@ export function useOrders() {
 
 function getErrorMessage(err: unknown) {
   return getUserSafeErrorMessage(err, 'Sync failed. Please try again.');
+}
+
+function getLocalDeadlineStatus(value: string): DeliveryOrder['deadlineStatus'] {
+  const planned = parseLocalSheetDate(value);
+  if (!planned) return 'unplanned';
+  const today = new Date();
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (planned.getTime() < localToday.getTime()) return 'overdue';
+  if (planned.getTime() === localToday.getTime()) return 'due_today';
+  return 'normal';
+}
+
+function parseLocalSheetDate(value: string) {
+  const raw = String(value || '').trim();
+  const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (dmy) {
+    const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
+    return new Date(year, Number(dmy[2]) - 1, Number(dmy[1]));
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
 async function trySubmitCurrentLocation(user: Parameters<typeof import('../services/liveLocation').submitCurrentLocation>[0], options?: { force?: boolean }) {

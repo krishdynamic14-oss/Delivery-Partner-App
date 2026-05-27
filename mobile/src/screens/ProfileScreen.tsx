@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Header, InfoRow, Screen } from '../components/ui';
 import { SyncStatusCard } from '../components/SyncStatusCard';
 import { themes, type AppColors, type ThemeName } from '../theme';
@@ -77,7 +77,7 @@ export function ProfileScreen() {
   function confirmRemove(action: QueueAction) {
     Alert.alert(
       'Remove pending action?',
-      'This only removes the pending action from this phone. Nothing will be uploaded to Google Sheets.',
+      'This only removes the pending action from this phone. Nothing will be uploaded to the system.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -97,7 +97,9 @@ export function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Header title="Profile" subtitle={`${user?.role === 'admin' ? 'Admin' : 'Partner'} settings and sync status`} />
         <Card>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{user?.name?.[0] || 'D'}</Text></View>
+          <View style={styles.avatar}>
+            <Image source={require('../../assets/icon.png')} style={styles.avatarLogo} />
+          </View>
           <Text style={styles.name}>{user?.name}</Text>
           <Text style={styles.meta}>{user?.district} · {user?.role === 'admin' ? 'Admin' : 'Delivery Partner'}</Text>
           <InfoRow icon="phone-outline" label="Mobile" value={user?.phone || '-'} />
@@ -148,7 +150,7 @@ export function ProfileScreen() {
         {queuedActions.length ? (
           <Card>
             <Text style={styles.sectionTitle}>Pending Action Details</Text>
-            <Text style={styles.helperText}>These actions are saved on this phone and will upload to Google Sheets when you tap Sync now.</Text>
+            <Text style={styles.helperText}>These actions are saved on this phone and will upload to the system when you tap Sync now.</Text>
             {queuedActions.map((action) => (
               <View key={action.id} style={styles.queueItem}>
                 <Text style={styles.queueTitle}>{getQueueActionTitle(action)}</Text>
@@ -187,8 +189,7 @@ function getQueueActionMeta(action: QueueAction) {
   }
   if (action.type === 'fail') {
     const proof = action.payload.photoUri ? ' · house proof attached' : '';
-    const recording = action.payload.callRecordingUri ? ' · call recording attached' : '';
-    return `${action.payload.reason || 'Failed delivery'}${proof}${recording}`;
+    return `${action.payload.reason || 'Failed delivery'}${proof}`;
   }
   const amount = Number(action.payload.amount || 0);
   const ref = action.payload.reference ? ` · Ref ${action.payload.reference}` : '';
@@ -210,8 +211,8 @@ function formatQueueDate(value: string) {
 function createStyles(colors: AppColors) {
   return StyleSheet.create({
   scrollContent: { paddingBottom: 18 },
-  avatar: { width: 62, height: 62, borderRadius: 20, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  avatarText: { color: colors.text, fontSize: 26, fontWeight: '900' },
+  avatar: { width: 62, height: 62, borderRadius: 20, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  avatarLogo: { width: 60, height: 60, resizeMode: 'contain' },
   name: { color: colors.text, fontSize: 24, fontWeight: '900' },
   meta: { color: colors.muted, marginTop: 8, marginBottom: 12 },
   sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '900', marginBottom: 6 },

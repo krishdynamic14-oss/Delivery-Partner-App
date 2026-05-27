@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Button, Card, DeadlineBadge, Header, InfoRow, Money, Screen } from '../components/ui';
 import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
@@ -24,8 +24,9 @@ function useScreenThemeStyles() {
 export function OrderDetailScreen({ route, navigation }: Props) {
   useScreenThemeStyles();
   const { user } = useAuth();
-  const { orders } = useOrders();
+  const { orders, setOrderPlannedDeliveryDate } = useOrders();
   const [calling, setCalling] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
   const order = orders.find((item) => item.id === route.params.orderId);
 
   if (!order) {
@@ -42,6 +43,7 @@ export function OrderDetailScreen({ route, navigation }: Props) {
   const hasRemoteProof = proofUrl.startsWith('http');
   const isAdmin = user?.role === 'admin';
   const customerContact = order.phoneMasked || 'Number hidden';
+  const needsPlannedDate = !isAdmin && order.status === 'pending' && !order.plannedDeliveryDate;
 
   async function callCustomer() {
     if (!user?.token) {
@@ -60,6 +62,25 @@ export function OrderDetailScreen({ route, navigation }: Props) {
     } finally {
       setCalling(false);
     }
+  }
+
+  async function choosePlannedDate(value: string) {
+    setSavingPlan(true);
+    try {
+      await setOrderPlannedDeliveryDate(currentOrder.id, value);
+    } catch (err) {
+      Alert.alert('Date not saved', err instanceof Error ? err.message : 'Could not save planned delivery date.');
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  function requirePlannedDate(action: () => void) {
+    if (needsPlannedDate) {
+      Alert.alert('Select delivery date', 'Choose the planned delivery date before updating this order.');
+      return;
+    }
+    action();
   }
 
   return (
@@ -83,17 +104,37 @@ export function OrderDetailScreen({ route, navigation }: Props) {
         </Card>
         <Card>
           <InfoRow icon="credit-card-outline" label="Payment" value={order.paymentType} />
-          <InfoRow icon="calendar-clock" label="Delivery deadline" value={getDeadlineLabel(order)} />
+          <InfoRow icon="calendar-clock" label="Planned delivery" value={order.plannedDeliveryDate || 'Not selected'} />
           <InfoRow icon="repeat" label="Attempts" value={String(order.attempts)} />
           <InfoRow icon="clock-outline" label="Last update" value={new Date(order.updatedAt).toLocaleString()} />
           {proofUrl ? <InfoRow icon="image-check-outline" label="Proof photo" value={hasRemoteProof ? 'Uploaded to Drive' : 'Captured on this device'} /> : null}
           {order.remarks ? <Text style={styles.remarks}>{order.remarks}</Text> : null}
         </Card>
+        {!isAdmin && order.status === 'pending' ? (
+          <Card>
+            <Text style={styles.planTitle}>{order.plannedDeliveryDate ? 'Change planned delivery date' : 'Select planned delivery date'}</Text>
+            <Text style={styles.planMeta}>Choose today or within the next 3 days.</Text>
+            <View style={styles.planGrid}>
+              {getPlannedDeliveryOptions().map((option) => (
+                <Pressable
+                  key={option.value}
+                  disabled={savingPlan}
+                  onPress={() => { void choosePlannedDate(option.value); }}
+                  style={[styles.planChip, order.plannedDeliveryDate === option.value && styles.planChipActive]}
+                >
+                  <Text style={[styles.planChipLabel, order.plannedDeliveryDate === option.value && styles.planChipLabelActive]}>{option.label}</Text>
+                  <Text style={styles.planChipDate}>{option.display}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {savingPlan ? <Text style={styles.planMeta}>Saving...</Text> : null}
+          </Card>
+        ) : null}
         <View style={{ gap: 10 }}>
           {!isAdmin ? <Button label="Call Customer" tone="secondary" loading={calling} onPress={callCustomer} /> : null}
           {hasRemoteProof ? <Button label="Open Proof Photo" tone="secondary" onPress={() => Linking.openURL(proofUrl)} /> : null}
-          {!isAdmin ? <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => navigation.navigate('Delivery', { orderId: order.id })} /> : null}
-          {!isAdmin ? <Button label="Report Failed / RTO" tone="danger" onPress={() => navigation.navigate('FailedDelivery', { orderId: order.id })} /> : null}
+          {!isAdmin ? <Button label="Start Delivery Confirmation" tone="secondary" onPress={() => requirePlannedDate(() => navigation.navigate('Delivery', { orderId: order.id }))} /> : null}
+          {!isAdmin ? <Button label="Report Failed / RTO" tone="danger" onPress={() => requirePlannedDate(() => navigation.navigate('FailedDelivery', { orderId: order.id }))} /> : null}
           <Button label="Back to Orders" tone="secondary" onPress={() => navigation.goBack()} />
         </View>
       </ScrollView>
@@ -108,5 +149,33 @@ function createStyles(colors: AppColors) {
   badges: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
   product: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   remarks: { color: colors.red, marginTop: 12 },
+  planTitle: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  planMeta: { color: colors.muted, marginTop: 7, lineHeight: 18 },
+  planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
+  planChip: { width: '47%', borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 11, backgroundColor: colors.glass },
+  planChipActive: { borderColor: colors.orange, backgroundColor: 'rgba(255,107,0,0.14)' },
+  planChipLabel: { color: colors.text, fontWeight: '900' },
+  planChipLabelActive: { color: colors.orange },
+  planChipDate: { color: colors.muted, marginTop: 4, fontSize: 11, fontWeight: '800' },
 });
+}
+
+function getPlannedDeliveryOptions() {
+  return [0, 1, 2, 3].map((offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    const display = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const label = offset === 0 ? `Today · ${display}` : offset === 1 ? `Tomorrow · ${display}` : display;
+    return {
+      label,
+      value: formatDateForApi(date),
+      display,
+    };
+  });
+}
+
+function formatDateForApi(date: Date) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}-${month}-${date.getFullYear()}`;
 }

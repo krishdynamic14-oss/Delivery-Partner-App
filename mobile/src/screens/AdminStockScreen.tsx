@@ -1,4 +1,4 @@
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,8 +7,8 @@ import { colors as defaultColors, type AppColors } from '../theme';
 import { useTheme } from '../state/ThemeContext';
 import { useOrders } from '../state/OrdersContext';
 import { useAuth } from '../state/AuthContext';
-import { addStockDispatch, createStockReorderRequest, fetchDeliveryPartners, fetchStockMaster } from '../services/api';
-import type { DeliveryPartnerSummary, StockItem, StockPartnerBreakdown } from '../types';
+import { addStockDispatch, createStockReorderRequest, fetchDeliveryPartners, fetchStockMaster, fetchStockPhotoLogs } from '../services/api';
+import type { DeliveryPartnerSummary, StockItem, StockPartnerBreakdown, StockPhotoLog } from '../types';
 
 
 let colors: AppColors = defaultColors;
@@ -36,13 +36,18 @@ export function AdminStockScreen() {
   const [reorderLoading, setReorderLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [stockPhotoLogs, setStockPhotoLogs] = useState<StockPhotoLog[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const fresh = await fetchStockMaster(user?.token);
+      const [fresh, photos] = await Promise.all([
+        fetchStockMaster(user?.token),
+        fetchStockPhotoLogs({}, user?.token),
+      ]);
       setProducts(fresh);
+      setStockPhotoLogs(photos);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load Stock Master.');
     } finally {
@@ -188,6 +193,8 @@ export function AdminStockScreen() {
           </View>
         ) : null}
 
+        <StockPhotoLogSection logs={stockPhotoLogs} />
+
         <Card>
           <View style={styles.forecastHeader}>
             <MaterialCommunityIcons name="chart-line" size={17} color={colors.orange} />
@@ -221,6 +228,93 @@ export function AdminStockScreen() {
       </ScrollView>
     </Screen>
   );
+}
+
+function StockPhotoLogSection({ logs }: { logs: StockPhotoLog[] }) {
+  const todayKey = getLocalDateKey();
+  const todayCount = logs.filter((log) => log.proofDate === todayKey).length;
+  const recentLogs = logs.slice(0, 8);
+  return (
+    <Card>
+      <View style={styles.proofSectionHeader}>
+        <View style={styles.proofIcon}>
+          <MaterialCommunityIcons name="camera-outline" size={18} color={colors.orange} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sectionTitle}>Daily Stock Photos</Text>
+          <Text style={styles.meta}>{todayCount} submitted today · latest partner uploads</Text>
+        </View>
+      </View>
+      {recentLogs.length ? recentLogs.map((log) => <StockPhotoLogCard key={`${log.partnerPhone}-${log.proofDate}-${log.submittedAt}`} log={log} />) : (
+        <View style={styles.emptyProof}>
+          <MaterialCommunityIcons name="image-off-outline" size={18} color={colors.muted} />
+          <Text style={styles.meta}>No stock photos submitted yet.</Text>
+        </View>
+      )}
+    </Card>
+  );
+}
+
+function StockPhotoLogCard({ log }: { log: StockPhotoLog }) {
+  const submittedText = formatDateTime(log.submittedAt);
+  const hasLocation = Boolean(log.latitude && log.longitude);
+  return (
+    <View style={styles.proofCard}>
+      <View style={styles.proofCardTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.proofPartner}>{log.partnerName || log.partnerPhone || 'Delivery Partner'}</Text>
+          <Text style={styles.meta}>{log.district || 'No district'} · {log.proofDate} · {submittedText}</Text>
+        </View>
+        <Badge label={`${log.photoCount || log.photoUrls.length} photos`} tone="delivered" />
+      </View>
+      <View style={styles.photoButtonRow}>
+        {(log.photoUrls || []).slice(0, 5).map((url, index) => (
+          <Pressable
+            key={`${url}-${index}`}
+            onPress={() => openExternalUrl(url, 'Photo could not be opened.')}
+            style={({ pressed }) => [styles.photoButton, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons name="image-outline" size={14} color={colors.orange} />
+            <Text style={styles.photoButtonText}>Photo {index + 1}</Text>
+          </Pressable>
+        ))}
+        {hasLocation ? (
+          <Pressable
+            onPress={() => openExternalUrl(`https://www.google.com/maps?q=${log.latitude},${log.longitude}`, 'Location could not be opened.')}
+            style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons name="map-marker-radius-outline" size={14} color={colors.green} />
+            <Text style={styles.locationButtonText}>Proof location</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {log.notes ? <Text style={styles.proofNotes}>{log.notes}</Text> : null}
+    </View>
+  );
+}
+
+function openExternalUrl(url: string, fallbackMessage: string) {
+  if (!url) return;
+  Linking.openURL(url).catch(() => Alert.alert('Could not open', fallbackMessage));
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return 'time not available';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getLocalDateKey() {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function ActionButton({ icon, label, color, onPress }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; color: string; onPress: () => void }) {
@@ -391,6 +485,18 @@ function createStyles(colors: AppColors) {
   sectionTitleOutside: { color: colors.text, fontSize: 15, fontWeight: '900', marginTop: 4, marginBottom: 10 },
   forecastHint: { color: colors.muted, fontSize: 10, marginLeft: 'auto' },
   forecastRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  proofSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  proofIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,107,0,0.13)', borderWidth: 1, borderColor: 'rgba(255,107,0,0.25)' },
+  proofCard: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 12, marginTop: 10 },
+  proofCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  proofPartner: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  photoButtonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  photoButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,107,0,0.25)', backgroundColor: 'rgba(255,107,0,0.1)' },
+  photoButtonText: { color: colors.orange, fontSize: 11, fontWeight: '900' },
+  locationButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(0,194,126,0.25)', backgroundColor: 'rgba(0,194,126,0.1)' },
+  locationButtonText: { color: colors.green, fontSize: 11, fontWeight: '900' },
+  proofNotes: { color: colors.muted, fontSize: 11, marginTop: 8 },
+  emptyProof: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   productTitle: { color: colors.text, fontSize: 13, fontWeight: '900' },
   districtTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
   districtProductRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 10, marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },

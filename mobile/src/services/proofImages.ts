@@ -18,6 +18,7 @@ type ProofImageOptions = {
   fileName: string;
   permissionMessage?: string;
   source?: 'camera' | 'library';
+  allowLibraryFallback?: boolean;
 };
 
 export async function captureProofImage(options: ProofImageOptions): Promise<ProofImage | null> {
@@ -26,8 +27,15 @@ export async function captureProofImage(options: ProofImageOptions): Promise<Pro
     throw new Error(options.permissionMessage || 'Allow camera access to capture proof photo.');
   }
 
-  const result = await ImagePicker.launchCameraAsync({ quality: 0.75 })
-    .catch(() => ImagePicker.launchImageLibraryAsync({ quality: 0.75, mediaTypes: ImagePicker.MediaTypeOptions.Images }));
+  let result: ImagePicker.ImagePickerResult;
+  try {
+    result = await ImagePicker.launchCameraAsync({ quality: 0.75 });
+  } catch (err) {
+    if (!options.allowLibraryFallback) {
+      throw new Error('Camera could not open. Please try again from the device camera.');
+    }
+    result = await ImagePicker.launchImageLibraryAsync({ quality: 0.75, mediaTypes: ImagePicker.MediaTypeOptions.Images });
+  }
   return imageResultToProof(result, options.fileName);
 }
 

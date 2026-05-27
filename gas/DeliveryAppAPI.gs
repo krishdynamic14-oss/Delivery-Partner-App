@@ -4,6 +4,7 @@ const PAYMENT_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProper
 const DELIVERY_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DELIVERY_LOG_SHEET') || 'DELIVERY LOG';
 const STOCK_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_MASTER_SHEET') || 'Stock Master';
 const STOCK_REORDER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_REORDER_SHEET') || 'STOCK REORDER REQUESTS';
+const STOCK_PHOTO_LOG_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_STOCK_PHOTO_LOG_SHEET') || 'STOCK PHOTO LOG';
 const DP_MASTER_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_DP_MASTER_SHEET') || 'DP MASTER';
 const PASSWORD_RESET_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PASSWORD_RESET_SHEET') || 'PASSWORD RESET';
 const PUSH_TOKEN_SHEET_NAME = PropertiesService.getScriptProperties().getProperty('DB_PUSH_TOKEN_SHEET') || 'PUSH TOKENS';
@@ -29,6 +30,7 @@ const BONVOICE_LEG_A_CHANNEL_ID = PropertiesService.getScriptProperties().getPro
 const BONVOICE_LEG_B_CHANNEL_ID = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_LEG_B_CHANNEL_ID') || '1';
 const BONVOICE_DIAL_ATTEMPTS = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_DIAL_ATTEMPTS') || '1';
 const BONVOICE_NUMBER_FORMAT = PropertiesService.getScriptProperties().getProperty('DB_BONVOICE_NUMBER_FORMAT') || '91';
+const MAX_STOCK_PROOF_PHOTOS = 5;
 
 const DEFAULT_COD_COMMISSION_SLABS = [
   { min: 0, max: 1199, commission: 150 },
@@ -62,6 +64,7 @@ const DEFAULT_COLUMN_ALIASES = {
   ORDER_COUNTED: ['ORDER_COUNTED', 'ORDER COUNTED'],
   DELIVERY_COUNTED: ['DELIVERY_COUNTED', 'DELIVERY COUNTED', 'DELIVERY STATUS'],
   DELIVERY_DATE: ['DELIVERY DATE', 'DELIVERY_DATE'],
+  PLANNED_DELIVERY_DATE: ['PLANNED DELIVERY DATE', 'PLANNED_DELIVERY_DATE', 'DELIVERY PLAN DATE', 'SCHEDULED DELIVERY DATE'],
   PROCESSED: ['PROCESSED'],
   BILL_LINK: ['BILL LINK'],
   BILL_WHATSAPP_STATUS: ['BILL WHATSAPP STATUS', 'BILL WA STATUS'],
@@ -121,6 +124,7 @@ function doPost(e) {
       'orders.all': () => getAllOrders_(token),
       'orders.byDistrict': () => getOrdersByDistrict_(body.district, token),
       'orders.byDistrictAndPartner': () => getOrdersByDistrictAndPartner_(body.district, body.partnerName, token),
+      'orders.setPlannedDeliveryDate': () => setPlannedDeliveryDate_(body, token),
       'orders.sendDeliveryOtp': () => sendDeliveryOtpByOrderId_(body.orderId, token),
       'orders.deliver': () => markOrderDelivered_(body, token),
       'orders.fail': () => markOrderFailed_(body, token),
@@ -132,6 +136,9 @@ function doPost(e) {
       'stock.master': () => getStockMaster_(token),
       'stock.dispatch': () => addStockDispatch_(body, token),
       'stock.reorder': () => createStockReorderRequest_(body, token),
+      'stock.photoStatus': () => getStockPhotoStatus_(token),
+      'stock.photoSubmit': () => submitStockPhotoProof_(body, token),
+      'admin.stockPhotoLogs': () => getStockPhotoLogs_(body, token),
       'admin.partners': () => getAdminPartners_(token),
       'orders.assign': () => assignOrderToPartner_(body, token),
       'calls.startMaskedCall': () => startMaskedCall_(body, token),
@@ -594,6 +601,40 @@ function assignOrderToPartner_(body, token) {
     orderId: orderId,
   });
   return { updated: true };
+}
+
+function setPlannedDeliveryDate_(body, token) {
+  const orderId = String(body && body.orderId || '').replace('#', '').trim();
+  if (!orderId) throw new Error('Order ID required');
+  assertToken_(token);
+  assertOrderAccess_(orderId, token);
+
+  const plannedDate = parsePlannedDeliveryDateInput_(body && body.plannedDeliveryDate);
+  validatePlannedDeliveryDate_(plannedDate);
+  const formattedDate = Utilities.formatDate(plannedDate, Session.getScriptTimeZone(), 'dd-MM-yyyy');
+  updateOrderRow_(orderId, { PLANNED_DELIVERY_DATE: formattedDate });
+  return {
+    updated: true,
+    orderId: orderId,
+    plannedDeliveryDate: formattedDate,
+  };
+}
+
+function parsePlannedDeliveryDateInput_(value) {
+  const parsed = parseSheetDate_(value);
+  if (!parsed) throw new Error('Valid planned delivery date required');
+  return parsed;
+}
+
+function validatePlannedDeliveryDate_(plannedDate) {
+  const today = startOfLocalDay_(new Date());
+  const maxDate = addDays_(today, 3);
+  if (plannedDate.getTime() < today.getTime()) {
+    throw new Error('Planned delivery date cannot be before today');
+  }
+  if (plannedDate.getTime() > maxDate.getTime()) {
+    throw new Error('Planned delivery date cannot be more than 3 days from today');
+  }
 }
 
 function startMaskedCall_(body, token) {
@@ -1191,6 +1232,7 @@ function updateOrderRow_(orderId, updates) {
         if (!col && key === 'PAYMENT_RECEIVED_REF') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED REF');
         if (!col && key === 'PAYMENT_RECEIVED_AMOUNT') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED AMOUNT');
         if (!col && key === 'PAYMENT_RECEIVED_AT') col = ensureColumn_(sheet, headers, 'PAYMENT RECEIVED AT');
+        if (!col && key === 'PLANNED_DELIVERY_DATE') col = ensureColumn_(sheet, headers, 'PLANNED DELIVERY DATE');
         if (col) sheet.getRange(r, col).setValue(updates[key]);
       });
       return;
@@ -1220,7 +1262,8 @@ function rowToOrder_(accessor, row) {
     : deliveryStatus === 'FAILED' || remarksUpper.indexOf('FAILED:') === 0 || remarksUpper.indexOf('CANCEL') !== -1 || remarksUpper.indexOf('RTO') !== -1
       ? 'failed'
       : 'pending';
-  const deadline = buildDeliveryDeadline_(accessor.read(row, 'ORDER_DATE'), status);
+  const plannedDeliveryDate = formatSheetDateForApp_(accessor.read(row, 'PLANNED_DELIVERY_DATE'));
+  const deadline = buildDeliveryDeadline_(plannedDeliveryDate, status);
   return {
     id: orderNo.replace('#', ''),
     orderNo: orderNo.replace('#', ''),
@@ -1237,6 +1280,7 @@ function rowToOrder_(accessor, row) {
     attempts: Number(accessor.read(row, 'ATTEMPT') || 1),
     assignedTo: String(accessor.read(row, 'POSTMAN') || '').trim(),
     orderDate: String(accessor.read(row, 'ORDER_DATE') || ''),
+    plannedDeliveryDate: plannedDeliveryDate,
     deliveryDeadline: deadline.deliveryDeadline,
     hoursLeft: deadline.hoursLeft,
     deadlineStatus: deadline.deadlineStatus,
@@ -1248,13 +1292,12 @@ function rowToOrder_(accessor, row) {
   };
 }
 
-function buildDeliveryDeadline_(orderDateValue, orderStatus) {
+function buildDeliveryDeadline_(plannedDateValue, orderStatus) {
   const normal = { deliveryDeadline: '', hoursLeft: undefined, deadlineStatus: 'normal' };
   if (orderStatus !== 'pending') return normal;
-  const orderDate = parseSheetDate_(orderDateValue);
-  if (!orderDate) return normal;
+  const deadline = parseSheetDate_(plannedDateValue);
+  if (!deadline) return { deliveryDeadline: '', hoursLeft: undefined, deadlineStatus: 'unplanned' };
 
-  const deadline = addDays_(orderDate, 2);
   const today = startOfLocalDay_(new Date());
   const hoursLeft = Math.ceil((deadline.getTime() - today.getTime()) / 3600000);
   const deadlineStatus = deadline.getTime() < today.getTime()
@@ -1267,6 +1310,12 @@ function buildDeliveryDeadline_(orderDateValue, orderStatus) {
     hoursLeft: hoursLeft,
     deadlineStatus: deadlineStatus,
   };
+}
+
+function formatSheetDateForApp_(value) {
+  const date = parseSheetDate_(value);
+  if (!date) return String(value || '').trim();
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd-MM-yyyy');
 }
 
 function parseSheetDate_(value) {
@@ -1760,6 +1809,216 @@ function ensureStockReorderHeader_(sheet) {
   sheet.setFrozenRows(1);
 }
 
+function getStockPhotoStatus_(token) {
+  const auth = assertToken_(token);
+  if (auth.role !== 'partner') throw new Error('Partner access required');
+  const proofDate = getStockProofDateKey_();
+  const row = findStockPhotoLogRow_(proofDate, auth.phone);
+  if (!row) {
+    return {
+      proofDate: proofDate,
+      submitted: false,
+      photoCount: 0,
+      status: 'PENDING',
+      photoUrls: [],
+    };
+  }
+  return stockPhotoLogRowToStatus_(row.row, row.indexByHeader, proofDate);
+}
+
+function submitStockPhotoProof_(body, token) {
+  const auth = assertToken_(token);
+  if (auth.role !== 'partner') throw new Error('Partner access required');
+
+  const photos = Array.isArray(body && body.photos) ? body.photos : [];
+  if (!photos.length) throw new Error('At least one stock photo is required');
+  if (photos.length > MAX_STOCK_PROOF_PHOTOS) throw new Error('Maximum ' + MAX_STOCK_PROOF_PHOTOS + ' stock photos are allowed');
+
+  const proofDate = getStockProofDateKey_();
+  const photoUrls = photos.map((photo, index) => uploadStockProofPhoto_(proofDate, auth.phone, index + 1, photo));
+  const sheet = getStockPhotoLogSheet_();
+  ensureStockPhotoLogHeader_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const existing = findStockPhotoLogRow_(proofDate, auth.phone);
+  const now = new Date();
+  const rowByHeader = {
+    'TIMESTAMP': now,
+    'PROOF DATE': proofDate,
+    'DELIVERY PARTNER NAME': String(auth.name || '').trim(),
+    'DELIVERY PARTNER NUMBER': onlyDigits_(auth.phone).slice(-10),
+    'DISTRICT': String(auth.district || '').trim(),
+    'PHOTO COUNT': photoUrls.length,
+    'PHOTO URL 1': photoUrls[0] || '',
+    'PHOTO URL 2': photoUrls[1] || '',
+    'PHOTO URL 3': photoUrls[2] || '',
+    'PHOTO URL 4': photoUrls[3] || '',
+    'PHOTO URL 5': photoUrls[4] || '',
+    'LATITUDE': Number(body && body.latitude || 0) || '',
+    'LONGITUDE': Number(body && body.longitude || 0) || '',
+    'ACCURACY': Number(body && body.accuracy || 0) || '',
+    'STATUS': 'SUBMITTED',
+    'NOTES': String(body && body.notes || '').trim(),
+    'SOURCE': 'mobile-app',
+  };
+
+  if (existing) {
+    Object.keys(rowByHeader).forEach((header) => {
+      const col = ensureLogColumn_(sheet, headers, indexByHeader, header);
+      sheet.getRange(existing.rowNumber, col + 1).setValue(rowByHeader[header]);
+    });
+  } else {
+    const row = headers.map((header) => {
+      const key = String(header || '').trim().toUpperCase();
+      return Object.prototype.hasOwnProperty.call(rowByHeader, key) ? rowByHeader[key] : '';
+    });
+    sheet.appendRow(row);
+  }
+
+  return {
+    proofDate: proofDate,
+    submitted: true,
+    photoCount: photoUrls.length,
+    submittedAt: now.toISOString(),
+    status: 'SUBMITTED',
+    photoUrls: photoUrls,
+  };
+}
+
+function getStockPhotoLogs_(body, token) {
+  assertAdminToken_(token);
+  const sheet = getStockPhotoLogSheet_();
+  ensureStockPhotoLogHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const targetDate = String(body && body.proofDate || '').trim();
+  return values.slice(1)
+    .map((row) => stockPhotoLogRowToAdmin_(row, indexByHeader))
+    .filter((row) => !targetDate || row.proofDate === targetDate)
+    .sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)))
+    .slice(0, 200);
+}
+
+function getStockPhotoLogSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(STOCK_PHOTO_LOG_SHEET_NAME) || ss.insertSheet(STOCK_PHOTO_LOG_SHEET_NAME);
+}
+
+function ensureStockPhotoLogHeader_(sheet) {
+  const headers = [
+    'TIMESTAMP',
+    'PROOF DATE',
+    'DELIVERY PARTNER NAME',
+    'DELIVERY PARTNER NUMBER',
+    'DISTRICT',
+    'PHOTO COUNT',
+    'PHOTO URL 1',
+    'PHOTO URL 2',
+    'PHOTO URL 3',
+    'PHOTO URL 4',
+    'PHOTO URL 5',
+    'LATITUDE',
+    'LONGITUDE',
+    'ACCURACY',
+    'STATUS',
+    'NOTES',
+    'SOURCE',
+  ];
+  const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
+  if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
+  const existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const existingUpper = existingHeaders.map((header) => String(header || '').trim().toUpperCase());
+  if (existingUpper[0] !== 'TIMESTAMP') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    headers.forEach((header) => {
+      if (existingUpper.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        existingUpper.push(header);
+      }
+    });
+  }
+  sheet.setFrozenRows(1);
+}
+
+function findStockPhotoLogRow_(proofDate, phone) {
+  const normalizedPhone = onlyDigits_(phone).slice(-10);
+  const sheet = getStockPhotoLogSheet_();
+  ensureStockPhotoLogHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return null;
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  for (let r = values.length; r >= 2; r -= 1) {
+    const row = values[r - 1];
+    const rowDate = String(readLogValue_(row, indexByHeader, 'PROOF DATE') || '').trim();
+    const rowPhone = onlyDigits_(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NUMBER')).slice(-10);
+    if (rowDate === proofDate && rowPhone === normalizedPhone) {
+      return { sheet: sheet, headers: headers, indexByHeader: indexByHeader, row: row, rowNumber: r };
+    }
+  }
+  return null;
+}
+
+function stockPhotoLogRowToStatus_(row, indexByHeader, proofDate) {
+  const photoUrls = getStockPhotoUrlsFromRow_(row, indexByHeader);
+  const status = normalizeText_(readLogValue_(row, indexByHeader, 'STATUS')) || 'SUBMITTED';
+  return {
+    proofDate: proofDate,
+    submitted: status === 'SUBMITTED' && photoUrls.length > 0,
+    photoCount: Number(readLogValue_(row, indexByHeader, 'PHOTO COUNT') || photoUrls.length || 0),
+    submittedAt: formatLogDate_(readLogValue_(row, indexByHeader, 'TIMESTAMP')),
+    status: status === 'SUBMITTED' ? 'SUBMITTED' : 'PENDING',
+    photoUrls: photoUrls,
+  };
+}
+
+function stockPhotoLogRowToAdmin_(row, indexByHeader) {
+  const photoUrls = getStockPhotoUrlsFromRow_(row, indexByHeader);
+  return {
+    submittedAt: formatLogDate_(readLogValue_(row, indexByHeader, 'TIMESTAMP')),
+    proofDate: String(readLogValue_(row, indexByHeader, 'PROOF DATE') || '').trim(),
+    partnerName: String(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NAME') || '').trim(),
+    partnerPhone: onlyDigits_(readLogValue_(row, indexByHeader, 'DELIVERY PARTNER NUMBER')).slice(-10),
+    district: String(readLogValue_(row, indexByHeader, 'DISTRICT') || '').trim(),
+    photoCount: Number(readLogValue_(row, indexByHeader, 'PHOTO COUNT') || photoUrls.length || 0),
+    photoUrls: photoUrls,
+    latitude: Number(readLogValue_(row, indexByHeader, 'LATITUDE') || 0),
+    longitude: Number(readLogValue_(row, indexByHeader, 'LONGITUDE') || 0),
+    accuracy: Number(readLogValue_(row, indexByHeader, 'ACCURACY') || 0),
+    status: normalizeText_(readLogValue_(row, indexByHeader, 'STATUS')) || 'SUBMITTED',
+    notes: String(readLogValue_(row, indexByHeader, 'NOTES') || '').trim(),
+  };
+}
+
+function getStockPhotoUrlsFromRow_(row, indexByHeader) {
+  const urls = [];
+  for (let i = 1; i <= MAX_STOCK_PROOF_PHOTOS; i += 1) {
+    const url = String(readLogValue_(row, indexByHeader, 'PHOTO URL ' + i) || '').trim();
+    if (url) urls.push(url);
+  }
+  return urls;
+}
+
+function uploadStockProofPhoto_(proofDate, phone, index, photo) {
+  if (!photo || !photo.photoBase64) throw new Error('Stock photo ' + index + ' is missing');
+  const folder = getProofFolder_();
+  const mimeType = String(photo.photoMimeType || 'image/jpeg');
+  const extension = mimeType.indexOf('png') !== -1 ? 'png' : 'jpg';
+  const safePhone = onlyDigits_(phone).slice(-10) || 'partner';
+  const fileName = String(photo.photoFileName || ('stock-proof-' + proofDate + '-' + safePhone + '-' + index + '.' + extension)).replace(/[^A-Za-z0-9_.-]/g, '_');
+  const bytes = Utilities.base64Decode(String(photo.photoBase64));
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function getStockProofDateKey_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
 function ensureStockMasterDispatchColumns_(sheet) {
   if (sheet.getLastRow() === 0 || !String(sheet.getRange(1, 1).getValue() || '').trim()) {
     sheet.getRange(1, 1, 1, 4).setValues([['PRODUCT', 'QUANTITY', 'DATE', 'LOCATION']]);
@@ -1896,6 +2155,7 @@ function ensurePushTokenHeader_(sheet) {
     'APP VERSION',
     'STATUS',
     'LAST SEEN',
+    'NOTES',
   ];
   const currentFirstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toUpperCase();
   if (sheet.getLastRow() > 0 && currentFirstCell && currentFirstCell !== 'TIMESTAMP') sheet.insertRowBefore(1);
@@ -1958,6 +2218,7 @@ function sendExpoPushNotifications_(tokens, title, message, data) {
   const payload = tokens.map((token) => ({
     to: token,
     sound: 'default',
+    channelId: 'dynamic-bazar-delivery',
     priority: 'high',
     title: String(title || 'Dynamic Bazar'),
     body: String(message || ''),
@@ -1975,7 +2236,136 @@ function sendExpoPushNotifications_(tokens, title, message, data) {
     Logger.log('Expo push failed HTTP ' + code + ': ' + text);
     return { sent: 0, error: 'Expo push HTTP ' + code };
   }
-  return { sent: tokens.length, response: truncate_(text, 450) };
+
+  const parsed = parseJsonSafe_(text);
+  const tickets = parsed && Array.isArray(parsed.data) ? parsed.data : [];
+  const failedTicketTokens = deactivateTokensFromFailedExpoTickets_(tickets, tokens);
+  const receiptResult = inspectExpoPushReceipts_(tickets, tokens);
+  const staleTokens = (failedTicketTokens || []).concat(receiptResult.staleTokens || []);
+  const uniqueStaleTokens = uniqueValues_(staleTokens);
+  if (uniqueStaleTokens.length) {
+    deactivatePushTokensByValue_(uniqueStaleTokens, 'Expo push token rejected by FCM');
+  }
+
+  const acceptedTickets = tickets.length
+    ? tickets.filter((ticket) => ticket && ticket.status === 'ok').length
+    : tokens.length;
+  return {
+    sent: Math.max(0, acceptedTickets - uniqueStaleTokens.length),
+    failed: uniqueStaleTokens.length,
+    response: truncate_(text, 450),
+    receipts: receiptResult.summary || '',
+  };
+}
+
+function deactivateTokensFromFailedExpoTickets_(tickets, tokens) {
+  if (!tickets || !tickets.length) return [];
+  const staleTokens = [];
+  tickets.forEach((ticket, index) => {
+    const error = ticket && ticket.details && ticket.details.error;
+    if (String(error || '') === 'DeviceNotRegistered' && tokens[index]) {
+      staleTokens.push(tokens[index]);
+    }
+  });
+  return staleTokens;
+}
+
+function inspectExpoPushReceipts_(tickets, tokens) {
+  const idToToken = {};
+  (tickets || []).forEach((ticket, index) => {
+    if (ticket && ticket.status === 'ok' && ticket.id && tokens[index]) {
+      idToToken[String(ticket.id)] = tokens[index];
+    }
+  });
+
+  const ids = Object.keys(idToToken);
+  if (!ids.length) return { staleTokens: [], summary: 'no_receipts_to_check' };
+
+  try {
+    Utilities.sleep(1500);
+    const response = UrlFetchApp.fetch('https://exp.host/--/api/v2/push/getReceipts', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ ids: ids }),
+      muteHttpExceptions: true,
+    });
+    const code = response.getResponseCode();
+    const text = response.getContentText();
+    if (code < 200 || code >= 300) {
+      Logger.log('Expo receipt check failed HTTP ' + code + ': ' + text);
+      return { staleTokens: [], summary: 'receipt_http_' + code };
+    }
+
+    const parsed = parseJsonSafe_(text);
+    const receipts = parsed && parsed.data ? parsed.data : {};
+    const staleTokens = [];
+    let delivered = 0;
+    let failed = 0;
+    Object.keys(receipts).forEach((id) => {
+      const receipt = receipts[id] || {};
+      if (receipt.status === 'ok') {
+        delivered += 1;
+        return;
+      }
+      if (receipt.status === 'error') {
+        failed += 1;
+        const error = receipt.details && receipt.details.error;
+        if (String(error || '') === 'DeviceNotRegistered' && idToToken[id]) {
+          staleTokens.push(idToToken[id]);
+        }
+      }
+    });
+    return {
+      staleTokens: staleTokens,
+      summary: 'checked=' + ids.length + ',delivered=' + delivered + ',failed=' + failed,
+    };
+  } catch (err) {
+    Logger.log('Expo receipt check skipped/failed: ' + String(err && err.message ? err.message : err));
+    return { staleTokens: [], summary: 'receipt_check_failed' };
+  }
+}
+
+function deactivatePushTokensByValue_(tokens, reason) {
+  const tokenMap = {};
+  (tokens || []).forEach((token) => {
+    const value = String(token || '').trim();
+    if (value) tokenMap[value] = true;
+  });
+  const tokenValues = Object.keys(tokenMap);
+  if (!tokenValues.length) return 0;
+
+  const sheet = getPushTokenSheet_();
+  ensurePushTokenHeader_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return 0;
+  const headers = values[0] || [];
+  const indexByHeader = buildHeaderIndex_(headers);
+  const tokenCol = indexByHeader['EXPO PUSH TOKEN'];
+  if (tokenCol === undefined) return 0;
+  const statusCol = ensureLogColumn_(sheet, headers, indexByHeader, 'STATUS');
+  const lastSeenCol = ensureLogColumn_(sheet, headers, indexByHeader, 'LAST SEEN');
+  const notesCol = ensureLogColumn_(sheet, headers, indexByHeader, 'NOTES');
+  let updated = 0;
+
+  for (let r = 2; r <= values.length; r += 1) {
+    const token = String(values[r - 1][tokenCol] || '').trim();
+    if (!tokenMap[token]) continue;
+    sheet.getRange(r, statusCol + 1).setValue('INACTIVE');
+    sheet.getRange(r, lastSeenCol + 1).setValue(new Date());
+    sheet.getRange(r, notesCol + 1).setValue(String(reason || 'Push token inactive').trim());
+    updated += 1;
+  }
+  return updated;
+}
+
+function uniqueValues_(values) {
+  const seen = {};
+  return (values || []).filter((value) => {
+    const key = String(value || '').trim();
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
 }
 
 function runDeadlineReminders_(body, token) {
@@ -1989,6 +2379,7 @@ function sendTestNotification_(body, token) {
   const role = normalizeText_(body && body.role);
   const title = String(body && body.title || 'Dynamic Bazar test').trim();
   const message = String(body && body.message || 'Test notification from Delivery App').trim();
+  const orderId = String(body && (body.orderId || body.orderNo || body.order_id) || '').replace('#', '').trim();
   let tokens = [];
 
   if (phone) {
@@ -1999,16 +2390,20 @@ function sendTestNotification_(body, token) {
     tokens = getActivePushTokens_({});
   }
 
-  const result = sendExpoPushNotifications_(tokens, title, message, {
-    type: 'test_notification',
+  const notificationData = {
+    type: orderId ? 'order_notification_test' : 'test_notification',
     phone: phone,
     role: role,
-  });
+  };
+  if (orderId) notificationData.orderId = orderId;
+
+  const result = sendExpoPushNotifications_(tokens, title, message, notificationData);
   return {
     matchedTokens: tokens.length,
     sent: result.sent || 0,
     error: result.error || '',
     response: result.response || '',
+    orderId: orderId,
   };
 }
 
@@ -2082,6 +2477,7 @@ function sendManualTestPush_(options) {
   const role = normalizeText_(options && options.role);
   const title = String(options && options.title || 'Dynamic Bazar test').trim();
   const message = String(options && options.message || 'Test notification from Delivery App').trim();
+  const orderId = String(options && (options.orderId || options.orderNo || options.order_id) || '').replace('#', '').trim();
   let tokens = [];
 
   if (phone) {
@@ -2092,16 +2488,20 @@ function sendManualTestPush_(options) {
     tokens = getActivePushTokens_({});
   }
 
-  const result = sendExpoPushNotifications_(tokens, title, message, {
-    type: 'manual_test_notification',
+  const notificationData = {
+    type: orderId ? 'order_notification_test' : 'manual_test_notification',
     phone: phone,
     role: role,
-  });
+  };
+  if (orderId) notificationData.orderId = orderId;
+
+  const result = sendExpoPushNotifications_(tokens, title, message, notificationData);
   return {
     matchedTokens: tokens.length,
     sent: result.sent || 0,
     error: result.error || '',
     response: result.response || '',
+    orderId: orderId,
   };
 }
 
@@ -2121,33 +2521,33 @@ function sendDeadlineRemindersDaily(options) {
     if (!order.id || order.status !== 'pending') return;
     result.checked += 1;
 
-    const orderDate = parseSheetDate_(accessor.read(row, 'ORDER_DATE'));
-    if (!orderDate) {
+    const plannedDate = parseSheetDate_(order.plannedDeliveryDate);
+    if (!plannedDate) {
       result.skipped += 1;
       return;
     }
 
-    const daysSinceOrder = Math.floor((today.getTime() - orderDate.getTime()) / 86400000);
+    const daysUntilPlanned = Math.floor((plannedDate.getTime() - today.getTime()) / 86400000);
     const partnerPhone = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
-    if (daysSinceOrder === 1) {
-      if (sendReminderOnce_(props, dryRun, 'partner_day_1', order.id, () => {
-        notifyPartnerByPhone_(partnerPhone, 'Delivery reminder', 'Order #' + order.orderNo + ' is still pending. Please deliver within 2 days.', {
+    if (daysUntilPlanned === 1) {
+      if (sendReminderOnce_(props, dryRun, 'partner_planned_tomorrow', order.id, () => {
+        notifyPartnerByPhone_(partnerPhone, 'Delivery reminder', 'Order #' + order.orderNo + ' is planned for tomorrow.', {
           type: 'delivery_deadline_reminder',
           orderId: order.id,
           deadlineStatus: order.deadlineStatus,
         });
       })) result.partnerReminders += 1;
-    } else if (daysSinceOrder === 2) {
+    } else if (daysUntilPlanned === 0) {
       if (sendReminderOnce_(props, dryRun, 'partner_due_today', order.id, () => {
-        notifyPartnerByPhone_(partnerPhone, 'Delivery due today', 'Order #' + order.orderNo + ' reaches its 2-day delivery deadline today.', {
+        notifyPartnerByPhone_(partnerPhone, 'Delivery due today', 'Order #' + order.orderNo + ' is planned for delivery today.', {
           type: 'delivery_due_today',
           orderId: order.id,
           deadlineStatus: order.deadlineStatus,
         });
       })) result.partnerReminders += 1;
-    } else if (daysSinceOrder > 2) {
+    } else if (daysUntilPlanned < 0) {
       if (sendReminderOnce_(props, dryRun, 'admin_overdue', order.id, () => {
-        notifyAdmins_('Order overdue', 'Order #' + order.orderNo + ' is past the 2-day delivery window.', {
+        notifyAdmins_('Order overdue', 'Order #' + order.orderNo + ' is past its planned delivery date.', {
           type: 'delivery_overdue',
           orderId: order.id,
           partner: order.assignedTo || '',

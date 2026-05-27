@@ -74,7 +74,7 @@ export function DeadlineBadge({ status, label }: { status: DeadlineStatus; label
   const { theme } = useTheme();
   const colors = theme.colors;
   const styles = getStyles(colors);
-  const color = status === 'overdue' ? colors.red : status === 'due_today' ? colors.amber : colors.green;
+  const color = status === 'overdue' || status === 'unplanned' ? colors.red : status === 'due_today' ? colors.amber : colors.green;
   return <Text style={[styles.badge, { color, borderColor: color, backgroundColor: `${color}18` }]}>{label}</Text>;
 }
 

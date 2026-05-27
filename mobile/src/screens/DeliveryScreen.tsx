@@ -35,6 +35,18 @@ export function DeliveryScreen({ route, navigation }: Props) {
   if (!order) return null;
   const currentOrder = order;
 
+  if (!currentOrder.plannedDeliveryDate) {
+    return (
+      <Screen bottomPadding={20}>
+        <Card>
+          <Text style={styles.label}>Delivery date required</Text>
+          <Text style={styles.meta}>Select the planned delivery date from order details before confirming delivery.</Text>
+          <Button label="Back to Order" tone="secondary" onPress={() => navigation.goBack()} />
+        </Card>
+      </Screen>
+    );
+  }
+
   async function pickImage() {
     try {
       const nextPhoto = await captureProofImage({

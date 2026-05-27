@@ -3,7 +3,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type OrderStatus = 'pending' | 'delivered' | 'failed';
 export type PaymentType = 'COD' | 'Prepaid';
 export type PaymentReceivedMode = 'Cash' | 'UPI QR' | 'Prepaid';
-export type DeadlineStatus = 'normal' | 'due_today' | 'overdue';
+export type DeadlineStatus = 'normal' | 'due_today' | 'overdue' | 'unplanned';
 
 export type Partner = {
   id: string;
@@ -68,6 +68,7 @@ export type DeliveryOrder = {
   attempts: number;
   assignedTo: string;
   orderDate?: string;
+  plannedDeliveryDate?: string;
   deliveryDeadline?: string;
   hoursLeft?: number;
   deadlineStatus?: DeadlineStatus;
@@ -166,6 +167,44 @@ export type StockReorderItem = {
 export type StockReorderPayload = {
   items: StockReorderItem[];
   requestedBy?: string;
+  notes?: string;
+};
+
+export type StockPhotoProofImage = {
+  photoBase64: string;
+  photoMimeType?: string;
+  photoFileName?: string;
+};
+
+export type StockPhotoSubmitPayload = {
+  photos: StockPhotoProofImage[];
+  latitude?: number | null;
+  longitude?: number | null;
+  accuracy?: number | null;
+  notes?: string;
+};
+
+export type StockPhotoStatus = {
+  proofDate: string;
+  submitted: boolean;
+  photoCount: number;
+  submittedAt?: string;
+  status?: 'PENDING' | 'SUBMITTED';
+  photoUrls?: string[];
+};
+
+export type StockPhotoLog = {
+  submittedAt: string;
+  proofDate: string;
+  partnerName: string;
+  partnerPhone: string;
+  district: string;
+  photoCount: number;
+  photoUrls: string[];
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  status: 'PENDING' | 'SUBMITTED' | string;
   notes?: string;
 };
 

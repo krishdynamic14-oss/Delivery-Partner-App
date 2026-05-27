@@ -16,6 +16,9 @@ import type {
   SettlementPayload,
   StockDispatchPayload,
   StockItem,
+  StockPhotoLog,
+  StockPhotoStatus,
+  StockPhotoSubmitPayload,
   StockReorderPayload,
 } from '../types';
 import { mockOrders } from '../data/mockOrders';
@@ -84,6 +87,12 @@ export async function sendDeliveryOtp(orderId: string, token?: string): Promise<
   if (GAS_URL) return request<SendDeliveryOtpResult>('orders.sendDeliveryOtp', { orderId }, token);
   if (!USE_MOCK_API) serverNotConfigured();
   return { sent: true, orderId, statusCode: 200 };
+}
+
+export async function setPlannedDeliveryDate(orderId: string, plannedDeliveryDate: string, token?: string): Promise<{ updated: true; orderId: string; plannedDeliveryDate: string }> {
+  if (GAS_URL) return request<{ updated: true; orderId: string; plannedDeliveryDate: string }>('orders.setPlannedDeliveryDate', { orderId, plannedDeliveryDate }, token);
+  if (!USE_MOCK_API) serverNotConfigured();
+  return { updated: true, orderId, plannedDeliveryDate };
 }
 
 export async function startMaskedCall(orderId: string, token?: string): Promise<MaskedCallResult> {
@@ -192,6 +201,22 @@ export async function createStockReorderRequest(payload: StockReorderPayload, to
   if (GAS_URL) return request<{ requestId: string; itemCount: number }>('stock.reorder', payload, token);
   if (!USE_MOCK_API) serverNotConfigured();
   return { requestId: `REQ-${Date.now()}`, itemCount: payload.items.length };
+}
+
+export async function fetchStockPhotoStatus(token?: string): Promise<StockPhotoStatus> {
+  if (GAS_URL) return request<StockPhotoStatus>('stock.photoStatus', {}, token);
+  serverNotConfigured();
+}
+
+export async function submitStockPhotoProof(payload: StockPhotoSubmitPayload, token?: string): Promise<StockPhotoStatus> {
+  if (GAS_URL) return request<StockPhotoStatus>('stock.photoSubmit', payload, token);
+  serverNotConfigured();
+}
+
+export async function fetchStockPhotoLogs(payload: { proofDate?: string } = {}, token?: string): Promise<StockPhotoLog[]> {
+  if (GAS_URL) return request<StockPhotoLog[]>('admin.stockPhotoLogs', payload, token);
+  if (!USE_MOCK_API) serverNotConfigured();
+  return [];
 }
 
 export async function registerPushToken(payload: PushTokenRegistration, token?: string): Promise<{ registered: true }> {

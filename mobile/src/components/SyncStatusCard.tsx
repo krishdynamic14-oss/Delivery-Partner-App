@@ -28,7 +28,7 @@ export function SyncStatusCard({ compact = false }: { compact?: boolean }) {
         </View>
         <View style={styles.titleBlock}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.meta}>{isOnline === false ? 'Offline mode' : 'Google Sheets sync'}</Text>
+          <Text style={styles.meta}>{isOnline === false ? 'Offline mode' : 'Order sync'}</Text>
         </View>
         <Text style={[styles.pill, { color, borderColor: color, backgroundColor: `${color}18` }]}>
           {pendingSync} pending

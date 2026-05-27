@@ -4,9 +4,36 @@ This file is the working source of truth for the React Native Android MVP. Updat
 
 ## Status Legend
 
-- `[x]` Done and committed
+- `[x]` Done
 - `[~]` Started but not production-ready
 - `[ ]` Not started
+
+## Current Snapshot - 27 May 2026
+
+### Finished In This Round
+
+- [x] Dynamic Bazar logo/app icon/splash polish added across Android launch and in-app branded surfaces.
+- [x] Cancel/failed delivery call-recording attachment option removed from partner failed-delivery flow.
+- [x] Admin stock photo proof module added: partner photo submit, backend log sheet, and admin viewing screen.
+- [x] Planned delivery date flow added end to end: backend column/API, partner date selection, order detail edit, delivery/RTO blocking until date is selected, and planned-date based reminders/deadline status.
+- [x] Planned date labels changed from `+2/+3 days` to actual dates.
+- [x] Orders screen date/status filtering changed to a compact dropdown with Today, Tomorrow, dynamic dates, Unplanned, Pending, Delivered, Failed, and All.
+- [x] Missing planned date no longer shows stale overdue status; it shows as unplanned.
+- [x] Blocking planned-date popup removed from home; partner can open order/call customer before choosing date.
+- [x] Push notification registration and live Expo push test verified on real devices.
+- [x] Notification payload deep-link support added; order assignment/test notifications can carry `orderId`, and the app opens Order Detail from notification taps after latest APK install.
+- [x] User-facing `Google Sheets`/`GAS` wording removed from mobile sync copy and replaced with system/order sync wording.
+- [x] Mobile TypeScript check passing after latest changes.
+- [x] GAS syntax check passing after latest backend changes.
+
+### Still Remaining
+
+- [ ] Rebuild latest APK and install on all test phones after the notification deep-link and sync-copy changes.
+- [ ] Verify notification tap on latest installed APK opens the exact Order Detail, not only Home.
+- [ ] Do one full partner real-device regression: login, refresh, choose planned date, call customer, deliver with OTP/photo, failed/RTO, COD, sync.
+- [ ] Do one admin real-device regression: orders list/detail, stock photo logs, settlement approval, live location, partner assignment.
+- [ ] Confirm Play Store production assets: 512 icon, feature graphic, screenshots, privacy policy, data safety.
+- [ ] Prepare Play Console internal testing release and install through Play testing track.
 
 ## Build And Test Tracker
 

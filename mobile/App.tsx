@@ -1,13 +1,13 @@
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
-import { OrdersProvider } from './src/state/OrdersContext';
+import { OrdersProvider, useOrders } from './src/state/OrdersContext';
 import { ThemeProvider, useTheme } from './src/state/ThemeContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
@@ -27,6 +27,7 @@ import type { AdminTabParamList, RootStackParamList, TabParamList } from './src/
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<TabParamList>();
 const AdminTabs = createBottomTabNavigator<AdminTabParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function TabNavigator() {
   const insets = useSafeAreaInsets();
@@ -125,6 +126,7 @@ function AppNavigator() {
 
   return (
     <NavigationContainer
+      ref={navigationRef}
       theme={{
         ...DefaultTheme,
         colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border },
@@ -154,8 +156,83 @@ function Bootstrapper() {
   return (
     <OrdersProvider district={ordersValue.district}>
       <AppNavigator />
+      <NotificationDeepLinkHandler />
     </OrdersProvider>
   );
+}
+
+function NotificationDeepLinkHandler() {
+  const { user } = useAuth();
+  const { orders, refresh } = useOrders();
+  const [pendingOrderId, setPendingOrderId] = useState('');
+  const handledResponseIds = useRef<Record<string, true>>({});
+
+  useEffect(() => {
+    let subscription: { remove?: () => void } | undefined;
+    let mounted = true;
+
+    async function registerListener() {
+      try {
+        const Notifications = await import('expo-notifications');
+        const handleResponse = (response: unknown) => {
+          const responseId = getNotificationResponseId(response);
+          if (responseId && handledResponseIds.current[responseId]) return;
+          if (responseId) handledResponseIds.current[responseId] = true;
+
+          const orderId = getNotificationOrderId(response);
+          if (orderId) setPendingOrderId(orderId);
+        };
+
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (mounted && lastResponse) handleResponse(lastResponse);
+        if (!mounted) return;
+        subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+      } catch (err) {
+        console.log('Notification tap listener skipped:', err instanceof Error ? err.message : String(err || 'unknown error'));
+      }
+    }
+
+    void registerListener();
+    return () => {
+      mounted = false;
+      subscription?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingOrderId || !user || !navigationRef.isReady()) return;
+
+    let cancelled = false;
+    async function openOrderDetail() {
+      if (!orders.some((order) => order.id === pendingOrderId)) {
+        await refresh();
+      }
+      if (cancelled || !navigationRef.isReady()) return;
+      navigationRef.navigate('OrderDetail', { orderId: pendingOrderId });
+      setPendingOrderId('');
+    }
+
+    void openOrderDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [orders, pendingOrderId, refresh, user]);
+
+  return null;
+}
+
+function getNotificationResponseId(response: unknown) {
+  const value = response as { notification?: { request?: { identifier?: unknown } } };
+  const identifier = value?.notification?.request?.identifier;
+  return typeof identifier === 'string' ? identifier : '';
+}
+
+function getNotificationOrderId(response: unknown) {
+  const value = response as { notification?: { request?: { content?: { data?: Record<string, unknown> } } } };
+  const data = value?.notification?.request?.content?.data || {};
+  const rawOrderId = data.orderId || data.orderNo || data.order_id;
+  if (rawOrderId === undefined || rawOrderId === null) return '';
+  return String(rawOrderId).replace('#', '').trim();
 }
 
 export default function App() {

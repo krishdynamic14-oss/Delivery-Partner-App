@@ -8,18 +8,22 @@ import { savePushRegistrationStatus } from './storage';
 const CHANNEL_ID = 'dynamic-bazar-delivery';
 
 export async function setupPushNotifications(user: Partner): Promise<string | null> {
+  logPushRegistration('started', { role: user.role, phone: user.phone });
   if (!Device.isDevice) {
     await savePushStatus('skipped', 'Push notifications work on the installed Android app.');
+    logPushRegistration('skipped: simulator');
     return null;
   }
   if (isExpoGo()) {
     await savePushStatus('skipped', 'Push notifications work in the installed APK, not Expo Go.');
+    logPushRegistration('skipped: expo go');
     return null;
   }
 
   const Notifications = await loadNotifications();
   if (!Notifications) {
     await savePushStatus('error', 'Push notifications are not available on this device.');
+    logPushRegistration('failed: module unavailable');
     return null;
   }
 
@@ -36,12 +40,14 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
   const permission = await ensureNotificationPermission(Notifications);
   if (!permission) {
     await savePushStatus('skipped', 'Notification permission is off. Enable notifications from Android App Info.');
+    logPushRegistration('skipped: permission denied');
     return null;
   }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
   if (!projectId) {
     await savePushStatus('error', 'Push notification project ID is missing. Contact admin.');
+    logPushRegistration('failed: project id missing');
     return null;
   }
 
@@ -59,9 +65,12 @@ export async function setupPushNotifications(user: Partner): Promise<string | nu
       appVersion: Constants.expoConfig?.version || '',
     }, user.token);
     await savePushStatus('registered', 'Notifications are active for this device.', token);
+    logPushRegistration('registered', { tokenPreview: `${token.slice(0, 22)}...` });
     return token;
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err || '');
     await savePushStatus('error', getUserSafePushError(err));
+    logPushRegistration('failed', { message });
     return null;
   }
 }
@@ -117,4 +126,12 @@ function getUserSafePushError(err: unknown) {
   if (/firebase|fcm|credential|project|server key|Default FirebaseApp/i.test(message)) return 'Push notification service is not configured for this project. Contact admin.';
   if (/network|fetch|internet|timeout/i.test(message)) return 'Could not register notifications. Check internet and try again.';
   return 'Could not register notifications on this device. Try again later.';
+}
+
+function logPushRegistration(event: string, details?: Record<string, string>) {
+  if (details) {
+    console.log('[PushRegistration]', event, details);
+    return;
+  }
+  console.log('[PushRegistration]', event);
 }
