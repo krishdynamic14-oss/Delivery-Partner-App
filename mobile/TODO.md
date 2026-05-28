@@ -33,7 +33,8 @@ This file is the working source of truth for the React Native Android MVP. Updat
 - [ ] Do one full partner real-device regression: login, refresh, choose planned date, call customer, deliver with OTP/photo, failed/RTO, COD, sync.
 - [ ] Do one admin real-device regression: orders list/detail, stock photo logs, settlement approval, live location, partner assignment.
 - [~] Confirm Play Store production assets: AAB, 512 icon, feature graphic, listing/privacy/data-safety drafts ready; final screenshots pending ADB authorization.
-- [ ] Prepare Play Console internal testing release and install through Play testing track.
+- [x] Direct APK distribution selected instead of Play Store internal testing.
+- [~] Demo video script and raw screen recording ready; final voiceover/edit pending.
 
 ## Build And Test Tracker
 
@@ -208,7 +209,8 @@ Create a premium, field-usable mobile UI. The app should feel like a polished lo
 - [x] Build local standalone release APK
 - [~] Install APK on at least two Android phones
 - [x] Build production AAB locally
-- [~] Prepare Play Console internal testing release
+- [x] Prepare direct APK distribution notes
+- [~] Prepare demo video for delivery partners
 - [~] Privacy policy URL
 - [x] App icon 512x512
 - [x] Feature graphic 1024x500
