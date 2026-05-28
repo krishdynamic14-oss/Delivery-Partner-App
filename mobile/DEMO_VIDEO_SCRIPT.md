@@ -1,76 +1,104 @@
-# Dynamic Bazar Delivery - Demo Video Script
+# Dynamic Bazar Delivery Partner App - Demo Video Script
 
 Target video length: 4 to 6 minutes.
 
 Language: Hinglish.
 
-Audience: Sir/admin team and delivery partners.
+Audience: Delivery partners.
 
-## Video Structure
+Purpose: Delivery partner ko app use karna samjhana.
 
-### 1. Intro
+## 1. Intro
 
 Voiceover:
 
 ```text
-Namaste sir, ye Dynamic Bazar Delivery Partner App ka demo hai. Is app se delivery partner apne assigned orders dekh sakta hai, delivery date plan kar sakta hai, customer ko call kar sakta hai, delivery OTP/photo proof ke saath complete kar sakta hai, failed ya RTO order report kar sakta hai, COD settlement submit kar sakta hai, aur daily stock proof upload kar sakta hai.
+Namaste. Ye Dynamic Bazar Delivery Partner App ka demo hai. Is app se aap apne assigned orders dekh sakte ho, delivery ka planned date select kar sakte ho, customer ko call kar sakte ho, OTP aur photo proof ke saath delivery complete kar sakte ho, failed ya RTO order report kar sakte ho, COD settlement submit kar sakte ho, aur daily stock proof upload kar sakte ho.
 ```
 
 Screen:
 
 - App icon / splash
-- Login or Home screen
+- Login screen or Home screen
 
-### 2. Login And Home Dashboard
+## 2. Login Kaise Karein
 
 Voiceover:
 
 ```text
-Partner apne registered mobile number aur password se login karega. Login ke baad home screen par total orders, pending orders, COD collected, stock proof status aur sync status dikhte hain. Yahan "Order sync" app ka system sync status batata hai.
+App open karne ke baad apna registered mobile number aur password enter karein. Ye wahi number hona chahiye jo company ke system me delivery partner ke naam se registered hai. Login ke baad aapko apna dashboard dikh jayega.
+```
+
+Screen:
+
+- Login screen
+- Mobile number field
+- Password field
+- Login button
+
+## 3. Home Screen Samjhein
+
+Voiceover:
+
+```text
+Home screen par aapko aaj ka kaam summary me dikhta hai. Yahan total orders, pending orders, COD collected, daily stock proof aur sync status dikhte hain. Agar "All synced" dikh raha hai to aapka data system me update ho chuka hai. Agar pending sync dikh raha hai to internet aane par ya Sync now dabane par data upload ho jayega.
 ```
 
 Screen:
 
 - Home dashboard
-- Sync status card
+- Order sync card
 - COD collected card
 - Daily stock proof card
+- Total / Delivered / Pending / Failed cards
 
-### 3. Orders And Filters
+## 4. Orders Kaise Dekhein
 
 Voiceover:
 
 ```text
-Orders tab me partner ko sirf apne assigned orders dikhte hain. Yahan search se order number, customer, area, product ya amount ke hisaab se order find kar sakte hain. Filter dropdown se Today, Tomorrow, specific date, Unplanned, Pending, Delivered, Failed aur All orders dekh sakte hain.
+Orders tab par tap karein. Yahan aapko sirf aapke assigned orders dikhenge. Search box me order number, customer area, product ya amount type karke order find kar sakte hain.
 ```
 
 Screen:
 
 - Orders tab
 - Search bar
-- Filter dropdown
-- Order cards
+- Order list
 
-### 4. Planned Delivery Date
+## 5. Date Filter Ka Use
 
 Voiceover:
 
 ```text
-Har pending order ke liye planned delivery date select karna important hai. Partner Today, Tomorrow ya next available dates me se choose kar sakta hai. Jab tak planned date save nahi hoti, delivery complete ya RTO action blocked rahega. Lekin partner order open karke customer ko call kar sakta hai.
+Filter dropdown se aap orders ko date ke hisaab se dekh sakte ho. Today me aaj deliver karne wale orders dikhenge. Tomorrow me kal wale orders dikhenge. Actual date wale filters me us date ke planned orders dikhenge. Unplanned me wo orders honge jinka delivery date abhi select nahi hua hai.
+```
+
+Screen:
+
+- Orders filter dropdown
+- Today / Tomorrow / date / Unplanned / Pending / Delivered / Failed / All
+
+## 6. Planned Delivery Date Select Karna
+
+Voiceover:
+
+```text
+Jab aap kisi pending order ko open karte ho, sabse pehle planned delivery date select karna zaruri hai. Aap Today, Tomorrow ya available dates me se date choose kar sakte ho. Jab tak date save nahi hoti, delivery complete ya RTO submit nahi hoga. Lekin aap order open karke customer ko call kar sakte ho.
 ```
 
 Screen:
 
 - Order detail
 - Planned delivery date chips
-- Save planned date
+- Save / selected date state
 
-### 5. Customer Call
+## 7. Customer Ko Call Karna
 
 Voiceover:
 
 ```text
-Order detail me Call Customer button diya gaya hai. Isse partner customer se delivery timing confirm kar sakta hai. Customer ka full number app me openly show nahi hota; calling configured company flow ke through hoti hai.
+Order detail me Call Customer button diya gaya hai. Isse aap customer se delivery timing confirm kar sakte ho. Customer ka full number app me openly nahi dikhta. Calling company ke configured calling flow se hoti hai.
 ```
 
 Screen:
@@ -78,120 +106,138 @@ Screen:
 - Order detail
 - Call customer button
 
-### 6. Delivery Complete Flow
+## 8. Delivery Complete Kaise Karein
 
 Voiceover:
 
 ```text
-Delivery ke time partner Delivery Confirmation open karega. Customer ko OTP bheja jayega, partner OTP enter karega, payment mode select karega, aur delivery proof photo capture karega. Submit karne ke baad order delivered mark ho jayega aur system me sync ho jayega.
+Jab order deliver karna ho, Delivery button par tap karein. Customer ko OTP bhejein. Customer se OTP le kar app me enter karein. Payment mode select karein - Cash, UPI ya Prepaid. Agar COD cash hai to collected amount confirm karein. Phir delivery proof photo capture karein aur submit karein. Submit ke baad order delivered mark ho jayega.
 ```
 
 Screen:
 
-- Delivery button
+- Delivery confirmation screen
+- Send OTP
 - OTP field
 - Payment mode
-- Photo proof
-- Submit
+- Proof photo capture
+- Submit button
 
-### 7. Failed / RTO Flow
+## 9. Failed Ya RTO Order Kaise Submit Karein
 
 Voiceover:
 
 ```text
-Agar delivery nahi ho paati, partner Failed/RTO flow use karega. Reason select karega, notes add karega, house/proof photo capture karega, aur submit karega. Ye order failed status me update ho jayega.
+Agar customer available nahi hai, address issue hai, customer refuse karta hai, ya order deliver nahi ho paata, to Report Failed / RTO option use karein. Reason select karein, notes add karein, proof photo capture karein, aur submit karein. Isse admin ko clear update mil jayega.
 ```
 
 Screen:
 
-- Failed/RTO button
-- Reason dropdown
+- Failed/RTO screen
+- Reason selection
+- Notes
 - Proof photo
 - Submit
 
-### 8. COD Settlement
+## 10. COD Settlement Kaise Karein
 
 Voiceover:
 
 ```text
-COD tab me partner ko cash collected, commission, payable amount aur pending settlement dikhte hain. Partner yahi se settlement amount submit kar sakta hai. Admin baad me settlement approve ya reject kar sakta hai.
+COD tab me aapko cash collected, commission, payable amount aur remaining COD dikhte hain. Jab aap company ko COD amount submit karte ho, settlement form me amount, method aur reference enter karke submit karein. Admin approval ke baad settlement complete ho jayega.
 ```
 
 Screen:
 
 - COD tab
-- Summary cards
-- Settlement form/history
+- COD summary
+- Settlement form
+- Settlement history
 
-### 9. Daily Stock Proof
+## 11. Daily Stock Proof Upload
 
 Voiceover:
 
 ```text
-Home screen par daily stock proof section hai. Partner apne current stock ki photos capture karke submit karega. Admin login me ye stock proof logs review ho sakte hain.
+Home screen par Daily stock proof section hai. Roz apne paas bache stock ki photo capture karke submit karein. Aap maximum allowed photos upload kar sakte ho. Submit hone ke baad status submitted ho jayega, aur admin stock proof check kar payega.
 ```
 
 Screen:
 
 - Daily stock proof card
 - Capture photo
+- Photo count
 - Submit status
 
-### 10. Notifications
+## 12. Sync Ka Use
 
 Voiceover:
 
 ```text
-Order assign hone par partner ko notification milti hai. Notification par tap karne se app directly us order ke detail page par open hoti hai, jisse partner jaldi action le sakta hai.
+Internet slow ya off hone par app kuch actions phone me save kar sakta hai. Jab network aa jaye, Sync now dabayein. All synced dikhne ka matlab aapka kaam system me update ho chuka hai.
 ```
 
 Screen:
 
-- Notification receive
+- Order sync card
+- Sync now
+- Profile pending actions if available
+
+## 13. Notifications Ka Use
+
+Voiceover:
+
+```text
+Jab company aapko new order assign karegi, aapko notification milegi. Notification par tap karne se app directly us order ke detail page par open hoga. Isliye notification permission allow rakhna zaruri hai.
+```
+
+Screen:
+
+- Notification example
 - Tap notification
 - Order detail opens
 
-### 11. Admin Overview
+## 14. Permissions
 
 Voiceover:
 
 ```text
-Admin login me admin all orders monitor kar sakta hai, partners ko orders assign kar sakta hai, COD settlement approve kar sakta hai, stock view/update kar sakta hai, stock photo logs dekh sakta hai, aur live partner location check kar sakta hai.
+App me three permissions important hain. Notification permission order alerts ke liye hai. Camera permission delivery, failed delivery aur stock proof photos ke liye hai. Location permission company ko field route visibility dene ke liye hai jab app open hota hai.
 ```
 
 Screen:
 
-- Admin dashboard
-- Orders/admin tabs
-- Stock photo logs
-- Settlement approval
+- Permission prompts if recording fresh install
+- Profile/home if permissions already allowed
 
-### 12. Closing
+## 15. Closing
 
 Voiceover:
 
 ```text
-Is app ka main purpose delivery partner ka field work simple karna hai: assigned orders, planned delivery date, customer call, OTP delivery, proof photo, failed/RTO report, COD settlement, stock proof aur sync - sab ek app me manage hota hai.
+Is app me aapka pura delivery ka kaam ek jagah manage hota hai: assigned orders dekhna, delivery date plan karna, customer ko call karna, OTP ke saath delivery complete karna, failed/RTO report karna, COD settlement submit karna, stock proof upload karna aur sync status check karna. Har delivery ke baad app me correct update karna zaruri hai.
 ```
 
 Screen:
 
 - Home dashboard
+- Orders tab
 - App logo
 
 ## Recording Checklist
 
-- Phone battery sufficient ho.
-- App latest APK installed ho.
-- Partner login ready ho.
+- Latest APK installed ho.
+- Partner login available ho.
+- Test partner ke assigned orders available hon.
+- At least one pending/unplanned order ho.
 - Notification permission allowed ho.
-- Camera/location permission allowed ho.
-- Test order available ho.
-- At least one unplanned/pending order available ho.
-- One notification test ready ho.
+- Camera permission allowed ho.
+- Location permission allowed ho.
+- Internet available ho.
+- Demo ke liye customer/order data sensitive ho to crop ya safe test data use karein.
 
 ## Suggested Final File Name
 
 ```text
-dynamic-bazar-delivery-demo-v1.mp4
+dynamic-bazar-delivery-partner-demo-v1.mp4
 ```
