@@ -3163,6 +3163,7 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
   const safeName = customerName.replace(/[^A-Za-z0-9]/g, '_');
   const copyName = 'BILL_' + orderNo + '_' + safeName;
   const slideCopy = DriveApp.getFileById(BILL_TEMPLATE_ID).makeCopy(copyName, folder);
+  slideCopy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   const slideId = slideCopy.getId();
 
   const presentation = SlidesApp.openById(slideId);
@@ -3174,15 +3175,15 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
   presentation.saveAndClose();
   Utilities.sleep(800);
 
+  const pdfFileName = makeBillPdfFileName_(orderNo, customerName, rowNumber);
   const pdfBlob = DriveApp.getFileById(slideId)
     .getAs('application/pdf')
-    .setName(makeBillPdfFileName_(orderNo, customerName, rowNumber));
+    .setName(pdfFileName);
   const pdfFile = folder.createFile(pdfBlob);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const pdfDownloadUrl = getDriveDownloadUrl_(pdfFile.getId(), pdfFile.getName());
+  const pdfDownloadUrl = getSlidesPdfExportUrl_(slideId, pdfFileName);
   const pdfUrl = pdfFile.getUrl();
 
-  DriveApp.getFileById(slideId).setTrashed(true);
   sheet.getRange(rowNumber, billLinkCol)
     .setValue(pdfUrl)
     .setFontColor('#1565C0')
@@ -3279,6 +3280,13 @@ function getDriveDownloadUrlFromAnyLink_(url, fileName) {
   if (!text) return '';
   const fileIdMatch = text.match(/\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
   return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1], fileName) : '';
+}
+
+function getSlidesPdfExportUrl_(slideId, fileName) {
+  const id = String(slideId || '').trim();
+  if (!id) return '';
+  const name = String(fileName || 'Bill.pdf').trim().replace(/[^\w.-]/g, '_');
+  return 'https://docs.google.com/presentation/d/' + encodeURIComponent(id) + '/export/pdf?download=1&filename=' + encodeURIComponent(name);
 }
 
 function writeBillWhatsAppStatus_(sheet, accessor, rowNumber, status, responseText) {
