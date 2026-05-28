@@ -133,6 +133,7 @@ function doPost(e) {
       'cod.settlements': () => getCodSettlements_(token),
       'cod.approveSettlement': () => approveCodSettlement_(body, token),
       'bills.generate': () => generateBillByOrderId_(body.orderId, token),
+      'bills.resendWhatsApp': () => resendBillWhatsAppByOrderId_(body.orderId, token),
       'stock.master': () => getStockMaster_(token),
       'stock.dispatch': () => addStockDispatch_(body, token),
       'stock.reorder': () => createStockReorderRequest_(body, token),
@@ -3097,6 +3098,36 @@ function generateBillByOrderId_(orderId, token) {
   return generateBillByOrderIdInternal_(orderId);
 }
 
+function resendBillWhatsAppByOrderId_(orderId, token) {
+  assertAdminToken_(token);
+  const sheet = getOrderSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('Orders sheet is empty');
+  const headers = values[0];
+  const accessor = buildAccessor_(headers);
+  const orderHeader = accessor.resolve('ORDER_NO');
+  const orderCol = orderHeader ? headers.indexOf(orderHeader) : -1;
+  if (orderCol === -1) throw new Error('ORDER NO column missing');
+
+  const targetOrder = String(orderId || '').replace('#', '').trim();
+  for (let i = 1; i < values.length; i += 1) {
+    const rowOrder = String(values[i][orderCol] || '').replace('#', '').trim();
+    if (rowOrder !== targetOrder) continue;
+
+    const rowNumber = i + 1;
+    const billLinkHeader = accessor.resolve('BILL_LINK');
+    const billLinkCol = billLinkHeader ? headers.indexOf(billLinkHeader) + 1 : 0;
+    const billUrl = billLinkCol ? String(sheet.getRange(rowNumber, billLinkCol).getValue() || '').trim() : '';
+    if (!billUrl) {
+      const generated = generateBillForRow_(sheet, rowNumber, accessor);
+      return trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, generated.billDownloadUrl || generated.billUrl);
+    }
+
+    return sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl, 'manual_resend');
+  }
+  throw new Error('Order not found: ' + orderId);
+}
+
 function generateBillByOrderIdInternal_(orderId) {
   const sheet = getOrderSheet_();
   const values = sheet.getDataRange().getValues();
@@ -3200,7 +3231,19 @@ function trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
     const message = String(err && err.message ? err.message : err);
     Logger.log('Bill WhatsApp skipped/failed for row ' + rowNumber + ': ' + message);
     writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'ERROR', message);
-    return { sent: false, error: message };
+    try {
+      const fallback = sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl, message);
+      return {
+        sent: !!fallback.sent,
+        fallback: true,
+        error: message,
+        fallbackResponse: fallback.response || '',
+      };
+    } catch (fallbackErr) {
+      const fallbackMessage = String(fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr);
+      writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'ERROR', message + ' | fallback: ' + fallbackMessage);
+      return { sent: false, error: message, fallbackError: fallbackMessage };
+    }
   }
 }
 
@@ -3258,6 +3301,51 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
   }
 
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT', truncate_(text, 450));
+  return { sent: true, statusCode: code, response: text };
+}
+
+function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl, originalError) {
+  if (!AISENSY_API_KEY) throw new Error('DB_AISENSY_API_KEY missing');
+  if (!billUrl) throw new Error('Bill link missing');
+
+  const row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const customerName = String(accessor.read(row, 'CUSTOMER_NAME') || '').trim() || 'Customer';
+  const product = String(accessor.read(row, 'PRODUCT') || '').trim();
+  const orderNo = String(accessor.read(row, 'ORDER_NO') || '').replace('#', '').trim();
+  const phone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
+  if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
+
+  const mediaFileName = makeBillPdfFileName_(orderNo || rowNumber, customerName, rowNumber);
+  const linkUrl = getDriveDownloadUrlFromAnyLink_(billUrl, mediaFileName) || billUrl;
+  const payload = {
+    apiKey: AISENSY_API_KEY,
+    campaignName: AISENSY_CAMPAIGN_NAME,
+    destination: '+91' + phone,
+    userName: customerName,
+    source: 'dynamic-bazar-app',
+    templateParams: [product + ' - Bill: ' + linkUrl],
+    tags: ['bill-link-fallback'],
+    attributes: {
+      order_no: orderNo,
+      product: product,
+      bill_url: linkUrl,
+      media_error: truncate_(originalError || '', 250),
+    },
+  };
+
+  const response = UrlFetchApp.fetch(AISENSY_API_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('AiSensy fallback HTTP ' + code + ': ' + text);
+  }
+
+  writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT_LINK', truncate_(text, 450));
   return { sent: true, statusCode: code, response: text };
 }
 
