@@ -3176,10 +3176,10 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
 
   const pdfBlob = DriveApp.getFileById(slideId)
     .getAs('application/pdf')
-    .setName('Bill_' + orderNo + '_' + customerName.split(' ')[0] + '.pdf');
+    .setName(makeBillPdfFileName_(orderNo, customerName, rowNumber));
   const pdfFile = folder.createFile(pdfBlob);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const pdfDownloadUrl = getDriveDownloadUrl_(pdfFile.getId());
+  const pdfDownloadUrl = getDriveDownloadUrl_(pdfFile.getId(), pdfFile.getName());
   const pdfUrl = pdfFile.getUrl();
 
   DriveApp.getFileById(slideId).setTrashed(true);
@@ -3220,7 +3220,8 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
   if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
 
   const destination = '+91' + phone;
-  const mediaUrl = getDriveDownloadUrlFromAnyLink_(billUrl) || billUrl;
+  const mediaFileName = makeBillPdfFileName_(orderNo || rowNumber, customerName, rowNumber);
+  const mediaUrl = getDriveDownloadUrlFromAnyLink_(billUrl, mediaFileName) || billUrl;
   const payload = {
     apiKey: AISENSY_API_KEY,
     campaignName: AISENSY_CAMPAIGN_NAME,
@@ -3229,7 +3230,10 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
     source: 'dynamic-bazar-app',
     media: {
       url: mediaUrl,
-      filename: 'Bill_' + (orderNo || rowNumber) + '.pdf',
+      filename: mediaFileName,
+      type: 'document',
+      mimeType: 'application/pdf',
+      contentType: 'application/pdf',
     },
     templateParams: [product],
     tags: ['bill-sent'],
@@ -3256,16 +3260,25 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
   return { sent: true, statusCode: code, response: text };
 }
 
-function getDriveDownloadUrl_(fileId) {
-  const id = String(fileId || '').trim();
-  return id ? 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) : '';
+function makeBillPdfFileName_(orderNo, customerName, fallback) {
+  const safeOrder = String(orderNo || fallback || 'order').replace(/[^A-Za-z0-9_-]/g, '');
+  const firstName = String(customerName || '').trim().split(/\s+/)[0] || 'customer';
+  const safeName = firstName.replace(/[^A-Za-z0-9_-]/g, '');
+  return ('Bill_' + safeOrder + '_' + safeName + '.pdf').replace(/_+\.pdf$/, '.pdf');
 }
 
-function getDriveDownloadUrlFromAnyLink_(url) {
+function getDriveDownloadUrl_(fileId, fileName) {
+  const id = String(fileId || '').trim();
+  if (!id) return '';
+  const name = String(fileName || 'Bill.pdf').trim().replace(/[^\w.-]/g, '_');
+  return 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) + '&filename=' + encodeURIComponent(name);
+}
+
+function getDriveDownloadUrlFromAnyLink_(url, fileName) {
   const text = String(url || '').trim();
   if (!text) return '';
   const fileIdMatch = text.match(/\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
-  return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1]) : '';
+  return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1], fileName) : '';
 }
 
 function writeBillWhatsAppStatus_(sheet, accessor, rowNumber, status, responseText) {
