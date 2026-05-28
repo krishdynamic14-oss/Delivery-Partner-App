@@ -3310,7 +3310,7 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl, options) {
   }
 
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT', truncate_(text, 450));
-  return { sent: true, statusCode: code, response: text };
+  return { sent: true, statusCode: code, response: text, destinationMasked: maskPhone_(phone), mediaUrl: mediaUrl };
 }
 
 function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl, originalError) {
@@ -3356,7 +3356,7 @@ function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl
   }
 
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT_LINK', truncate_(text, 450));
-  return { sent: true, statusCode: code, response: text };
+  return { sent: true, statusCode: code, response: text, destinationMasked: maskPhone_(phone), mediaUrl: linkUrl };
 }
 
 function makeBillPdfFileName_(orderNo, customerName, fallback) {
@@ -3376,6 +3376,7 @@ function getDriveDownloadUrl_(fileId, fileName) {
 function getDriveDownloadUrlFromAnyLink_(url, fileName) {
   const text = String(url || '').trim();
   if (!text) return '';
+  if (text.indexOf('/export/pdf') !== -1 || text.indexOf('export=download') !== -1) return text;
   const fileIdMatch = text.match(/\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
   return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1], fileName) : '';
 }
