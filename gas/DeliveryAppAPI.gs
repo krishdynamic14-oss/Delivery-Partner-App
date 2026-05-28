@@ -3220,8 +3220,10 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
     .setName(pdfFileName);
   const pdfFile = folder.createFile(pdfBlob);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const pdfDownloadUrl = getSlidesPdfExportUrl_(slideId, pdfFileName);
+  const pdfDownloadUrl = getDriveDownloadUrl_(pdfFile.getId(), pdfFileName);
   const pdfUrl = pdfFile.getUrl();
+
+  DriveApp.getFileById(slideId).setTrashed(true);
 
   sheet.getRange(rowNumber, billLinkCol)
     .setValue(pdfUrl)
@@ -3272,7 +3274,7 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl, options) {
   const phone = onlyDigits_(accessor.read(row, 'WHATSAPP') || accessor.read(row, 'MOBILE')).slice(-10);
   if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
 
-  const destination = '+91' + phone;
+  const destination = formatAiSensyPhone_(phone);
   const mediaFileName = makeBillPdfFileName_(orderNo || rowNumber, customerName, rowNumber);
   const mediaUrl = getDriveDownloadUrlFromAnyLink_(billUrl, mediaFileName) || billUrl;
   const payload = {
@@ -3309,8 +3311,20 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl, options) {
     throw new Error('AiSensy HTTP ' + code + ': ' + text);
   }
 
+  const parsed = parseJsonSafe_(text);
+  if (!isAiSensySendSuccess_(parsed)) {
+    throw new Error('AiSensy did not confirm message submit: ' + text);
+  }
+
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT', truncate_(text, 450));
-  return { sent: true, statusCode: code, response: text, destinationMasked: maskPhone_(phone), mediaUrl: mediaUrl };
+  return {
+    sent: true,
+    statusCode: code,
+    response: text,
+    messageId: String(parsed.submitted_message_id || parsed.messageId || ''),
+    destinationMasked: maskPhone_(phone),
+    mediaUrl: mediaUrl,
+  };
 }
 
 function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl, originalError) {
@@ -3330,7 +3344,7 @@ function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl
   const payload = {
     apiKey: AISENSY_API_KEY,
     campaignName: AISENSY_BILL_LINK_CAMPAIGN_NAME,
-    destination: '+91' + phone,
+    destination: formatAiSensyPhone_(phone),
     userName: customerName,
     source: 'dynamic-bazar-app',
     templateParams: [product, linkUrl],
@@ -3355,8 +3369,20 @@ function sendBillWhatsAppLinkFallbackForRow_(sheet, rowNumber, accessor, billUrl
     throw new Error('AiSensy fallback HTTP ' + code + ': ' + text);
   }
 
+  const parsed = parseJsonSafe_(text);
+  if (!isAiSensySendSuccess_(parsed)) {
+    throw new Error('AiSensy fallback did not confirm message submit: ' + text);
+  }
+
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT_LINK', truncate_(text, 450));
-  return { sent: true, statusCode: code, response: text, destinationMasked: maskPhone_(phone), mediaUrl: linkUrl };
+  return {
+    sent: true,
+    statusCode: code,
+    response: text,
+    messageId: String(parsed.submitted_message_id || parsed.messageId || ''),
+    destinationMasked: maskPhone_(phone),
+    mediaUrl: linkUrl,
+  };
 }
 
 function makeBillPdfFileName_(orderNo, customerName, fallback) {
@@ -3369,16 +3395,31 @@ function makeBillPdfFileName_(orderNo, customerName, fallback) {
 function getDriveDownloadUrl_(fileId, fileName) {
   const id = String(fileId || '').trim();
   if (!id) return '';
-  const name = String(fileName || 'Bill.pdf').trim().replace(/[^\w.-]/g, '_');
-  return 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) + '&filename=' + encodeURIComponent(name);
+  return 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id);
 }
 
 function getDriveDownloadUrlFromAnyLink_(url, fileName) {
   const text = String(url || '').trim();
   if (!text) return '';
-  if (text.indexOf('/export/pdf') !== -1 || text.indexOf('export=download') !== -1) return text;
+  if (text.indexOf('lh3.googleusercontent.com/d/') !== -1) return text;
   const fileIdMatch = text.match(/\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
   return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1], fileName) : '';
+}
+
+function formatAiSensyPhone_(phone) {
+  let digits = onlyDigits_(phone);
+  if (digits.indexOf('0') === 0) digits = digits.slice(1);
+  if (digits.length === 10) digits = '91' + digits;
+  if (digits.length === 12 && digits.indexOf('91') === 0) return digits;
+  throw new Error('Invalid AiSensy phone: ' + maskPhone_(digits));
+}
+
+function isAiSensySendSuccess_(parsed) {
+  if (!parsed) return false;
+  if (parsed.success === true || String(parsed.success || '').toLowerCase() === 'true') return true;
+  if (String(parsed.status || '').toLowerCase() === 'success') return true;
+  if (parsed.submitted_message_id || parsed.messageId) return true;
+  return false;
 }
 
 function getSlidesPdfExportUrl_(slideId, fileName) {
