@@ -403,7 +403,6 @@ function markOrderFailed_(body, token) {
   const callRecordingUrl = body.uploadCallRecording === true ? (body.callRecordingUrl || uploadCallRecording_(body)) : (body.callRecordingUrl || '');
   const detail = [];
   if (body.notes) detail.push('Notes: ' + String(body.notes).trim());
-  if (body.nextAttemptDate) detail.push('Next attempt: ' + String(body.nextAttemptDate).trim());
   if (body.photoUri || photoUrl) detail.push('House proof captured');
   if (body.callRecordingUri || callRecordingUrl) detail.push('Call recording: ' + callRecordingUrl);
 

@@ -286,7 +286,6 @@ export type DeliverPayload = {
 export type FailPayload = {
   reason: string;
   notes?: string;
-  nextAttemptDate?: string;
   photoUri?: string;
   photoBase64?: string;
   photoMimeType?: string;

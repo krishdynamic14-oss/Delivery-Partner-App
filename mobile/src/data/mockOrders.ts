@@ -68,6 +68,6 @@ export const mockOrders: DeliveryOrder[] = [
     attempts: 2,
     assignedTo: 'SURESHBHAI',
     updatedAt: new Date().toISOString(),
-    remarks: 'FAILED: Customer not available',
+    remarks: 'FAILED: Refused delivery',
   },
 ];

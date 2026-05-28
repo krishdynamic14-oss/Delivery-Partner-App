@@ -22,12 +22,11 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
   useScreenThemeStyles();
   const { orders, failOrder } = useOrders();
   const order = orders.find((item) => item.id === route.params.orderId);
-  const [reason, setReason] = useState('Customer not available');
+  const [reason, setReason] = useState('Refused delivery');
   const [notes, setNotes] = useState('');
-  const [nextAttemptDate, setNextAttemptDate] = useState('');
   const [photo, setPhoto] = useState<ProofImage>();
   const [loading, setLoading] = useState(false);
-  const reasons = ['Customer not available', 'Phone not answered', 'Refused delivery', 'Cancelled by customer', 'Wrong address', 'Item damaged'];
+  const reasons = ['Refused delivery', 'Cancelled by customer'];
   const requiresHouseProof = /refused|cancel/i.test(reason);
 
   if (!order?.plannedDeliveryDate) {
@@ -56,7 +55,7 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
 
   async function submit() {
     if (!reason.trim()) {
-      Alert.alert('Reason required', 'Select or enter a failed delivery reason.');
+      Alert.alert('Reason required', 'Select a failed delivery reason.');
       return;
     }
     if (requiresHouseProof && !photo?.uri) {
@@ -68,7 +67,6 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
       const result = await failOrder(route.params.orderId, {
         reason: reason.trim(),
         notes: notes.trim(),
-        nextAttemptDate: nextAttemptDate.trim(),
         photoUri: photo?.uri,
         photoBase64: photo?.base64,
         photoMimeType: photo?.mimeType,
@@ -98,8 +96,6 @@ export function FailedDeliveryScreen({ route, navigation }: Props) {
             ))}
           </View>
         </Card>
-        <Field value={reason} onChangeText={setReason} placeholder="Custom reason" />
-        <Field value={nextAttemptDate} onChangeText={setNextAttemptDate} placeholder="Next attempt date" />
         <Field value={notes} onChangeText={setNotes} placeholder="Notes" multiline numberOfLines={4} />
         <Card>
           <Text style={styles.label}>{requiresHouseProof ? 'House proof required' : 'House proof optional'}</Text>
