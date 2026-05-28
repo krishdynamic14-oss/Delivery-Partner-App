@@ -2967,6 +2967,7 @@ function sendDeliveryOtpForRow_(sheet, rowNumber, accessor) {
   const customerName = String(accessor.read(row, 'CUSTOMER_NAME') || '').trim() || 'Customer';
   const partnerName = String(accessor.read(row, 'POSTMAN') || '').trim() || 'Delivery Partner';
   const partnerNumber = onlyDigits_(accessor.read(row, 'POSTMAN_NUMBER')).slice(-10);
+  const customerCallNumber = getCustomerVisibleCallNumber_(partnerNumber);
   const product = String(accessor.read(row, 'PRODUCT') || '').trim();
   const amount = String(accessor.read(row, 'AMOUNT') || '').trim();
   const orderNo = String(accessor.read(row, 'ORDER_NO') || '').replace('#', '').trim();
@@ -2985,12 +2986,13 @@ function sendDeliveryOtpForRow_(sheet, rowNumber, accessor) {
     destination: '+91' + phone,
     userName: customerName,
     source: 'dynamic-bazar-app',
-    templateParams: [partnerName, partnerNumber, product, amount, otp],
+    templateParams: [partnerName, customerCallNumber, product, amount, otp],
     tags: ['delivery-otp'],
     attributes: {
       order_no: orderNo,
       delivery_partner: partnerName,
-      partner_number: partnerNumber,
+      partner_number: customerCallNumber,
+      actual_partner_number: partnerNumber,
       product: product,
       amount: amount,
     },
@@ -3013,6 +3015,14 @@ function sendDeliveryOtpForRow_(sheet, rowNumber, accessor) {
   sheet.getRange(rowNumber, statusCol).setValue('SENT');
   sheet.getRange(rowNumber, responseCol).setValue(truncate_(text, 450));
   return { sent: true, orderId: orderNo, statusCode: code };
+}
+
+function getCustomerVisibleCallNumber_(partnerNumber) {
+  const did = onlyDigits_(BONVOICE_DID_NUMBER).slice(-10);
+  if (did) return did;
+  const fallback = onlyDigits_(BONVOICE_FALLBACK_NUMBER).slice(-10);
+  if (fallback) return fallback;
+  return onlyDigits_(partnerNumber).slice(-10);
 }
 
 function verifyDeliveryOtpByOrderId_(orderId, inputOtp) {
