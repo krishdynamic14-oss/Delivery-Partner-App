@@ -3109,7 +3109,7 @@ function generateBillByOrderIdInternal_(orderId) {
 
 function generateBillAndNotifyForRow_(sheet, rowNumber, accessor) {
   const bill = generateBillForRow_(sheet, rowNumber, accessor);
-  const whatsApp = trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, bill.billUrl);
+  const whatsApp = trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, bill.billDownloadUrl || bill.billUrl);
   bill.whatsApp = whatsApp;
   return bill;
 }
@@ -3169,6 +3169,7 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
     .setName('Bill_' + orderNo + '_' + customerName.split(' ')[0] + '.pdf');
   const pdfFile = folder.createFile(pdfBlob);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const pdfDownloadUrl = getDriveDownloadUrl_(pdfFile.getId());
   const pdfUrl = pdfFile.getUrl();
 
   DriveApp.getFileById(slideId).setTrashed(true);
@@ -3178,7 +3179,7 @@ function generateBillForRow_(sheet, rowNumber, accessor) {
     .setFontStyle('normal')
     .setNote('Bill: ' + orderNo + ' | ' + customerName);
 
-  return { generated: true, billUrl: pdfUrl };
+  return { generated: true, billUrl: pdfUrl, billDownloadUrl: pdfDownloadUrl };
 }
 
 function trySendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
@@ -3209,6 +3210,7 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
   if (!phone || phone.length !== 10) throw new Error('Customer WhatsApp/mobile number missing');
 
   const destination = '+91' + phone;
+  const mediaUrl = getDriveDownloadUrlFromAnyLink_(billUrl) || billUrl;
   const payload = {
     apiKey: AISENSY_API_KEY,
     campaignName: AISENSY_CAMPAIGN_NAME,
@@ -3216,7 +3218,7 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
     userName: customerName,
     source: 'dynamic-bazar-app',
     media: {
-      url: billUrl,
+      url: mediaUrl,
       filename: 'Bill_' + (orderNo || rowNumber) + '.pdf',
     },
     templateParams: [product],
@@ -3224,7 +3226,7 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
     attributes: {
       order_no: orderNo,
       product: product,
-      bill_url: billUrl,
+      bill_url: mediaUrl,
     },
   };
 
@@ -3242,6 +3244,18 @@ function sendBillWhatsAppForRow_(sheet, rowNumber, accessor, billUrl) {
 
   writeBillWhatsAppStatus_(sheet, accessor, rowNumber, 'SENT', truncate_(text, 450));
   return { sent: true, statusCode: code, response: text };
+}
+
+function getDriveDownloadUrl_(fileId) {
+  const id = String(fileId || '').trim();
+  return id ? 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) : '';
+}
+
+function getDriveDownloadUrlFromAnyLink_(url) {
+  const text = String(url || '').trim();
+  if (!text) return '';
+  const fileIdMatch = text.match(/\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  return fileIdMatch && fileIdMatch[1] ? getDriveDownloadUrl_(fileIdMatch[1]) : '';
 }
 
 function writeBillWhatsAppStatus_(sheet, accessor, rowNumber, status, responseText) {
