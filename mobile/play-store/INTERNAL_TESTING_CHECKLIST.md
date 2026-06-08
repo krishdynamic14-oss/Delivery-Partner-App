@@ -32,7 +32,7 @@ Last updated: 08-06-2026
 4. [ ] Set default language: English.
 5. [ ] Category: Business.
 6. [ ] Add app access instructions for tester login credentials.
-7. [ ] Add privacy policy URL.
+7. [x] Add privacy policy URL: `https://dynamicbazar.com/privacy-policy/`
 8. [ ] Complete Data safety using `DATA_SAFETY_DRAFT.md`.
 9. [ ] Complete App content:
    - Ads: No
@@ -73,7 +73,7 @@ Last updated: 08-06-2026
 ## Known Remaining Manual Items
 
 - [ ] Complete Play Console account payment and identity verification with matching legal details.
-- [ ] Publish privacy policy draft at a public URL.
+- [x] Publish privacy policy draft at a public URL: `https://dynamicbazar.com/privacy-policy/`
 - [ ] Confirm reviewer/tester login credentials for Play Console App access.
 - [ ] Upload AAB in Play Console with account owner access.
 - [ ] Complete Data safety and App content forms in Play Console.
