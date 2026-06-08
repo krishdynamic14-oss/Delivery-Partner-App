@@ -30,7 +30,7 @@ Write-Host "Project: $projectRoot"
 
 Push-Location $androidDir
 try {
-  & cmd /c gradlew.bat --no-daemon assembleRelease
+  & $gradlew --no-daemon assembleRelease
 } finally {
   Pop-Location
 }
