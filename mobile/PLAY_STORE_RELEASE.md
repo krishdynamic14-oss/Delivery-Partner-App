@@ -37,8 +37,8 @@ Upload the generated AAB to Play Console Internal testing.
 - Auto push registration creates/updates a row in `PUSH TOKENS` without pressing a debug button.
 - Admin receives test/admin alert; partner receives assigned-order or stock/deadline alert.
 - Delivery OTP sends, delivery submit writes Sheet status and proof URL.
-- Failed/refused submit writes Sheet status and proof URL.
-- Cancelled parcel requires call recording and stores call recording URL.
+- Failed/refused/cancelled submit writes Sheet status and proof URL.
+- Refused delivery and cancelled by customer require house proof photo.
 - Offline delivery/fail/settlement queues, then reconnect sync uploads proof and clears pending item.
 - COD Cash, UPI QR, and Prepaid flows behave correctly.
 - COD settlement proof reaches `PAYMENT LOG`; admin approve/reject works.

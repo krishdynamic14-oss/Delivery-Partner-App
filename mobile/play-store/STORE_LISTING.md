@@ -37,7 +37,7 @@ Business
 
 ## Contact
 
-Developer / Support email: dynamicbazarofficial@gmail.com
+Developer / Support email: ceo@dynamicbazar.com
 
 ## Release Notes - Version 1.0.0
 

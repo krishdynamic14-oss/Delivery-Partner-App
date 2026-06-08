@@ -1,0 +1,31 @@
+# Local dependencies and caches
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+*.tsbuildinfo
+
+# Local env/secrets
+.env
+.env.*
+google-services.json
+*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+
+# Local native build outputs should never be uploaded to EAS Build.
+android/.gradle/
+android/build/
+android/app/build/
+android/**/build/
+
+# Generated release artifacts
+*.apk
+*.aab
+*.apks
+play-store/release/

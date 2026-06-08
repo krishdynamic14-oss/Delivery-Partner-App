@@ -10,9 +10,9 @@
     "postinstall": "node scripts/patch-android-native-linking.js",
     "typecheck": "tsc --noEmit",
     "build:local:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-local-release-apk.ps1",
-    "eas:whoami": "npx eas whoami",
-    "build:apk": "npx eas build --platform android --profile preview",
-    "build:aab": "npx eas build --platform android --profile production"
+    "eas:whoami": "npx eas-cli whoami",
+    "build:apk": "npx eas-cli build --platform android --profile preview",
+    "build:aab": "npx eas-cli build --platform android --profile production"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

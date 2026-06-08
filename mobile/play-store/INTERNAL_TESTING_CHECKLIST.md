@@ -53,7 +53,7 @@
 - Call customer button starts configured masked call flow or safe fallback.
 - Delivery OTP send/verify works.
 - Delivery proof photo uploads.
-- Failed/RTO proof photo uploads.
+- Failed/refused/cancelled proof photo uploads.
 - COD summary and settlement submission works.
 - Daily stock proof photo submission works.
 - Admin login opens admin tabs.
@@ -66,6 +66,6 @@
 ## Known Remaining Manual Items
 
 - Publish privacy policy draft at a public URL.
-- Capture final Play screenshots after device authorization is restored.
+- Capture 4-6 final Play screenshots after device authorization is restored.
 - Confirm notification tap behavior manually on physical phone.
 - Upload AAB in Play Console with account owner access.

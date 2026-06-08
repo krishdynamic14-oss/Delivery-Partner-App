@@ -59,6 +59,6 @@ Users can contact Dynamic Bazar admin/support to correct account details, reques
 
 For privacy questions, contact:
 
-dynamicbazarofficial@gmail.com
+ceo@dynamicbazar.com
 
 Note: Review this draft with the business owner before publishing it as the public privacy policy URL.
