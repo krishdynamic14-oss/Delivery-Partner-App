@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge, Card, DeadlineBadge, Field, Header, Money, Screen } from '../components/ui';
 import { colors as defaultColors, type AppColors } from '../theme';
@@ -26,15 +26,17 @@ export function OrdersScreen() {
   const [tab, setTab] = useState<OrderTab>('pending');
   const [filterOpen, setFilterOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const didChooseInitialTab = useRef(false);
   const { orders, loading, refresh } = useOrders();
   const normalizedQuery = query.trim().toLowerCase();
   const dateKeys = getPlannedDateKeys();
   const tabItems = getTabItems(orders, dateKeys);
   const activeTab = tabItems.find((item) => item.key === tab) || tabItems[0];
   useEffect(() => {
-    if (tab !== 'pending' || !orders.length) return;
+    if (didChooseInitialTab.current || !orders.length) return;
+    didChooseInitialTab.current = true;
     setTab(tabItems.find((item) => item.key === 'unplanned')?.count ? 'unplanned' : 'today');
-  }, [orders.length, tab, tabItems]);
+  }, [orders.length, tabItems]);
   const filtered = sortByDeadlinePriority(getOrdersForTab(orders, tab, dateKeys)
     .filter((order) => {
       if (!normalizedQuery) return true;
